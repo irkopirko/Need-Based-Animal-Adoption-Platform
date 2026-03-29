@@ -35,7 +35,7 @@ src/
 1. Clone the repository:
 
 ```
-git clone https://github.com/your-username/your-repo-name.git
+git clone https://github.com/irkopirko/Need-Based-Animal-Adoption-Platform
 ```
 
 2. Open the project in IntelliJ IDEA
