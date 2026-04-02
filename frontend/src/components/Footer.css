@@ -1,0 +1,45 @@
+.footer {
+  border-top: 1px solid #e8e8e2;
+  background: #fbfbf9;
+  padding: 30px 40px;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.footer-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  color: #28c95a;
+}
+
+.footer-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2bd85d;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footer-left p {
+  margin-top: 10px;
+  color: #666;
+}
+
+.footer-right {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.footer-right button {
+  border: none;
+  background: transparent;
+  font-weight: 700;
+  cursor: pointer;
+}

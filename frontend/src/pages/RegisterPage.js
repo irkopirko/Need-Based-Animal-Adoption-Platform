@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import "./RegisterPage.css";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 function RegisterPage() {
   const [role, setRole] = useState("adopter");
@@ -39,186 +41,170 @@ function RegisterPage() {
     });
   };
 
- const handleSubmit = async (e) => {
-   e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-   const newErrors = {
-     fullName: false,
-     email: false,
-     password: false,
-     location: false,
-     phone: false,
-     agreeToTerms: false,
-   };
+    const newErrors = {
+      fullName: false,
+      email: false,
+      password: false,
+      location: false,
+      phone: false,
+      agreeToTerms: false,
+    };
 
-   let hasError = false;
+    let hasError = false;
 
-   if (formData.fullName.trim() === "") {
-     newErrors.fullName = true;
-     hasError = true;
-   }
+    if (formData.fullName.trim() === "") {
+      newErrors.fullName = true;
+      hasError = true;
+    }
 
-   if (formData.email.trim() === "") {
-     newErrors.email = true;
-     hasError = true;
-   }
+    if (formData.email.trim() === "") {
+      newErrors.email = true;
+      hasError = true;
+    }
 
-   if (formData.password.trim() === "") {
-     newErrors.password = true;
-     hasError = true;
-   }
+    if (formData.password.trim() === "") {
+      newErrors.password = true;
+      hasError = true;
+    }
 
-   if (formData.location.trim() === "") {
-     newErrors.location = true;
-     hasError = true;
-   }
+    if (formData.location.trim() === "") {
+      newErrors.location = true;
+      hasError = true;
+    }
 
-   if (formData.phone.trim() === "") {
-     newErrors.phone = true;
-     hasError = true;
-   }
+    if (formData.phone.trim() === "") {
+      newErrors.phone = true;
+      hasError = true;
+    }
 
-   if (!formData.agreeToTerms) {
-     newErrors.agreeToTerms = true;
-     hasError = true;
-   }
+    if (!formData.agreeToTerms) {
+      newErrors.agreeToTerms = true;
+      hasError = true;
+    }
 
-   setErrors(newErrors);
+    setErrors(newErrors);
 
-   if (hasError) {
-     setShowToast(true);
+    if (hasError) {
+      setShowToast(true);
 
-     setTimeout(() => {
-       setShowToast(false);
-     }, 3000);
+      setTimeout(() => {
+        setShowToast(false);
+      }, 3000);
 
-     return;
-   }
+      return;
+    }
 
-   const userData = {
-     role: role,
-     fullName: formData.fullName,
-     email: formData.email,
-     password: formData.password,
-     location: formData.location,
-     phone: formData.phone,
-   };
+    const userData = {
+      role: role,
+      fullName: formData.fullName,
+      email: formData.email,
+      password: formData.password,
+      location: formData.location,
+      phone: formData.phone,
+    };
 
-   try {
-     const response = await fetch("http://localhost:8080/api/auth/register", {
-       method: "POST",
-       headers: {
-         "Content-Type": "application/json",
-       },
-       body: JSON.stringify(userData),
-     });
+    try {
+      const response = await fetch("http://localhost:8080/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userData),
+      });
 
-     if (!response.ok) {
-       throw new Error("Request failed");
-     }
+      if (!response.ok) {
+        throw new Error("Request failed");
+      }
 
-     const result = await response.json();
+      const result = await response.json();
 
-     console.log("Backend response:", result);
-     alert("Account created successfully!");
+      console.log("Backend response:", result);
+      alert("Account created successfully!");
 
-     setFormData({
-       fullName: "",
-       email: "",
-       password: "",
-       location: "",
-       phone: "",
-       agreeToTerms: false,
-     });
+      setFormData({
+        fullName: "",
+        email: "",
+        password: "",
+        location: "",
+        phone: "",
+        agreeToTerms: false,
+      });
 
-     setErrors({
-       fullName: false,
-       email: false,
-       password: false,
-       location: false,
-       phone: false,
-       agreeToTerms: false,
-     });
-   } catch (error) {
-     console.error("Error while sending register request:", error);
-     alert("Could not connect to backend.");
-   }
- };
+      setErrors({
+        fullName: false,
+        email: false,
+        password: false,
+        location: false,
+        phone: false,
+        agreeToTerms: false,
+      });
+    } catch (error) {
+      console.error("Error while sending register request:", error);
+      alert("Could not connect to backend.");
+    }
+  };
 
   return (
     <div className="register-page">
-      <header className="topbar">
-        <div className="brand">
-          <div className="brand-logo">❤</div>
-          <span className="brand-name">Pavia</span>
-        </div>
-
-        <nav className="topbar-nav">
-          <a href="/">How it works</a>
-          <a href="/">Adopt</a>
-          <a href="/">Register Animal</a>
-        </nav>
-
-        <div className="topbar-actions">
-          <button type="button" className="login-link">
-            Log in
-          </button>
-          <button type="button" className="get-started-btn">
-            Get Started
-          </button>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="register-main">
-        <section className="hero-section">
-          <h1>Join the Pavia Community</h1>
-          <p>
+        <section className="register-hero">
+          <h1 className="register-title">Join the Pavia Community</h1>
+          <p className="register-description">
             Find your perfect companion or help animals find their forever homes
             based on lifestyle compatibility.
-            {/* TODO improve descriptions later*/}
           </p>
         </section>
 
-        <section className="role-cards">
+        <section className="register-role-cards">
           <button
             type="button"
-            className={`role-card ${role === "adopter" ? "role-card-active" : ""}`}
+            className={`register-role-card ${
+              role === "adopter" ? "register-role-card-active" : ""
+
+            }`}
             onClick={() => setRole("adopter")}
           >
-            <div className="role-icon role-icon-green">👤</div>
+            <div className="register-role-icon register-role-icon-green">👤</div>
             <h3>I Want to Adopt</h3>
             <p>
               Browse animals, fill out your profile, and find pets that match
               your lifestyle.
-              {/* TODO improve descriptions later*/}
             </p>
           </button>
 
           <button
             type="button"
-            className={`role-card ${role === "owner" ? "role-card-active" : ""}`}
+            className={`register-role-card ${
+              role === "owner" ? "register-role-card-active" : ""
+            }`}
             onClick={() => setRole("owner")}
           >
-            <div className="role-icon role-icon-gray">📋</div>
+            <div className="register-role-icon register-role-icon-gray">📋</div>
             <h3>I am a Shelter / Owner</h3>
             <p>
               Register animals, manage adoption requests, and help them find
               suitable homes.
-              {/* TODO improve descriptions later*/}
             </p>
           </button>
         </section>
 
-        <section className="form-card">
-          <h2>{role === "adopter" ? "Adopter Sign Up" : "Owner / Shelter Sign Up"}</h2>
+        <section className="register-form-card">
+          <h2 className="register-form-title">
+            {role === "adopter" ? "Adopter Sign Up" : "Owner / Shelter Sign Up"}
+          </h2>
 
-          <p className="form-subtitle">
+          <p className="register-form-subtitle">
             Tell us a bit about yourself to get started.
           </p>
 
           <form onSubmit={handleSubmit}>
-            <div className="form-grid">
-              <div className="input-group">
+            <div className="register-form-grid">
+              <div className="register-input-group">
                 <label htmlFor="fullName">Full Name</label>
                 <input
                   id="fullName"
@@ -226,12 +212,12 @@ function RegisterPage() {
                   name="fullName"
                   placeholder="Your full name"
                   value={formData.fullName}
-                  onChange={handleChange}
-                  className={errors.fullName ? "input-error" : ""}
+                  onChange= {handleChange}
+                  className= {errors.fullName ? "input-error" : ""}
                 />
               </div>
 
-              <div className="input-group">
+              <div className="register-input-group">
                 <label htmlFor="email">Email Address</label>
                 <input
                   id="email"
@@ -244,7 +230,7 @@ function RegisterPage() {
                 />
               </div>
 
-              <div className="input-group">
+              <div className="register-input-group">
                 <label htmlFor="password">Password</label>
                 <div className="password-wrapper">
                   <input
@@ -266,7 +252,7 @@ function RegisterPage() {
                 </div>
               </div>
 
-              <div className="input-group">
+              <div className="register-input-group">
                 <label htmlFor="location">Location</label>
                 <input
                   id="location"
@@ -280,7 +266,7 @@ function RegisterPage() {
               </div>
             </div>
 
-            <div className="input-group full-width-group">
+            <div className="register-input-group register-full-width-group">
               <label htmlFor="phone">Phone Number</label>
               <input
                 id="phone"
@@ -293,7 +279,7 @@ function RegisterPage() {
               />
             </div>
 
-            <label className="checkbox-row">
+            <label className="register-checkbox-row">
               <input
                 type="checkbox"
                 name="agreeToTerms"
@@ -306,59 +292,25 @@ function RegisterPage() {
               </span>
             </label>
 
-            <button type="submit" className="submit-btn">
+            <button type="submit" className="register-submit-btn">
               Create Account
-              <span className="arrow">→</span>
+              <span className="register-arrow">→</span>
             </button>
           </form>
 
-          <div className="divider"></div>
+          <div className="register-divider"></div>
 
-          <p className="login-text">
-            Already have an account? <a href="/">Log in here</a>
+          <p className="register-login-text">
+            Already have an account? <a href="/login">Log in here</a>
           </p>
         </section>
       </main>
 
-      <footer className="footer">
-        <div className="footer-brand">
-          <div className="brand footer-brand-row">
-            <div className="brand-logo">❤</div>
-            <span className="brand-name">Pavia</span>
-          </div>
-
-          <p>
-            Connecting adopters and animals through compatibility-based
-            matching.
-            {/* TODO defintely improve the descriptions */}
-          </p>
-        </div>
-
-        <div className="footer-column">
-          <h4>Platform</h4>
-          <a href="/">How it works</a>
-          <a href="/">Find an Animal</a>
-          <a href="/">List an Animal</a>
-        </div>
-
-        <div className="footer-column">
-          <h4>Trust & Safety</h4>
-          <a href="/">Privacy Policy</a>
-          <a href="/">Terms of Service</a>
-          <a href="/">Adoption Process</a>
-        </div>
-
-        <div className="footer-column">
-          <h4>Support</h4>
-          <a href="/">Help Center</a>
-          <a href="/">Contact Us</a>
-          <a href="/">Shelter Login</a>
-        </div>
-      </footer>
+      <Footer />
 
       {showToast && (
-        <div className="toast">
-          Required fields must be completed.
+        <div className ="toast">
+          The required fields must be completed.
         </div>
       )}
     </div>
