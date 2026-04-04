@@ -1,7 +1,6 @@
-package com.example.backend.dto;
+package com.adoptionplatform.backend.dto;
 
 public class RegisterRequest {
-
     private String role;
     private String fullName;
     private String email;
@@ -33,7 +32,7 @@ public class RegisterRequest {
     }
 
     public void setEmail(String email) {
-        this.email = email;
+        this.email= email;
     }
 
     public String getPassword() {
