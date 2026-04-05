@@ -169,7 +169,7 @@ function RegisterPage() {
             }`}
             onClick={() => setRole("adopter")}
           >
-            <div className="register-role-icon register-role-icon-green">👤</div>
+            <div className="register-role-icon register-role-icon-green"></div>
             <h3>I Want to Adopt</h3>
             <p>
               Browse animals, fill out your profile, and find pets that match
@@ -184,7 +184,7 @@ function RegisterPage() {
             }`}
             onClick={() => setRole("owner")}
           >
-            <div className="register-role-icon register-role-icon-gray">📋</div>
+            <div className="register-role-icon register-role-icon-gray"></div>
             <h3>I am a Shelter / Owner</h3>
             <p>
               Register animals, manage adoption requests, and help them find

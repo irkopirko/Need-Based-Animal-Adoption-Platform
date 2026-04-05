@@ -20,12 +20,24 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> register(@RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.register(request));
+    public ResponseEntity<Map<String, String>> registerUser(@RequestBody RegisterRequest request) {
+        Map<String, String> result = authService.register(request);
+
+        if (result.containsKey("error")) {
+            return ResponseEntity.badRequest().body(result);
+        }
+
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<Map<String, String>> loginUser(@RequestBody LoginRequest request) {
+        Map<String, String> result = authService.login(request);
+
+        if (result.containsKey("error")) {
+            return ResponseEntity.status(401).body(result);
+        }
+
+        return ResponseEntity.ok(result);
     }
 }
