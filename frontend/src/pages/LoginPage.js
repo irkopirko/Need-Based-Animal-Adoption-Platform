@@ -47,9 +47,17 @@ function LoginPage() {
         const data = await response.json();
         console.log("login success:", data);
 
-        // 👉 login başarılıysa homepage'e gönder
+        if (data.role === "adopter") {
+          navigate("/adopter-home");
+          return;
+        }
+
+       if (data.role === "owner" || data.role === "shelter") {
+         navigate("/owner-home");
+         return;
+       }
+
         navigate("/");
-        return;
       }
 
       setMessage("User not found or password is incorrect.");
