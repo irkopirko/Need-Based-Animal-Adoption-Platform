@@ -95,7 +95,7 @@
   position: relative;
   width: 100%;
   min-height: 720px;
-  background-image: url("/images/homePageIMAGE.jpg");
+  background-image: url("../images/homePageIMAGE.jpg");
   background-size: cover;
   background-position: center 65%;
   display: flex;

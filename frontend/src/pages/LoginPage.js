@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LoginPage.css";
+import Navbar from "../components/Navbar";
+import Footer from "../components/Footer";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -10,9 +12,6 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
 
-  const goHome = () => {
-    navigate("/");
-  };
   const goSignup = () => {
     navigate("/register");
   };
@@ -45,19 +44,19 @@ function LoginPage() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log("login success:", data);
 
         if (data.role === "adopter") {
           navigate("/adopter-home");
           return;
         }
 
-       if (data.role === "owner" || data.role === "shelter") {
-         navigate("/owner-home");
-         return;
-       }
+        if (data.role === "owner") {
+          navigate("/owner-home");
+          return;
+        }
 
         navigate("/");
+        return;
       }
 
       setMessage("User not found or password is incorrect.");
@@ -69,83 +68,93 @@ function LoginPage() {
 
   return (
     <div className="login-page">
-      <header className="login-topbar">
-        <button type="button" className="login-brand-btn" onClick={goHome}>
-          <span className="login-logo">❤</span>
-          <span className="login-brand-name">Pavia</span>
-        </button>
-
-        <div className="login-topbar-right">
-          <button type="button" className="login-link-btn" onClick={goHome}>
-            Home
-          </button>
-          <button type="button" className="login-signup-btn" onClick={goSignup}>
-            Sign Up
-          </button>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="login-main">
-        <div className="login-box">
-          <h1>Log In</h1>
-          <p className="login-subtitle">
-            Log in to continue where you left off.
-          </p>
+        <div className="login-card">
+          <div className="login-left">
+            <div className="login-left-overlay"></div>
+            <div className="login-left-text">
+              <p className="login-left-tag">Welcome Back</p>
+              <h2>
+                Continue your
+                <br />
+                adoption journey
+                <br />
+                with Pavia.
+              </h2>
+              <p className="login-left-desc">
+                Access your adopter or owner account, continue your request flow,
+                and manage your experience from one place.
+              </p>
+            </div>
+          </div>
 
-          {message !== "" && (
-            <div className="login-message">{message}</div>
-          )}
+          <div className="login-right">
+            <div className="login-box">
+              <p className="login-form-tag">Account Access</p>
+              <h1>Log In</h1>
+              <p className="login-subtitle">
+                Enter your email and password to continue.
+              </p>
 
-          <form onSubmit={handleSubmit}>
-            <label className="login-label">
-              Email
-              <input
-                type="email"
-                className="login-input"
-                placeholder="example@mail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
+              {message !== "" && (
+                <div className="login-message">{message}</div>
+              )}
 
-            <label className="login-label">
-              Password
-              <div className="login-password-wrap">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  className="login-input"
-                  placeholder="******"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+              <form onSubmit={handleSubmit}>
+                <label className="login-label">
+                  Email
+                  <input
+                    type="email"
+                    className="login-input"
+                    placeholder="example@mail.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
 
+                <label className="login-label">
+                  Password
+                  <div className="login-password-wrap">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="login-input"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                    />
+                    <button
+                      type="button"
+                      className="login-show-btn"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </label>
+
+                <button type="submit" className="login-submit-btn">
+                  Log In
+                </button>
+              </form>
+
+              <p className="login-bottom-text">
+                Don&apos;t have an account?{" "}
                 <button
                   type="button"
-                  className="login-show-btn"
-                  onClick={() => setShowPassword(!showPassword)}
+                  className="login-inline-link"
+                  onClick={goSignup}
                 >
-                  {showPassword ? "Hide" : "Show"}
+                  Sign Up
                 </button>
-              </div>
-            </label>
-
-            <button type="submit" className="login-submit-btn">
-              Log In
-            </button>
-          </form>
-
-          <p className="login-bottom-text">
-            Don&apos;t have an account?{" "}
-            <button
-              type="button"
-              className="login-inline-link"
-              onClick={goSignup}
-            >
-              Sign Up
-            </button>
-          </p>
+              </p>
+            </div>
+          </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }
