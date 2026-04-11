@@ -16,7 +16,6 @@ function AboutUsPage() {
       <Navbar />
 
       <main className="about-main">
-        {/* HERO SECTION */}
         <section
           className="about-hero"
           style={{ backgroundImage: `url(${aboutHeroImage})` }}
@@ -36,12 +35,11 @@ function AboutUsPage() {
             <p className="about-hero-text">
               Pavia is a compatibility-based animal adoption platform designed
               to create meaningful matches. We focus on care, responsibility, and
-              trust to build lasting connections between adopters and animals.
+              trust to build lasting connections between the adopters and animals.
             </p>
           </div>
         </section>
 
-        {/* STORY SECTION */}
         <section className="about-story">
           <div className="about-story-left">
             <p className="about-section-tag">Why We Exist</p>
@@ -85,7 +83,6 @@ function AboutUsPage() {
           </div>
         </section>
 
-        {/* VALUES SECTION */}
         <section className="about-values">
           <div className="about-value-card soft-green">
             <span className="about-value-number">01</span>
@@ -115,7 +112,7 @@ function AboutUsPage() {
           </div>
         </section>
 
-        {/* HOW IT WORKS */}
+
         <section className="about-how">
           <div className="about-how-head">
             <p className="about-section-tag">How It Works</p>
@@ -148,7 +145,7 @@ function AboutUsPage() {
           </div>
         </section>
 
-        {/* EMOTIONAL SECTION */}
+
         <section className="about-emotion-band">
           <div className="about-emotion-text">
             <p className="about-section-tag">What We Care About</p>
@@ -171,7 +168,6 @@ function AboutUsPage() {
           </div>
         </section>
 
-        {/* IMPACT ON THE ANIMALS  SECTION */}
         <section className="about-impact-section">
           <div className="about-impact-image-wrap">
             <img
@@ -187,13 +183,13 @@ function AboutUsPage() {
             <h2>
               Every better match means
               <br />
-              one less stray animal
+              one less animal is
               <br />
               left without a home.
             </h2>
 
             <p>
-              Pavia is committed to improving the lives of stray and vulnerable
+              Pavia is committed to improving the lives of the stray and vulnerable
               animals. By creating meaningful and compatible matches, we help
               reduce abandonment and promote responsible adoption.
             </p>
@@ -216,8 +212,6 @@ function AboutUsPage() {
             </div>
           </div>
         </section>
-
-        {/* REVIEWS */}
         <section className="about-reviews">
           <div className="about-reviews-head">
             <p className="about-section-tag">Community Voice</p>
