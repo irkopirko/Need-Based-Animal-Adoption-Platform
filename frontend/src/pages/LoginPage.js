@@ -42,26 +42,33 @@ function LoginPage() {
         })
       });
 
-      if (response.ok) {
-        const data = await response.json();
-
-        if (data.role === "adopter") {
-          navigate("/adopter-home");
-          return;
-        }
-
-        if (data.role === "owner") {
-          navigate("/owner-home");
-          return;
-        }
-
-        navigate("/");
+      if (!response.ok) {
+        setMessage("User not found or password is incorrect.");
         return;
       }
 
-      setMessage("User not found or password is incorrect.");
+
+      const data = await response.json();
+
+
+      localStorage.setItem(
+        "paviaUser",
+        JSON.stringify({
+          email: email.trim(),
+          role: data.role
+        })
+      );
+
+
+      if (data.role === "adopter") {
+        navigate("/adopter-home");
+      } else if (data.role === "owner") {
+        navigate("/owner-home");
+      } else {
+        navigate("/");
+      }
     } catch (error) {
-      console.log(error);
+      console.error(error);
       setMessage("Backend may not be running yet.");
     }
   };
@@ -113,6 +120,7 @@ function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </label>
+
 
                 <label className="login-label">
                   Password

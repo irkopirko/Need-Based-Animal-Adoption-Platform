@@ -5,6 +5,8 @@ import RegisterPage from "./pages/RegisterPage";
 import AdopterHomePage from "./pages/AdopterHomePage";
 import OwnerHomePage from "./pages/OwnerHomePage";
 import AdoptionRequestPage from "./pages/AdoptionRequestPage";
+import AboutUsPage from "./pages/AboutUsPage";
+import GuestAdoptPage from "./pages/GuestAdoptPage";
 function App() {
   return (
     <Router>
@@ -15,6 +17,8 @@ function App() {
         <Route path="/adopter-home" element={<AdopterHomePage />} />
         <Route path="/owner-home" element={<OwnerHomePage />} />
         <Route path="/adoption-request" element={<AdoptionRequestPage />} />
+        <Route path="/about" element={<AboutUsPage />} />
+        <Route path="/adopt" element={<GuestAdoptPage />} />
       </Routes>
     </Router>
   );

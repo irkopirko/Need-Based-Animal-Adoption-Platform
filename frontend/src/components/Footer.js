@@ -1,17 +1,20 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import "./Footer.css";
 
 function Footer() {
+  const navigate = useNavigate();
+
   const goToRegister = () => {
-    window.location.pathname = "/register";
+    navigate("/register");
   };
 
   const goToLogin = () => {
-    window.location.pathname = "/login";
+    navigate("/login");
   };
 
   const goToAbout = () => {
-    window.location.pathname = "/about";
+    navigate("/about");
   };
 
   return (

@@ -3,10 +3,10 @@
   padding: 0 32px;
   background: #ffffff;
   border-bottom: 1px solid #e8e8e2;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
+  column-gap: 18px;
 }
 
 .navbar-brand {
@@ -14,7 +14,7 @@
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .navbar-logo {
@@ -38,9 +38,9 @@
 .navbar-links {
   display: flex;
   align-items: center;
-  gap: 26px;
-  flex: 1 1 auto;
   justify-content: center;
+  gap: 26px;
+  min-width: 0;
 }
 
 .navbar-link-btn {
@@ -50,6 +50,8 @@
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  padding: 0;
 }
 
 .navbar-link-btn:hover {
@@ -59,8 +61,9 @@
 .navbar-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 16px;
-  flex: 0 0 auto;
+  position: relative;
 }
 
 .navbar-login-btn {
@@ -88,42 +91,65 @@
 }
 
 .nav-profile-btn {
-  width: 42px;
-  height: 42px;
-  border: none;
-  background: transparent;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #dfe9df;
+  background: #ffffff;
+  border-radius: 50%;
   padding: 0;
   cursor: pointer;
-}
-
-.nav-profile-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: #2bd85d;
-  color: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  box-shadow: 0 6px 18px rgba(43, 216, 93, 0.18);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 6px 18px rgba(43, 216, 93, 0.12);
 }
 
-.nav-profile-btn:hover .nav-profile-avatar,
-.nav-profile-btn-open .nav-profile-avatar {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(43, 216, 93, 0.24);
+.nav-profile-btn-open,
+.nav-profile-btn:hover {
+  border-color: #cfe6d1;
+  box-shadow: 0 10px 24px rgba(43, 216, 93, 0.16);
+}
+
+.nav-profile-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f5f5f2 0%, #e8e8e2 100%);
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.nav-avatar-head {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #8d8d88;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.nav-avatar-body {
+  position: absolute;
+  width: 18px;
+  height: 10px;
+  border-radius: 10px 10px 0 0;
+  background: #8d8d88;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .nav-profile-menu {
   position: absolute;
-  top: 54px;
+  top: 58px;
   right: 0;
-  width: 220px;
+  width: 240px;
   background: #ffffff;
   border: 1px solid #e8e8e2;
-  border-radius: 16px;
+  border-radius: 18px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
   padding: 10px;
   z-index: 999;
@@ -169,22 +195,39 @@
 }
 
 .nav-profile-item-icon {
-  width: 20px;
-  text-align: center;
-  font-size: 14px;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: #e9f7ed;
+  border: 1px solid #cfeeda;
+  flex-shrink: 0;
+}
+
+.nav-profile-item-logout {
+  margin-top: 4px;
+  border-top: 1px solid #efefe9;
+  padding-top: 14px;
+}
+
+.nav-profile-item-icon-logout {
+  background: #f7eeee;
+  border: 1px solid #eed0d0;
 }
 
 @media (max-width: 900px) {
   .navbar {
     height: auto;
     padding: 16px;
+    display: flex;
     flex-wrap: wrap;
     justify-content: center;
+    gap: 14px;
   }
 
   .navbar-links {
     width: 100%;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 16px;
   }
 
