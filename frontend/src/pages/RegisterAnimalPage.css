@@ -1,0 +1,146 @@
+.register-animal-page {
+  min-height: 100vh;
+  background: #f7f7f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.register-animal-main {
+  max-width: 1100px;
+  margin: 40px auto 60px;
+  padding: 0 20px;
+}
+
+.register-animal-hero {
+  margin-bottom: 24px;
+}
+
+.register-animal-tag {
+  font-size: 12px;
+  font-weight: 700;
+  color: #28c95a;
+  margin-bottom: 6px;
+}
+
+.register-animal-hero h1 {
+  font-size: 32px;
+  font-weight: 800;
+  color: #171717;
+}
+
+.register-animal-hero p {
+  font-size: 15px;
+  color: #555;
+  max-width: 650px;
+}
+
+.register-animal-card {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 30px;
+  border: 1px solid #ecece6;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.06);
+}
+
+.register-animal-card h2 {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 20px;
+}
+
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  border: 1px solid #dbdbd4;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
+}
+
+.form-group textarea {
+  min-height: 100px;
+}
+
+.full-width {
+  grid-column: 1 / -1;
+}
+
+.image-upload-box input {
+  margin-top: 10px;
+}
+
+.image-preview {
+  display: flex;
+  gap: 12px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.image-preview img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+}
+
+.image-note {
+  font-size: 13px;
+  color: #777;
+}
+
+.submit-btn {
+  margin-top: 20px;
+  background: #28c95a;
+  color: #fff;
+  border: none;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.submit-btn:hover {
+  background: #22b14c;
+}
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.toast.success {
+  background: #28c95a;
+}
+
+.toast.error {
+  background: #ff4d4f;
+}
+
+@media (max-width: 768px) {
+  .register-grid {
+    grid-template-columns: 1fr;
+  }
+}

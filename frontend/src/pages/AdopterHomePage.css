@@ -1,56 +1,68 @@
 .adopter-page {
   min-height: 100vh;
-  background: #f7f7f5;
+  background: linear-gradient(180deg, #f7f7f5 0%, #f2f6f2 100%);
   color: #171717;
-  font-family: Arial, sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
 .adopter-main {
   max-width: 1300px;
   margin: 0 auto;
   padding: 34px 24px 70px;
+  box-sizing: border-box;
 }
 
 .adopter-hero {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 26px;
+  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  gap: 24px;
   align-items: stretch;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
+}
+
+.adopter-hero-left,
+.adopter-summary-card,
+.adopter-panel-card,
+.adopter-action-card {
+  box-sizing: border-box;
 }
 
 .adopter-hero-left {
-  background: #ffffff;
-  border: 1px solid #e8e8e2;
-  border-radius: 18px;
-  padding: 34px 30px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
+  border: 1px solid #e6ece4;
+  border-radius: 24px;
+  padding: 38px 34px;
+  box-shadow: 0 14px 34px rgba(16, 24, 16, 0.04);
 }
 
 .adopter-hero-tag {
   margin: 0 0 12px;
-  color: #28c95a;
+  color: #1f8f46;
   font-size: 14px;
   font-weight: 800;
+  letter-spacing: 0.2px;
 }
 
 .adopter-hero-title {
   margin: 0;
-  font-size: 58px;
-  line-height: 0.98;
+  font-size: 56px;
+  line-height: 0.96;
   font-weight: 900;
-  letter-spacing: -1.3px;
+  letter-spacing: -1.5px;
+  color: #171717;
+  max-width: 680px;
 }
 
 .adopter-hero-text {
   margin: 18px 0 0;
   max-width: 650px;
-  color: #666;
+  color: #5f665f;
   font-size: 17px;
-  line-height: 1.8;
+  line-height: 1.82;
 }
 
 .adopter-hero-buttons {
-  margin-top: 24px;
+  margin-top: 28px;
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
@@ -58,20 +70,21 @@
 
 .adopter-primary-btn {
   border: none;
-  border-radius: 12px;
-  background: #2bd85d;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #28c95a 0%, #24b953 100%);
   color: #ffffff;
   padding: 14px 20px;
   font-size: 15px;
   font-weight: 800;
   cursor: pointer;
+  box-shadow: 0 12px 24px rgba(40, 201, 90, 0.2);
 }
 
 .adopter-secondary-btn {
-  border: 1px solid #dcdcd6;
-  border-radius: 12px;
-  background: #f1f1ed;
-  color: #8a8a8a;
+  border: 1px solid #d7ddd5;
+  border-radius: 14px;
+  background: #f6f7f4;
+  color: #7e857d;
   padding: 14px 20px;
   font-size: 15px;
   font-weight: 800;
@@ -80,153 +93,328 @@
 
 .adopter-hero-right {
   display: flex;
+  align-items: stretch;
   justify-content: center;
+  min-width: 0;
 }
 
-.adopter-status-card {
+.adopter-slider {
+  position: relative;
   width: 100%;
-  background: #ffffff;
-  border: 1px solid #e8e8e2;
-  border-radius: 18px;
-  padding: 24px 22px;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid #dfe7dd;
+  background: #edf3ee;
+  box-shadow: 0 14px 34px rgba(16, 24, 16, 0.05);
+  min-width: 0;
 }
 
-.adopter-status-badge {
-  display: inline-block;
-  margin-bottom: 14px;
-  background: #eff9f1;
-  color: #28c95a;
-  border: 1px solid #cfeeda;
+.adopter-slider::before {
+  content: "";
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+}
+
+.adopter-slider-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+  display: block;
+}
+
+.adopter-slider-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 26px 24px 24px;
+  background: linear-gradient(
+    180deg,
+    rgba(8, 10, 8, 0.04) 0%,
+    rgba(8, 10, 8, 0.22) 38%,
+    rgba(8, 10, 8, 0.72) 100%
+  );
+  color: #ffffff;
+}
+
+.adopter-slider-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #ffffff;
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 12px;
   font-weight: 800;
+  margin-bottom: 14px;
+  backdrop-filter: blur(4px);
 }
 
-.adopter-status-card h3 {
+.adopter-slider-overlay h3 {
   margin: 0 0 10px;
-  font-size: 24px;
-  font-weight: 800;
+  font-size: 28px;
+  line-height: 1.04;
+  font-weight: 900;
+  letter-spacing: -0.6px;
 }
 
-.adopter-status-card p {
-  margin: 0;
-  color: #666;
-  line-height: 1.7;
-  font-size: 15px;
-}
-
-.adopter-status-steps {
-  margin-top: 22px;
-  display: grid;
-  gap: 14px;
-}
-
-.adopter-step {
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 12px;
-  align-items: start;
-  padding: 14px;
-  background: #fbfbf9;
-  border: 1px solid #ecece6;
-  border-radius: 14px;
-}
-
-.adopter-step-number {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: #2bd85d;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.adopter-step h4 {
-  margin: 2px 0 6px;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.adopter-step p {
+.adopter-slider-overlay p {
   margin: 0;
   font-size: 14px;
-  line-height: 1.6;
-  color: #666;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.94);
+  max-width: 420px;
+}
+
+.adopter-slider-dots {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  display: flex;
+  gap: 7px;
+}
+
+.adopter-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.adopter-dot.active {
+  background: #ffffff;
 }
 
 .adopter-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 18px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
 }
 
 .adopter-summary-card {
-  background: #ffffff;
-  border: 1px solid #e8e8e2;
-  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
+  border: 1px solid #e4ebe2;
+  border-radius: 20px;
   padding: 22px 20px;
+  box-shadow: 0 10px 24px rgba(16, 24, 16, 0.03);
 }
 
-.adopter-summary-card h3 {
-  margin: 0 0 10px;
-  font-size: 18px;
-  font-weight: 800;
+.adopter-summary-card:nth-child(1) {
+  background: linear-gradient(180deg, #f8fcf8 0%, #f1f9f2 100%);
 }
 
-.adopter-summary-card p {
+.adopter-summary-card:nth-child(2) {
+  background: linear-gradient(180deg, #fcfcf8 0%, #f7f8f1 100%);
+}
+
+.adopter-summary-card:nth-child(3) {
+  background: linear-gradient(180deg, #f7fbfb 0%, #eef7f6 100%);
+}
+
+.adopter-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.adopter-summary-label {
+  color: #505750;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.adopter-summary-mini-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28c95a;
+}
+
+.adopter-summary-value {
   margin: 0;
-  color: #28c95a;
-  font-size: 20px;
-  font-weight: 800;
+  color: #171717;
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
 }
 
-.adopter-info-section {
+.adopter-summary-note {
+  display: inline-block;
+  margin-top: 10px;
+  color: #727972;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.adopter-panel-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
+  margin-bottom: 28px;
 }
 
-.adopter-info-card {
-  background: #ffffff;
-  border: 1px solid #e8e8e2;
-  border-radius: 18px;
+.adopter-panel-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
+  border: 1px solid #e4ebe2;
+  border-radius: 24px;
   padding: 24px 22px;
+  box-shadow: 0 10px 24px rgba(16, 24, 16, 0.03);
 }
 
-.adopter-info-card h2 {
+.adopter-panel-card:first-child {
+  background: linear-gradient(180deg, #fbfdfb 0%, #f4faf4 100%);
+}
+
+.adopter-panel-card:last-child {
+  background: linear-gradient(180deg, #fffefb 0%, #faf8f1 100%);
+}
+
+.adopter-panel-top h2 {
   margin: 0 0 12px;
   font-size: 28px;
   font-weight: 800;
+  color: #171717;
 }
 
-.adopter-info-card p {
+.adopter-panel-top p {
   margin: 0;
-  color: #666;
+  color: #636a63;
   line-height: 1.8;
   font-size: 15px;
 }
 
-.adopter-info-list {
+.adopter-mini-points {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.adopter-mini-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid #e6ece4;
+  border-radius: 14px;
+}
+
+.adopter-mini-point-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #28c95a;
+  margin-top: 7px;
+  flex-shrink: 0;
+}
+
+.adopter-mini-point p {
   margin: 0;
-  padding-left: 20px;
-  color: #666;
-  line-height: 1.9;
+  color: #444b44;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.adopter-request-list {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+.adopter-request-item {
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid #e7ece1;
+  border-radius: 14px;
+}
+
+.adopter-request-item strong {
+  display: block;
   font-size: 15px;
+  color: #171717;
+}
+
+.adopter-request-item p {
+  margin: 6px 0 0;
+  color: #666d66;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.adopter-action-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.adopter-action-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
+  border: 1px solid #e4ebe2;
+  border-radius: 22px;
+  padding: 22px 20px;
+  box-shadow: 0 10px 24px rgba(16, 24, 16, 0.03);
+}
+
+.adopter-action-card:nth-child(1) {
+  background: linear-gradient(180deg, #f7fcf8 0%, #eef9f0 100%);
+}
+
+.adopter-action-card:nth-child(2) {
+  background: linear-gradient(180deg, #f8fcfc 0%, #eef7f7 100%);
+}
+
+.adopter-action-card:nth-child(3) {
+  background: linear-gradient(180deg, #fcfcf8 0%, #f8f8ef 100%);
+}
+
+.adopter-action-card h3 {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #171717;
+}
+
+.adopter-action-card p {
+  margin: 0 0 18px;
+  color: #666d66;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.adopter-action-card button {
+  height: 46px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: #171717;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 @media (max-width: 980px) {
   .adopter-hero,
   .adopter-summary-grid,
-  .adopter-info-section {
+  .adopter-panel-grid,
+  .adopter-action-strip {
     grid-template-columns: 1fr;
   }
+
   .adopter-hero-title {
     font-size: 42px;
+  }
+
+  .adopter-slider {
+    max-width: 520px;
+    margin: 0 auto;
   }
 }

@@ -1,14 +1,64 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdopterHomePage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import animalSlide1 from "../images/animalSlide1.jpg";
+import animalSlide2 from "../images/animalSlide2.jpg";
+import animalSlide3 from "../images/animalSlide3.jpg";
+import animalSlide4 from "../images/animalSlide4.jpg";
+import animalSlide5 from "../images/animalSlide5.jpg";
+import animalSlide6 from "../images/animalSlide6.jpg";
+import animalSlide7 from "../images/animalSlide7.jpg";
+import animalSlide8 from "../images/animalSlide8.jpg";
+import animalSlide9 from "../images/animalSlide9.jpg";
+import animalSlide10 from "../images/animalSlide10.jpg";
+import animalSlide11 from "../images/animalSlide11.jpg";
+import animalSlide12 from "../images/animalSlide12.jpg";
+import animalSlide13 from "../images/animalSlide13.jpg";
+import animalSlide14 from "../images/animalSlide14.jpg";
+import animalSlide15 from "../images/animalSlide15.jpg";
 
 function AdopterHomePage() {
   const navigate = useNavigate();
+  const [currentSlide, setCurrentSlide] = useState(0);
 
-  const goToProfileForm = () => {
-    navigate("/adoption-profile");
+  const slides = [
+    animalSlide1,
+    animalSlide2,
+    animalSlide3,
+    animalSlide4,
+    animalSlide5,
+    animalSlide6,
+    animalSlide7,
+    animalSlide8,
+    animalSlide9,
+    animalSlide10,
+    animalSlide11,
+    animalSlide12,
+    animalSlide13,
+    animalSlide14,
+    animalSlide15
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [slides.length]);
+
+  const goToAdoptionRequest = () => {
+    navigate("/adoption-request");
+  };
+
+  const goToSavedAnimals = () => {
+    navigate("/saved-animals");
+  };
+
+  const goToMessages = () => {
+    navigate("/adopter-messages");
   };
 
   return (
@@ -18,28 +68,29 @@ function AdopterHomePage() {
       <main className="adopter-main">
         <section className="adopter-hero">
           <div className="adopter-hero-left">
-            <p className="adopter-hero-tag">Welcome back</p>
+            <p className="adopter-hero-tag">Adopter Dashboard</p>
+
             <h1 className="adopter-hero-title">
-              Before seeing any matches,
+              Your adoption journey
               <br />
-              you need to complete
+              starts with a request,
               <br />
-              your adoption profile.
+              not random browsing.
             </h1>
+
             <p className="adopter-hero-text">
-              Pavia does not show animals before this step. Your housing,
-              routine, household details, and animal preferences are needed so
-              the system can calculate compatibility and only show animals above
-              the required threshold.
+              Many animals are still waiting for the right home. Complete your
+              adoption request so Pavia can unlock more suitable matches based on
+              your lifestyle, home, and expectations.
             </p>
 
             <div className="adopter-hero-buttons">
               <button
                 type="button"
                 className="adopter-primary-btn"
-                onClick={goToProfileForm}
+                onClick={goToAdoptionRequest}
               >
-                Start Adoption Profile
+                Create Adoption Request
               </button>
 
               <button
@@ -53,40 +104,29 @@ function AdopterHomePage() {
           </div>
 
           <div className="adopter-hero-right">
-            <div className="adopter-status-card">
-              <div className="adopter-status-badge">Profile Required</div>
+            <div className="adopter-slider">
+              <img
+                src={slides[currentSlide]}
+                alt="Animals waiting for adoption"
+                className="adopter-slider-image"
+              />
 
-              <h3>Your matching flow has not started yet</h3>
+              <div className="adopter-slider-overlay">
+                <span className="adopter-slider-badge">Waiting for a Home</span>
+                <h3>15 animals could be one step closer to the right match</h3>
+                <p>
+                  Complete your adoption request to begin seeing compatible
+                  animals through a more thoughtful process.
+                </p>
+              </div>
 
-              <p>
-                Once your adoption profile is completed, the system will generate
-                compatibility scores and only show suitable animals.
-              </p>
-
-              <div className="adopter-status-steps">
-                <div className="adopter-step">
-                  <span className="adopter-step-number">01</span>
-                  <div>
-                    <h4>Fill adoption profile</h4>
-                    <p>Enter home, lifestyle, and preference details.</p>
-                  </div>
-                </div>
-
-                <div className="adopter-step">
-                  <span className="adopter-step-number">02</span>
-                  <div>
-                    <h4>System calculates matches</h4>
-                    <p>Animals are evaluated with compatibility scoring.</p>
-                  </div>
-                </div>
-
-                <div className="adopter-step">
-                  <span className="adopter-step-number">03</span>
-                  <div>
-                    <h4>View only suitable animals</h4>
-                    <p>Only animals above the threshold will appear.</p>
-                  </div>
-                </div>
+              <div className="adopter-slider-dots">
+                {slides.map((_, index) => (
+                  <span
+                    key={index}
+                    className={`adopter-dot ${index === currentSlide ? "active" : ""}`}
+                  ></span>
+                ))}
               </div>
             </div>
           </div>
@@ -94,40 +134,117 @@ function AdopterHomePage() {
 
         <section className="adopter-summary-grid">
           <div className="adopter-summary-card">
-            <h3>Adoption Profile</h3>
-            <p>Not started</p>
+            <div className="adopter-summary-head">
+              <span className="adopter-summary-label">Adoption Request</span>
+              <span className="adopter-summary-mini-dot"></span>
+            </div>
+            <p className="adopter-summary-value">Not Started</p>
+            <span className="adopter-summary-note">Required before matching begins</span>
           </div>
 
           <div className="adopter-summary-card">
-            <h3>Compatible Animals</h3>
-            <p>Locked</p>
+            <div className="adopter-summary-head">
+              <span className="adopter-summary-label">Compatible Animals</span>
+              <span className="adopter-summary-mini-dot"></span>
+            </div>
+            <p className="adopter-summary-value">Locked</p>
+            <span className="adopter-summary-note">Available after request completion</span>
           </div>
 
           <div className="adopter-summary-card">
-            <h3>Saved Animals</h3>
-            <p>Available after matching</p>
+            <div className="adopter-summary-head">
+              <span className="adopter-summary-label">Saved Animals</span>
+              <span className="adopter-summary-mini-dot"></span>
+            </div>
+            <p className="adopter-summary-value">Pending</p>
+            <span className="adopter-summary-note">Starts once matching is active</span>
           </div>
         </section>
 
-        <section className="adopter-info-section">
-          <div className="adopter-info-card">
-            <h2>Why this step comes first</h2>
-            <p>
-              In Pavia, adopters do not browse all animals freely. This is a
-              deliberate design decision. The platform first collects structured
-              adopter information, then compares it with animal profiles to
-              avoid random or appearance-based choices.
-            </p>
+        <section className="adopter-panel-grid">
+          <div className="adopter-panel-card">
+            <div className="adopter-panel-top">
+              <div>
+                <h2>Why this step comes first</h2>
+                <p>
+                  Pavia is designed to avoid random, appearance-based browsing.
+                  Instead, it begins with structured adopter information so the
+                  platform can support more suitable and responsible matches.
+                </p>
+              </div>
+            </div>
+
+            <div className="adopter-mini-points">
+              <div className="adopter-mini-point">
+                <span className="adopter-mini-point-dot"></span>
+                <p>More compatibility-based matching</p>
+              </div>
+
+              <div className="adopter-mini-point">
+                <span className="adopter-mini-point-dot"></span>
+                <p>Fewer rushed or unsuitable choices</p>
+              </div>
+
+              <div className="adopter-mini-point">
+                <span className="adopter-mini-point-dot"></span>
+                <p>A more structured and transparent adoption flow</p>
+              </div>
+            </div>
           </div>
 
-          <div className="adopter-info-card">
-            <h2>What you will fill in</h2>
-            <ul className="adopter-info-list">
-              <li>Home environment and available space</li>
-              <li>Daily routine and activity level</li>
-              <li>Household information</li>
-              <li>Preferred animal characteristics</li>
-            </ul>
+          <div className="adopter-panel-card">
+            <div className="adopter-panel-top">
+              <div>
+                <h2>What your request includes</h2>
+                <p>
+                  Your request helps the platform understand your environment
+                  before any animal becomes visible in your matching flow.
+                </p>
+              </div>
+            </div>
+
+            <div className="adopter-request-list">
+              <div className="adopter-request-item">
+                <strong>Home Conditions</strong>
+                <p>Space, housing type, garden, and living environment</p>
+              </div>
+
+              <div className="adopter-request-item">
+                <strong>Lifestyle Details</strong>
+                <p>Routine, activity level, and time available at home</p>
+              </div>
+
+              <div className="adopter-request-item">
+                <strong>Household & Preferences</strong>
+                <p>Household structure and preferred animal characteristics</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="adopter-action-strip">
+          <div className="adopter-action-card">
+            <h3>Start your request</h3>
+            <p>Complete the required flow so matching can begin.</p>
+            <button type="button" onClick={goToAdoptionRequest}>
+              Create Adoption Request
+            </button>
+          </div>
+
+          <div className="adopter-action-card">
+            <h3>Saved animals</h3>
+            <p>Access saved animals after compatible matches are unlocked.</p>
+            <button type="button" onClick={goToSavedAnimals}>
+              View Saved Animals
+            </button>
+          </div>
+
+          <div className="adopter-action-card">
+            <h3>Messages</h3>
+            <p>Review your communication as the process moves forward.</p>
+            <button type="button" onClick={goToMessages}>
+              Open Messages
+            </button>
           </div>
         </section>
       </main>

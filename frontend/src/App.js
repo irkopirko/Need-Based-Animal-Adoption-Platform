@@ -7,6 +7,13 @@ import OwnerHomePage from "./pages/OwnerHomePage";
 import AdoptionRequestPage from "./pages/AdoptionRequestPage";
 import AboutUsPage from "./pages/AboutUsPage";
 import GuestAdoptPage from "./pages/GuestAdoptPage";
+import SavedAnimalsPage from "./pages/SavedAnimalsPage";
+import AdopterMessagesPage from "./pages/AdopterMessagesPage";
+import OwnerMessagesPage from "./pages/OwnerMessagesPage";
+import OwnerManageRequestsPage from "./pages/OwnerManageRequestsPage";
+import AnimalDetailPage from "./pages/AnimalDetailPage";
+import RegisterAnimalPage from "./pages/RegisterAnimalPage";
+import CompatibleAnimalsPage from "./pages/CompatibleAnimalsPage";
 function App() {
   return (
     <Router>
@@ -19,9 +26,15 @@ function App() {
         <Route path="/adoption-request" element={<AdoptionRequestPage />} />
         <Route path="/about" element={<AboutUsPage />} />
         <Route path="/adopt" element={<GuestAdoptPage />} />
+        <Route path="/saved-animals" element={<SavedAnimalsPage />} />
+        <Route path="/adopter-messages" element={<AdopterMessagesPage />} />
+        <Route path="/owner-messages" element={<OwnerMessagesPage />} />
+        <Route path="/owner-requests" element={<OwnerManageRequestsPage />} />
+        <Route path="/animal/:id" element={<AnimalDetailPage />} />
+        <Route path="/register-animal" element={<RegisterAnimalPage />} />
+        <Route path="/compatible-animals" element={<CompatibleAnimalsPage />} />
       </Routes>
     </Router>
   );
 }
-
 export default App;

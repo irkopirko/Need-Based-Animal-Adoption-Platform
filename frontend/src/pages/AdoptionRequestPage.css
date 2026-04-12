@@ -12,6 +12,7 @@
   padding: 0 20px;
   box-sizing: border-box;
 }
+
 .adoption-request-hero {
   margin-bottom: 24px;
 }
@@ -186,7 +187,8 @@
 }
 
 .adoption-request-group select,
-.adoption-request-group textarea {
+.adoption-request-group textarea,
+.adoption-text-input {
   border: 1px solid #dbdbd4;
   border-radius: 14px;
   padding: 12px 14px;
@@ -196,25 +198,14 @@
   box-sizing: border-box;
 }
 
-.adoption-request-group select {
-  min-height: 50px;
+.adoption-text-input {
+  height: 54px;
 }
 
 .adoption-request-group textarea {
   min-height: 110px;
   resize: vertical;
   line-height: 1.6;
-}
-
-.adoption-text-input {
-  height: 54px;
-  border: 1px solid #dbdbd4;
-  border-radius: 14px;
-  padding: 0 14px;
-  font-size: 14px;
-  background: #fff;
-  color: #171717;
-  box-sizing: border-box;
 }
 
 .checkbox-grid {
@@ -249,15 +240,9 @@
   height: 16px;
 }
 
-.check-card span {
-  font-size: 14px;
-  line-height: 1.5;
-  color: #333;
-}
-
 .animal-choice-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
@@ -273,10 +258,6 @@
   cursor: pointer;
   transition: 0.2s ease;
   text-align: center;
-}
-
-.animal-card:hover {
-  border-color: #cfd7cf;
 }
 
 .animal-card-selected {
@@ -305,47 +286,6 @@
   border-radius: 50%;
 }
 
-.animal-card span {
-  font-size: 14px;
-  font-weight: 700;
-  color: #2f2f2f;
-}
-
-.review-head {
-  margin-bottom: 20px;
-}
-
-.review-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.review-icon {
-  width: 36px;
-  height: 36px;
-  background: #f1f1ec;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #28c95a;
-  font-weight: 800;
-}
-
-.review-title-wrap h3 {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 800;
-  color: #171717;
-}
-
-.review-subtitle {
-  font-size: 13px;
-  color: #666;
-  margin: 4px 0 0;
-}
-
 .review-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -357,20 +297,6 @@
   border-radius: 16px;
   padding: 16px;
   border: 1px solid #ecece6;
-}
-
-.review-box h4 {
-  margin: 0 0 12px;
-  font-size: 16px;
-  font-weight: 800;
-  color: #171717;
-}
-
-.review-box p {
-  font-size: 13px;
-  margin: 0 0 6px;
-  line-height: 1.6;
-  color: #444;
 }
 
 .review-box-full {
@@ -395,17 +321,11 @@
   font-weight: 700;
   font-size: 14px;
   cursor: pointer;
-  transition: 0.2s ease;
 }
 
 .adoption-back-btn {
   background: #eeeeea;
   color: #171717;
-}
-
-.adoption-back-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 .adoption-next-btn {
@@ -456,10 +376,6 @@
     grid-template-columns: 1fr;
   }
 
-  .animal-choice-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .review-grid {
     grid-template-columns: 1fr;
   }
@@ -467,10 +383,6 @@
   .adoption-request-top {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  .adoption-step-row {
-    justify-content: flex-start;
   }
 }
 

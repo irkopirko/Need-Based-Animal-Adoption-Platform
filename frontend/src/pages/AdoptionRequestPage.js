@@ -108,7 +108,7 @@ function AdoptionRequestPage() {
       options.push(
         "Dog - Puppy / Young",
         "Dog - Adult",
-        "Dog - Senior (Small dogs often 10-12+, larger dogs often 8+)"
+        "Dog - Senior"
       );
     }
 
@@ -116,31 +116,7 @@ function AdoptionRequestPage() {
       options.push(
         "Cat - Kitten / Young",
         "Cat - Adult",
-        "Cat - Senior (10+)"
-      );
-    }
-
-    if (selectedAnimalTypes.includes("Rabbit")) {
-      options.push(
-        "Rabbit - Young",
-        "Rabbit - Adult",
-        "Rabbit - Senior (Around 5-8+)"
-      );
-    }
-
-    if (selectedAnimalTypes.includes("Hamster")) {
-      options.push(
-        "Hamster - Young",
-        "Hamster - Adult",
-        "Hamster - Senior (Around 1.5+)"
-      );
-    }
-
-    if (selectedAnimalTypes.includes("Bird")) {
-      options.push(
-        "Bird - Young",
-        "Bird - Adult",
-        "Bird - Senior (Depends on bird species)"
+        "Cat - Senior"
       );
     }
 
@@ -160,26 +136,10 @@ function AdoptionRequestPage() {
 
     if (selectedAnimalTypes.includes("Cat")) {
       options.push(
-        "Cat - Short Coat / Lower Grooming",
+        "Cat - Low Grooming",
         "Cat - Medium Grooming",
-        "Cat - Long Coat / Higher Grooming"
+        "Cat - High Grooming"
       );
-    }
-
-    if (selectedAnimalTypes.includes("Rabbit")) {
-      options.push(
-        "Rabbit - Lower Grooming",
-        "Rabbit - Medium Grooming",
-        "Rabbit - Long-Haired / Higher Grooming"
-      );
-    }
-
-    if (selectedAnimalTypes.includes("Hamster")) {
-      options.push("Hamster - Minimal Grooming");
-    }
-
-    if (selectedAnimalTypes.includes("Bird")) {
-      options.push("Bird - Regular Habitat Cleaning And Feather Care");
     }
 
     return options;
@@ -193,14 +153,6 @@ function AdoptionRequestPage() {
         "Dog - Small",
         "Dog - Medium",
         "Dog - Large"
-      );
-    }
-
-    if (selectedAnimalTypes.includes("Bird")) {
-      options.push(
-        "Bird - Small",
-        "Bird - Medium",
-        "Bird - Large"
       );
     }
 
@@ -252,7 +204,9 @@ function AdoptionRequestPage() {
 
     if (step === 4) {
       if (formData.primaryCaretaker === "") newErrors.primaryCaretaker = true;
-      if (formData.hasPreviousExperience === "") newErrors.hasPreviousExperience = true;
+      if (formData.hasPreviousExperience === "") {
+        newErrors.hasPreviousExperience = true;
+      }
 
       if (showPrimaryCaretakerOther && formData.primaryCaretakerOther.trim() === "") {
         newErrors.primaryCaretakerOther = true;
@@ -488,6 +442,7 @@ function AdoptionRequestPage() {
                       <option value="Other">Other</option>
                     </select>
                   </div>
+
                   {showLivingSpaceOther && (
                     <div className="adoption-request-group adoption-request-full">
                       <label>Please Specify Your Living Space</label>
@@ -532,7 +487,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group adoption-request-full">
-                    <label>Outdoor Access</label>
+                    <label>What kind of outdoor access do you have?</label>
                     <select
                       name="outdoorAccess"
                       value={formData.outdoorAccess}
@@ -540,8 +495,10 @@ function AdoptionRequestPage() {
                       className={errors.outdoorAccess ? "error-input" : ""}
                     >
                       <option value="">Select</option>
-                      <option value="Yard">Yard</option>
+                      <option value="Private Yard">Private Yard</option>
                       <option value="Balcony">Balcony</option>
+                      <option value="Terrace">Terrace</option>
+                      <option value="Shared Outdoor Area">Shared Outdoor Area</option>
                       <option value="None">None</option>
                     </select>
                   </div>
@@ -639,7 +596,7 @@ function AdoptionRequestPage() {
                     </select>
                   </div>
 
-                  {showChildrenAge&& (
+                  {showChildrenAge && (
                     <div className={`adoption-request-group adoption-request-full ${errors.childrenAgeGroup ? "error-group" : ""}`}>
                       <label>Children Age Group</label>
                       <CheckboxGroup
@@ -668,7 +625,7 @@ function AdoptionRequestPage() {
                       <label>Other Pets Type</label>
                       <CheckboxGroup
                         fieldName="otherPetsType"
-                        options={["Dog", "Cat", "Bird", "Rabbit", "Hamster", "Other"]}
+                        options={["Dog", "Cat", "Other"]}
                       />
                     </div>
                   )}
@@ -745,7 +702,7 @@ function AdoptionRequestPage() {
                       <label>What Type of Pet Did You Have Before?</label>
                       <CheckboxGroup
                         fieldName="previousPetTypes"
-                        options={["Dog", "Cat", "Bird", "Rabbit", "Hamster", "Other"]}
+                        options={["Dog", "Cat", "Other"]}
                       />
                     </div>
                   )}
@@ -774,7 +731,7 @@ function AdoptionRequestPage() {
                 <div className={`adoption-request-group adoption-request-full ${errors.preferredAnimalTypes ? "error-group" : ""}`}>
                   <label>Preferred Animal Type</label>
                   <div className="animal-choice-grid">
-                    {["Dog", "Cat", "Bird", "Hamster", "Rabbit"].map((animal)=> {
+                    {["Dog", "Cat"].map((animal) => {
                       const isSelected = formData.preferredAnimalTypes.includes(animal);
 
                       return (
@@ -834,7 +791,7 @@ function AdoptionRequestPage() {
                   </div>
                 )}
 
-                {selectedAnimalTypes.length>0 && (
+                {selectedAnimalTypes.length > 0 && (
                   <div
                     className={`adoption-request-group adoption-request-full ${
                       errors.groomingTolerance ||
@@ -971,6 +928,7 @@ function AdoptionRequestPage() {
           </form>
         </section>
       </main>
+
       <Footer />
 
       {showToast && (
