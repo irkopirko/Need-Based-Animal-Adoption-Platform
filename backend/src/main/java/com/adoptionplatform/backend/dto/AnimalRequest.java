@@ -1,7 +1,5 @@
 package com.adoptionplatform.backend.dto;
-
 public class AnimalRequest {
-
     private String name;
     private String animalType;
     private String breed;
@@ -13,10 +11,8 @@ public class AnimalRequest {
     private String groomingNeed;
     private String specialNeeds;
     private String description;
-
     public AnimalRequest() {
     }
-
     public String getName() {
         return name;
     }
@@ -85,7 +81,7 @@ public class AnimalRequest {
         return groomingNeed;
     }
 
-    public void setGroomingNeed(String groomingNeed) {
+    public void setGroomingNeed( String groomingNeed) {
         this.groomingNeed = groomingNeed;
     }
 
@@ -100,7 +96,6 @@ public class AnimalRequest {
     public String getDescription() {
         return description;
     }
-
     public void setDescription(String description) {
         this.description = description;
     }
