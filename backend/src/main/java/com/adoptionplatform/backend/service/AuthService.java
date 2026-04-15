@@ -2,6 +2,7 @@ package com.adoptionplatform.backend.service;
 
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
+import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
 import com.adoptionplatform.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -23,7 +24,6 @@ public class AuthService {
         Map<String, String> response = new HashMap<>();
 
         Optional<User> existingUser = userRepository.findByEmail(request.getEmail());
-
         if (existingUser.isPresent()) {
             response.put("error", "Email is already registered");
             return response;
@@ -35,12 +35,12 @@ public class AuthService {
         user.setPassword(request.getPassword());
         user.setLocation(request.getLocation());
         user.setPhone(request.getPhone());
-        user.setRole(request.getRole());
+        user.setRole(Role.valueOf(request.getRole().toUpperCase()));
 
         userRepository.save(user);
 
         response.put("message", "User registered successfully");
-        response.put("role", user.getRole());
+        response.put("role", user.getRole().name());
         return response;
     }
 
@@ -62,7 +62,7 @@ public class AuthService {
         }
 
         response.put("message", "Login successful");
-        response.put("role", user.getRole());
+        response.put("role", user.getRole().name());
         response.put("fullName", user.getFullName());
         return response;
     }
