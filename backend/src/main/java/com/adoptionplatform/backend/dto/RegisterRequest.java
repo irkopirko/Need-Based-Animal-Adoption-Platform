@@ -2,23 +2,12 @@ package com.adoptionplatform.backend.dto;
 
 public class RegisterRequest {
 
-    private String role;
     private String fullName;
     private String email;
     private String password;
     private String location;
     private String phone;
-
-    public RegisterRequest() {
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
+    private String role;
 
     public String getFullName() {
         return fullName;
@@ -58,5 +47,13 @@ public class RegisterRequest {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
     }
 }

@@ -3,3 +3,4 @@ node_modules/
 *.iml
 target/
 .env
+REACT_APP_API_URL=http://localhost:8080

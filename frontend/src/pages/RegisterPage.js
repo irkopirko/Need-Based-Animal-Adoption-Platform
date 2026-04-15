@@ -4,8 +4,9 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 function RegisterPage() {
-  const [role, setRole] = useState("adopter");
+  const [role, setRole] = useState("ADOPTER");
   const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState("");
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -43,6 +44,7 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setMessage("");
 
     const newErrors = {
       fullName: false,
@@ -60,7 +62,7 @@ function RegisterPage() {
       hasError = true;
     }
 
-    if (formData.email.trim() === "") {
+    if (formData.email.trim() === "" || !formData.email.includes("@")) {
       newErrors.email = true;
       hasError = true;
     }
@@ -89,11 +91,9 @@ function RegisterPage() {
 
     if (hasError) {
       setShowToast(true);
-
       setTimeout(() => {
         setShowToast(false);
       }, 3000);
-
       return;
     }
 
@@ -115,14 +115,15 @@ function RegisterPage() {
         body: JSON.stringify(userData),
       });
 
-      if (!response.ok) {
-        throw new Error("Request failed");
-      }
-
       const result = await response.json();
 
+      if (!response.ok) {
+        setMessage(result.error || "Registration failed.");
+        return;
+      }
+
       console.log("Backend response:", result);
-      alert("Account created successfully!");
+      setMessage("Account created successfully!");
 
       setFormData({
         fullName: "",
@@ -143,7 +144,7 @@ function RegisterPage() {
       });
     } catch (error) {
       console.error("Error while sending register request:", error);
-      alert("Could not connect to backend.");
+      setMessage("Could not connect to backend.");
     }
   };
 
@@ -164,10 +165,9 @@ function RegisterPage() {
           <button
             type="button"
             className={`register-role-card ${
-              role === "adopter" ? "register-role-card-active" : ""
-
+              role === "ADOPTER" ? "register-role-card-active" : ""
             }`}
-            onClick={() => setRole("adopter")}
+            onClick={() => setRole("ADOPTER")}
           >
             <div className="register-role-icon register-role-icon-green"></div>
             <h3>I Want to Adopt</h3>
@@ -180,9 +180,9 @@ function RegisterPage() {
           <button
             type="button"
             className={`register-role-card ${
-              role === "owner" ? "register-role-card-active" : ""
+              role === "SHELTER_OWNER" ? "register-role-card-active" : ""
             }`}
-            onClick={() => setRole("owner")}
+            onClick={() => setRole("SHELTER_OWNER")}
           >
             <div className="register-role-icon register-role-icon-gray"></div>
             <h3>I am a Shelter / Owner</h3>
@@ -195,12 +195,14 @@ function RegisterPage() {
 
         <section className="register-form-card">
           <h2 className="register-form-title">
-            {role === "adopter" ? "Adopter Sign Up" : "Owner / Shelter Sign Up"}
+            {role === "ADOPTER" ? "Adopter Sign Up" : "Owner / Shelter Sign Up"}
           </h2>
 
           <p className="register-form-subtitle">
             Tell us a bit about yourself to get started.
           </p>
+
+          {message !== "" && <div className="login-message">{message}</div>}
 
           <form onSubmit={handleSubmit}>
             <div className="register-form-grid">
@@ -212,8 +214,8 @@ function RegisterPage() {
                   name="fullName"
                   placeholder="Your full name"
                   value={formData.fullName}
-                  onChange= {handleChange}
-                  className= {errors.fullName ? "input-error" : ""}
+                  onChange={handleChange}
+                  className={errors.fullName ? "input-error" : ""}
                 />
               </div>
 
@@ -309,7 +311,7 @@ function RegisterPage() {
       <Footer />
 
       {showToast && (
-        <div className ="toast">
+        <div className="toast">
           The required fields must be completed.
         </div>
       )}

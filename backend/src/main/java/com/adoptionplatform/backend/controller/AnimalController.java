@@ -1,16 +1,22 @@
 package com.adoptionplatform.backend.controller;
 
+import com.adoptionplatform.backend.dto.AnimalRequest;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.service.AnimalService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/animals")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class AnimalController {
 
+    @PostMapping("/create")
+    public ResponseEntity<Animal> createAnimal(@RequestBody AnimalRequest request) {
+        return ResponseEntity.ok(animalService.createAnimal(request));
+    }
     private final AnimalService animalService;
 
     public AnimalController(AnimalService animalService) {

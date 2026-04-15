@@ -37,19 +37,17 @@ function LoginPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          email: email.trim(),
-          password: password
+          email,
+          password
         })
       });
 
-      if (!response.ok) {
-        setMessage("User not found or password is incorrect.");
-        return;
-      }
-
-
       const data = await response.json();
 
+      if (!response.ok) {
+        setMessage(data.error || "User not found or password is incorrect.");
+        return;
+      }
 
       localStorage.setItem(
         "paviaUser",
@@ -59,17 +57,16 @@ function LoginPage() {
         })
       );
 
-
-      if (data.role === "adopter") {
+      if (data.role === "ADOPTER") {
         navigate("/adopter-home");
-      } else if (data.role === "owner") {
+      } else if (data.role === "SHELTER_OWNER") {
         navigate("/owner-home");
       } else {
         navigate("/");
       }
     } catch (error) {
       console.error(error);
-      setMessage("Backend may not be running yet.");
+      setMessage("Could not connect to backend.");
     }
   };
 
@@ -120,7 +117,6 @@ function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </label>
-
 
                 <label className="login-label">
                   Password

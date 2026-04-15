@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class AuthController {
 
     private final AuthService authService;
@@ -20,24 +20,12 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> registerUser(@RequestBody RegisterRequest request) {
-        Map<String, String> result = authService.register(request);
-
-        if (result.containsKey("error")) {
-            return ResponseEntity.badRequest().body(result);
-        }
-
-        return ResponseEntity.ok(result);
+    public ResponseEntity<Map<String, String>> register(@RequestBody RegisterRequest request) {
+        return ResponseEntity.ok(authService.register(request));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> loginUser(@RequestBody LoginRequest request) {
-        Map<String, String> result = authService.login(request);
-
-        if (result.containsKey("error")) {
-            return ResponseEntity.status(401).body(result);
-        }
-
-        return ResponseEntity.ok(result);
+    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
     }
 }
