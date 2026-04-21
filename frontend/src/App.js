@@ -14,10 +14,12 @@ import OwnerManageRequestsPage from "./pages/OwnerManageRequestsPage";
 import AnimalDetailPage from "./pages/AnimalDetailPage";
 import RegisterAnimalPage from "./pages/RegisterAnimalPage";
 import CompatibleAnimalsPage from "./pages/CompatibleAnimalsPage";
+import MatchResultsPage from "./pages/MatchResultsPage";
 function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/matches" element={<MatchResultsPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />

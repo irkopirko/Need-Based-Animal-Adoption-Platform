@@ -61,6 +61,11 @@ function AdopterHomePage() {
     navigate("/adopter-messages");
   };
 
+  const goToMatches = ()  => {
+    navigate("/matches");
+    
+  };
+
   return (
     <div className="adopter-page">
       <Navbar />
@@ -96,9 +101,9 @@ function AdopterHomePage() {
               <button
                 type="button"
                 className="adopter-secondary-btn"
-                disabled
+                onClick={goToMatches}
               >
-                Compatible Animals Locked
+                View Compatible Animals
               </button>
             </div>
           </div>
