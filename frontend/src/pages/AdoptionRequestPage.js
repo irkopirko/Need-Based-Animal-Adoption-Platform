@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import "./AdoptionRequestPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -6,15 +6,8 @@ import { useNavigate } from "react-router-dom";
 
 function AdoptionRequestPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState(1);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState("success");
-  const [errors, setErrors] = useState({});
 
-  const totalSteps = 6;
-
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     indoorSpace: "",
     livingSpace: "",
     livingSpaceOther: "",
@@ -46,7 +39,32 @@ function AdoptionRequestPage() {
     groomingTolerance: [],
     specialNeedsAcceptance: "",
     notes: ""
-  });
+  };
+
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState(defaultFormData);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+  const [toastType, setToastType] = useState("success");
+  const [errors, setErrors] = useState({});
+  const [requestSaved, setRequestSaved] = useState(false);
+
+  const totalSteps = 6;
+
+  useEffect(() => {
+    const editingId = localStorage.getItem("editingRequestId");
+    const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
+
+    if (editingId) {
+      const existingRequest = storedRequests.find(
+        (item) => String(item.id) === String(editingId)
+      );
+
+      if (existingRequest) {
+        setFormData(existingRequest);
+      }
+    }
+  }, []);
 
   const triggerToast = (message, type = "success") => {
     setToastMessage(message);
@@ -70,6 +88,10 @@ function AdoptionRequestPage() {
       ...prev,
       [name]: false
     }));
+
+    if (step === 6) {
+      setRequestSaved(false);
+    }
   };
 
   const handleCheckboxArrayChange = (fieldName, value) => {
@@ -91,6 +113,10 @@ function AdoptionRequestPage() {
       ...prev,
       [fieldName]: false
     }));
+
+    if (step === 6) {
+      setRequestSaved(false);
+    }
   };
 
   const showChildrenAge = formData.hasChildren === "Yes";
@@ -107,19 +133,11 @@ function AdoptionRequestPage() {
     const options = [];
 
     if (selectedAnimalTypes.includes("Dog")) {
-      options.push(
-        "Dog - Puppy / Young",
-        "Dog - Adult",
-        "Dog - Senior"
-      );
+      options.push("Dog - Puppy / Young", "Dog - Adult", "Dog - Senior");
     }
 
     if (selectedAnimalTypes.includes("Cat")) {
-      options.push(
-        "Cat - Kitten / Young",
-        "Cat - Adult",
-        "Cat - Senior"
-      );
+      options.push("Cat - Kitten / Young", "Cat - Adult", "Cat - Senior");
     }
 
     return options;
@@ -151,11 +169,7 @@ function AdoptionRequestPage() {
     const options = [];
 
     if (selectedAnimalTypes.includes("Dog")) {
-      options.push(
-        "Dog - Small",
-        "Dog - Medium",
-        "Dog - Large"
-      );
+      options.push("Dog - Small", "Dog - Medium", "Dog - Large");
     }
 
     return options;
@@ -282,6 +296,7 @@ function AdoptionRequestPage() {
     }
 
     setErrors({});
+
     if (step < totalSteps) {
       setStep(step + 1);
     }
@@ -290,30 +305,54 @@ function AdoptionRequestPage() {
   const goBack = () => {
     if (step > 1) {
       setStep(step - 1);
+      setRequestSaved(false);
     }
   };
 
   const handleSubmit = (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  const valid = validateCurrentStep();
+    const valid = validateCurrentStep();
 
-  if (!valid) {
-    triggerToast("Required fields must be completed.", "error");
-    return;
-  }
+    if (!valid) {
+      triggerToast("Required fields must be completed.", "error");
+      return;
+    }
 
-  setErrors({});
+    setErrors({});
 
-  localStorage.setItem("adoptionRequest", JSON.stringify(formData));
+    const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
+    const editingId = localStorage.getItem("editingRequestId");
 
-  triggerToast("Adoption request saved successfully.", "success");
-  console.log("Adoption request data:", formData);
+    let updatedRequests = [];
 
-  setTimeout(() => {
-    navigate("/matches");
-  }, 1000);
-};
+    if (editingId) {
+      updatedRequests = storedRequests.map((item) =>
+        String(item.id) === String(editingId)
+          ? {
+              ...formData,
+              id: item.id,
+              createdAt: item.createdAt || new Date().toISOString()
+            }
+          : item
+      );
+    } else {
+      const newRequest = {
+        ...formData,
+        id: Date.now(),
+        createdAt: new Date().toISOString()
+      };
+
+      updatedRequests = [...storedRequests, newRequest];
+    }
+
+    localStorage.setItem("adoptionRequests", JSON.stringify(updatedRequests));
+    localStorage.setItem("adoptionRequest", JSON.stringify(formData));
+    localStorage.removeItem("editingRequestId");
+
+    setRequestSaved(true);
+    triggerToast("Adoption request saved successfully.", "success");
+  };
 
   const getStepClass = (stepNumber) => {
     if (stepNumber < step) {
@@ -911,27 +950,49 @@ function AdoptionRequestPage() {
             )}
 
             <div className="adoption-request-actions">
-              <button
-                type="button"
-                className="adoption-back-btn"
-                onClick={goBack}
-                disabled={step === 1}
-              >
-                Back
-              </button>
-
               {step < totalSteps ? (
-                <button
-                  type="button"
-                  className="adoption-next-btn"
-                  onClick={goNext}
-                >
-                  Next
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="adoption-back-btn"
+                    onClick={goBack}
+                    disabled={step === 1}
+                  >
+                    Back
+                  </button>
+
+                  <button
+                    type="button"
+                    className="adoption-next-btn"
+                    onClick={goNext}
+                  >
+                    Next
+                  </button>
+                </>
               ) : (
-                <button type="submit" className="adoption-submit-btn">
-                  Save Adoption Request
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="adoption-back-btn"
+                    onClick={goBack}
+                  >
+                    Go Back to Edit
+                  </button>
+
+                  {!requestSaved ? (
+                    <button type="submit" className="adoption-submit-btn">
+                      Save Adoption Request
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="adoption-submit-btn"
+                      onClick={() => navigate("/matches")}
+                    >
+                      Submit and Go to Matches
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </form>

@@ -14,6 +14,17 @@ function MatchResultsPage() {
   const user = JSON.parse(localStorage.getItem("paviaUser"));
   const userId = user?.userId || 1;
 
+  const handleEditPreferences = () => {
+  const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
+
+  if (storedRequests.length > 0) {
+    const latestRequest = storedRequests[storedRequests.length - 1];
+    localStorage.setItem("editingRequestId", latestRequest.id);
+  }
+
+  navigate("/adoption-request");
+};
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -78,7 +89,7 @@ function MatchResultsPage() {
             )}
 
             <button className="edit-preferences-btn"
-            onClick={()=> navigate("/adoption-request")}>
+            onClick={handleEditPreferences}>
               Edit Preferences
             </button>
           </div>
@@ -109,7 +120,7 @@ function MatchResultsPage() {
               <h3>No strong matches found yet</h3>
               <p>Try editing your preferences to discover more compatible animals.</p>
               <button className="empty-btn"
-              onClick={()=> navigate("/adoption-request")}>
+              onClick={handleEditPreferences}>
                 Edit Preferences
                 </button>
             </div>
