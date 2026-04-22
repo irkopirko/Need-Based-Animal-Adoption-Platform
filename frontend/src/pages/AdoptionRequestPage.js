@@ -2,8 +2,10 @@ import React, { useMemo, useState } from "react";
 import "./AdoptionRequestPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { useNavigate } from "react-router-dom";
 
 function AdoptionRequestPage() {
+  const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
@@ -292,19 +294,26 @@ function AdoptionRequestPage() {
   };
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    const valid = validateCurrentStep();
+  const valid = validateCurrentStep();
 
-    if (!valid) {
-      triggerToast("Required fields must be completed.", "error");
-      return;
-    }
+  if (!valid) {
+    triggerToast("Required fields must be completed.", "error");
+    return;
+  }
 
-    setErrors({});
-    triggerToast("Adoption request saved successfully.", "success");
-    console.log("Adoption request data:", formData);
-  };
+  setErrors({});
+
+  localStorage.setItem("adoptionRequest", JSON.stringify(formData));
+
+  triggerToast("Adoption request saved successfully.", "success");
+  console.log("Adoption request data:", formData);
+
+  setTimeout(() => {
+    navigate("/matches");
+  }, 1000);
+};
 
   const getStepClass = (stepNumber) => {
     if (stepNumber < step) {

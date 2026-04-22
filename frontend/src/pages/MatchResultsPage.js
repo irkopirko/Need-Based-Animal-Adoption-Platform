@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import "./MatchResultsPage.css";
+import "./MatchResultsPage.css"; 
+import { useNavigate } from "react-router-dom";
 
 function MatchResultsPage() {
   const [matches, setMatches] = useState([]);
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [requestData, setRequestData] = useState(null);
+  const navigate= useNavigate();
 
   const user = JSON.parse(localStorage.getItem("paviaUser"));
   const userId = user?.userId || 1;
@@ -29,7 +31,7 @@ function MatchResultsPage() {
 
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
-          setProfile(profileData);
+          // setProfile(profileData);
         }
       } catch (error) {
         console.error(error);
@@ -38,7 +40,11 @@ function MatchResultsPage() {
         setLoading(false);
       }
     };
-
+    const stored = localStorage.getItem("adoptionRequest");
+    if (stored) {
+      setRequestData(JSON.parse(stored));
+    }
+  
     fetchData();
   }, [userId]);
 
@@ -59,20 +65,20 @@ function MatchResultsPage() {
           <div className="summary-card">
             <h3>Your Preferences</h3>
 
-            {profile ? (
+            {requestData ? (
               <div className="summary-grid">
-                <div><span>Animal Type:</span> {profile.preferredAnimalType}</div>
-                <div><span>Size:</span> {profile.preferredSize}</div>
-                <div><span>Age:</span> {profile.preferredAge}</div>
-                <div><span>Home:</span> {profile.homeType}</div>
-                <div><span>Activity:</span> {profile.activityLevel}</div>
-                <div><span>Indoor Space:</span> {profile.indoorSpace}</div>
-              </div>
+  <div><span>Animal Type:</span> {requestData.preferredAnimalTypes?.join(", ")}</div>
+  <div><span>Size:</span> {requestData.preferredSizes?.join(", ")}</div>
+  <div><span>Age:</span> {requestData.preferredAgeRanges?.join(", ")}</div>
+  <div><span>Home:</span> {requestData.livingSpace}</div>
+  <div><span>Activity:</span> {requestData.activityLevel}</div>
+</div>
             ) : (
               <p className="match-info">Profile information could not be loaded.</p>
             )}
 
-            <button className="edit-preferences-btn">
+            <button className="edit-preferences-btn"
+            onClick={()=> navigate("/adoption-request")}>
               Edit Preferences
             </button>
           </div>
@@ -102,7 +108,10 @@ function MatchResultsPage() {
             <div className="match-empty">
               <h3>No strong matches found yet</h3>
               <p>Try editing your preferences to discover more compatible animals.</p>
-              <button className="empty-btn">Edit Preferences</button>
+              <button className="empty-btn"
+              onClick={()=> navigate("/adoption-request")}>
+                Edit Preferences
+                </button>
             </div>
           )}
 
