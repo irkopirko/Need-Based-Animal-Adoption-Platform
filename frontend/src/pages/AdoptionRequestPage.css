@@ -404,4 +404,24 @@
   .checkbox-grid {
     grid-template-columns: 1fr;
   }
+  .required-star {
+    color: #ff4d4f;
+    margin-left: 4px;
+    font-weight: 900;
+  }
+
+  .required-field-note {
+    position: fixed;
+    right: 22px;
+    bottom: 76px;
+    background: #ffffff;
+    border: 1px solid #ecece6;
+    color: #555;
+    padding: 10px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+    z-index: 998;
+  }
 }

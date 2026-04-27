@@ -14,24 +14,20 @@ function AdoptionRequestPage() {
     housingStatus: "",
     hasGarden: "",
     outdoorAccess: "",
-
     activityLevel: "",
     workSchedule: "",
     timeAtHome: "",
-
     householdType: "",
     hasChildren: "",
     childrenAgeGroup: [],
     hasOtherPets: "",
     otherPetsType: [],
     otherPetsTypeOther: "",
-
     primaryCaretaker: "",
     primaryCaretakerOther: "",
     hasPreviousExperience: "",
     previousPetTypes: [],
     previousPetTypesOther: "",
-
     preferredAnimalTypes: [],
     preferredEnergyLevels: [],
     preferredAgeRanges: [],
@@ -65,6 +61,43 @@ function AdoptionRequestPage() {
       }
     }
   }, []);
+
+  const applyDefaultValues = () => {
+    return {
+      ...formData,
+      housingStatus: formData.housingStatus || "Not Specified",
+      childrenAgeGroup:
+        formData.hasChildren === "Yes" && formData.childrenAgeGroup.length === 0
+          ? ["Not Specified"]
+          : formData.childrenAgeGroup,
+      otherPetsType:
+        formData.hasOtherPets === "Yes" && formData.otherPetsType.length === 0
+          ? ["Not Specified"]
+          : formData.otherPetsType,
+      otherPetsTypeOther:
+        formData.otherPetsType.includes("Other") &&
+        formData.otherPetsTypeOther.trim() === ""
+          ? "Not Specified"
+          : formData.otherPetsTypeOther,
+      primaryCaretaker: formData.primaryCaretaker || "Me",
+      primaryCaretakerOther:
+        formData.primaryCaretaker === "Other" &&
+        formData.primaryCaretakerOther.trim() === ""
+          ? "Not Specified"
+          : formData.primaryCaretakerOther,
+      previousPetTypes:
+        formData.hasPreviousExperience === "Yes" &&
+        formData.previousPetTypes.length === 0
+          ? ["Not Specified"]
+          : formData.previousPetTypes,
+      previousPetTypesOther:
+        formData.previousPetTypes.includes("Other") &&
+        formData.previousPetTypesOther.trim() === ""
+          ? "Not Specified"
+          : formData.previousPetTypesOther,
+      notes: formData.notes.trim() === "" ? "No additional notes" : formData.notes
+    };
+  };
 
   const triggerToast = (message, type = "success") => {
     setToastMessage(message);
@@ -118,6 +151,13 @@ function AdoptionRequestPage() {
       setRequestSaved(false);
     }
   };
+
+  const RequiredLabel = ({ children }) => (
+    <label>
+      {children}
+      <span className="required-star">*</span>
+    </label>
+  );
 
   const showChildrenAge = formData.hasChildren === "Yes";
   const showOtherPetsType = formData.hasOtherPets === "Yes";
@@ -185,7 +225,6 @@ function AdoptionRequestPage() {
     if (step === 1) {
       if (formData.indoorSpace === "") newErrors.indoorSpace = true;
       if (formData.livingSpace === "") newErrors.livingSpace = true;
-      if (formData.housingStatus === "") newErrors.housingStatus = true;
       if (formData.hasGarden === "") newErrors.hasGarden = true;
       if (formData.outdoorAccess === "") newErrors.outdoorAccess = true;
 
@@ -204,36 +243,11 @@ function AdoptionRequestPage() {
       if (formData.householdType === "") newErrors.householdType = true;
       if (formData.hasChildren === "") newErrors.hasChildren = true;
       if (formData.hasOtherPets === "") newErrors.hasOtherPets = true;
-
-      if (showChildrenAge && formData.childrenAgeGroup.length === 0) {
-        newErrors.childrenAgeGroup = true;
-      }
-
-      if (showOtherPetsType && formData.otherPetsType.length === 0) {
-        newErrors.otherPetsType = true;
-      }
-
-      if (showOtherPetsOther && formData.otherPetsTypeOther.trim() === "") {
-        newErrors.otherPetsTypeOther = true;
-      }
     }
 
     if (step === 4) {
-      if (formData.primaryCaretaker === "") newErrors.primaryCaretaker = true;
       if (formData.hasPreviousExperience === "") {
         newErrors.hasPreviousExperience = true;
-      }
-
-      if (showPrimaryCaretakerOther && formData.primaryCaretakerOther.trim() === "") {
-        newErrors.primaryCaretakerOther = true;
-      }
-
-      if (showPreviousPetTypes && formData.previousPetTypes.length === 0) {
-        newErrors.previousPetTypes = true;
-      }
-
-      if (showPreviousPetTypesOther && formData.previousPetTypesOther.trim() === "") {
-        newErrors.previousPetTypesOther = true;
       }
     }
 
@@ -250,11 +264,11 @@ function AdoptionRequestPage() {
         newErrors.specialNeedsAcceptance = true;
       }
 
-      if (ageOptions.length > 0 && formData.preferredAgeRanges.length === 0) {
+      if (selectedAnimalTypes.length > 0 && formData.preferredAgeRanges.length === 0) {
         newErrors.preferredAgeRanges = true;
       }
 
-      if (groomingOptions.length > 0 && formData.groomingTolerance.length === 0) {
+      if (selectedAnimalTypes.length > 0 && formData.groomingTolerance.length === 0) {
         newErrors.groomingTolerance = true;
       }
 
@@ -319,7 +333,7 @@ function AdoptionRequestPage() {
       return;
     }
 
-    setErrors({});
+    const completedFormData = applyDefaultValues();
 
     const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
     const editingId = localStorage.getItem("editingRequestId");
@@ -330,7 +344,7 @@ function AdoptionRequestPage() {
       updatedRequests = storedRequests.map((item) =>
         String(item.id) === String(editingId)
           ? {
-              ...formData,
+              ...completedFormData,
               id: item.id,
               createdAt: item.createdAt || new Date().toISOString()
             }
@@ -338,7 +352,7 @@ function AdoptionRequestPage() {
       );
     } else {
       const newRequest = {
-        ...formData,
+        ...completedFormData,
         id: Date.now(),
         createdAt: new Date().toISOString()
       };
@@ -347,9 +361,12 @@ function AdoptionRequestPage() {
     }
 
     localStorage.setItem("adoptionRequests", JSON.stringify(updatedRequests));
-    localStorage.setItem("adoptionRequest", JSON.stringify(formData));
+    localStorage.setItem("adoptionRequest", JSON.stringify(completedFormData));
+    localStorage.setItem("adoptionRequestCompleted", "true");
     localStorage.removeItem("editingRequestId");
 
+    setFormData(completedFormData);
+    setErrors({});
     setRequestSaved(true);
     triggerToast("Adoption request saved successfully.", "success");
   };
@@ -460,7 +477,7 @@ function AdoptionRequestPage() {
 
                 <div className="adoption-request-grid">
                   <div className="adoption-request-group">
-                    <label>Indoor Space</label>
+                    <RequiredLabel>Indoor Space</RequiredLabel>
                     <select
                       name="indoorSpace"
                       value={formData.indoorSpace}
@@ -475,7 +492,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group">
-                    <label>Living Space</label>
+                    <RequiredLabel>Living Space</RequiredLabel>
                     <select
                       name="livingSpace"
                       value={formData.livingSpace}
@@ -493,7 +510,7 @@ function AdoptionRequestPage() {
 
                   {showLivingSpaceOther && (
                     <div className="adoption-request-group adoption-request-full">
-                      <label>Please Specify Your Living Space</label>
+                      <RequiredLabel>Please Specify Your Living Space</RequiredLabel>
                       <input
                         type="text"
                         name="livingSpaceOther"
@@ -511,7 +528,6 @@ function AdoptionRequestPage() {
                       name="housingStatus"
                       value={formData.housingStatus}
                       onChange={handleChange}
-                      className={errors.housingStatus ? "error-input" : ""}
                     >
                       <option value="">Select</option>
                       <option value="Owner">Owner</option>
@@ -521,7 +537,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group">
-                    <label>Do You Have a Garden?</label>
+                    <RequiredLabel>Do You Have a Garden?</RequiredLabel>
                     <select
                       name="hasGarden"
                       value={formData.hasGarden}
@@ -535,7 +551,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group adoption-request-full">
-                    <label>What kind of outdoor access do you have?</label>
+                    <RequiredLabel>What kind of outdoor access do you have?</RequiredLabel>
                     <select
                       name="outdoorAccess"
                       value={formData.outdoorAccess}
@@ -560,7 +576,7 @@ function AdoptionRequestPage() {
 
                 <div className="adoption-request-grid">
                   <div className="adoption-request-group">
-                    <label>Activity Level</label>
+                    <RequiredLabel>Activity Level</RequiredLabel>
                     <select
                       name="activityLevel"
                       value={formData.activityLevel}
@@ -575,7 +591,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group">
-                    <label>Work / School Schedule</label>
+                    <RequiredLabel>Work / School Schedule</RequiredLabel>
                     <select
                       name="workSchedule"
                       value={formData.workSchedule}
@@ -591,7 +607,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group adoption-request-full">
-                    <label>Average Time Spent at Home</label>
+                    <RequiredLabel>Average Time Spent at Home</RequiredLabel>
                     <select
                       name="timeAtHome"
                       value={formData.timeAtHome}
@@ -615,7 +631,7 @@ function AdoptionRequestPage() {
 
                 <div className="adoption-request-grid">
                   <div className="adoption-request-group">
-                    <label>Household Type</label>
+                    <RequiredLabel>Household Type</RequiredLabel>
                     <select
                       name="householdType"
                       value={formData.householdType}
@@ -631,7 +647,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   <div className="adoption-request-group">
-                    <label>Children in Home</label>
+                    <RequiredLabel>Children in Home</RequiredLabel>
                     <select
                       name="hasChildren"
                       value={formData.hasChildren}
@@ -645,7 +661,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   {showChildrenAge && (
-                    <div className={`adoption-request-group adoption-request-full ${errors.childrenAgeGroup ? "error-group" : ""}`}>
+                    <div className="adoption-request-group adoption-request-full">
                       <label>Children Age Group</label>
                       <CheckboxGroup
                         fieldName="childrenAgeGroup"
@@ -655,7 +671,7 @@ function AdoptionRequestPage() {
                   )}
 
                   <div className="adoption-request-group">
-                    <label>Other Pets in Home</label>
+                    <RequiredLabel>Other Pets in Home</RequiredLabel>
                     <select
                       name="hasOtherPets"
                       value={formData.hasOtherPets}
@@ -669,7 +685,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   {showOtherPetsType && (
-                    <div className={`adoption-request-group adoption-request-full ${errors.otherPetsType ? "error-group" : ""}`}>
+                    <div className="adoption-request-group adoption-request-full">
                       <label>Other Pets Type</label>
                       <CheckboxGroup
                         fieldName="otherPetsType"
@@ -687,7 +703,7 @@ function AdoptionRequestPage() {
                         value={formData.otherPetsTypeOther}
                         onChange={handleChange}
                         placeholder="Write the other pet type"
-                        className={`adoption-text-input ${errors.otherPetsTypeOther ? "error-input" : ""}`}
+                        className="adoption-text-input"
                       />
                     </div>
                   )}
@@ -706,7 +722,6 @@ function AdoptionRequestPage() {
                       name="primaryCaretaker"
                       value={formData.primaryCaretaker}
                       onChange={handleChange}
-                      className={errors.primaryCaretaker ? "error-input" : ""}
                     >
                       <option value="">Select</option>
                       <option value="Me">Me</option>
@@ -726,13 +741,13 @@ function AdoptionRequestPage() {
                         value={formData.primaryCaretakerOther}
                         onChange={handleChange}
                         placeholder="Write who will be the caretaker"
-                        className={`adoption-text-input ${errors.primaryCaretakerOther ? "error-input" : ""}`}
+                        className="adoption-text-input"
                       />
                     </div>
                   )}
 
                   <div className="adoption-request-group adoption-request-full">
-                    <label>Do You Have Previous Experience Caring for a Pet?</label>
+                    <RequiredLabel>Do You Have Previous Experience Caring for a Pet?</RequiredLabel>
                     <select
                       name="hasPreviousExperience"
                       value={formData.hasPreviousExperience}
@@ -746,7 +761,7 @@ function AdoptionRequestPage() {
                   </div>
 
                   {showPreviousPetTypes && (
-                    <div className={`adoption-request-group adoption-request-full ${errors.previousPetTypes ? "error-group" : ""}`}>
+                    <div className="adoption-request-group adoption-request-full">
                       <label>What Type of Pet Did You Have Before?</label>
                       <CheckboxGroup
                         fieldName="previousPetTypes"
@@ -764,7 +779,7 @@ function AdoptionRequestPage() {
                         value={formData.previousPetTypesOther}
                         onChange={handleChange}
                         placeholder="Write the other pet type"
-                        className={`adoption-text-input ${errors.previousPetTypesOther ? "error-input" : ""}`}
+                        className="adoption-text-input"
                       />
                     </div>
                   )}
@@ -777,7 +792,7 @@ function AdoptionRequestPage() {
                 <h3>Animal Preferences</h3>
 
                 <div className={`adoption-request-group adoption-request-full ${errors.preferredAnimalTypes ? "error-group" : ""}`}>
-                  <label>Preferred Animal Type</label>
+                  <RequiredLabel>Preferred Animal Type</RequiredLabel>
                   <div className="animal-choice-grid">
                     {["Dog", "Cat"].map((animal) => {
                       const isSelected = formData.preferredAnimalTypes.includes(animal);
@@ -805,7 +820,7 @@ function AdoptionRequestPage() {
                 </div>
 
                 <div className={`adoption-request-group adoption-request-full ${errors.preferredEnergyLevels ? "error-group" : ""}`}>
-                  <label>Preferred Energy Level</label>
+                  <RequiredLabel>Preferred Energy Level</RequiredLabel>
                   <CheckboxGroup
                     fieldName="preferredEnergyLevels"
                     options={["Calm", "Balanced", "Active"]}
@@ -813,15 +828,8 @@ function AdoptionRequestPage() {
                 </div>
 
                 {selectedAnimalTypes.length > 0 && (
-                  <div
-                    className={`adoption-request-group adoption-request-full ${
-                      errors.preferredAgeRanges ||
-                      selectedAnimalTypes.some((animal) => errors[`age-${animal}`])
-                        ? "error-group"
-                        : ""
-                    }`}
-                  >
-                    <label>Preferred Age Range</label>
+                  <div className={`adoption-request-group adoption-request-full ${errors.preferredAgeRanges ? "error-group" : ""}`}>
+                    <RequiredLabel>Preferred Age Range</RequiredLabel>
                     <CheckboxGroup
                       fieldName="preferredAgeRanges"
                       options={ageOptions}
@@ -831,7 +839,7 @@ function AdoptionRequestPage() {
 
                 {sizeOptions.length > 0 && (
                   <div className={`adoption-request-group adoption-request-full ${errors.preferredSizes ? "error-group" : ""}`}>
-                    <label>Preferred Size</label>
+                    <RequiredLabel>Preferred Size</RequiredLabel>
                     <CheckboxGroup
                       fieldName="preferredSizes"
                       options={sizeOptions}
@@ -840,15 +848,8 @@ function AdoptionRequestPage() {
                 )}
 
                 {selectedAnimalTypes.length > 0 && (
-                  <div
-                    className={`adoption-request-group adoption-request-full ${
-                      errors.groomingTolerance ||
-                      selectedAnimalTypes.some((animal) => errors[`groom-${animal}`])
-                        ? "error-group"
-                        : ""
-                    }`}
-                  >
-                    <label>Grooming Tolerance</label>
+                  <div className={`adoption-request-group adoption-request-full ${errors.groomingTolerance ? "error-group" : ""}`}>
+                    <RequiredLabel>Grooming Tolerance</RequiredLabel>
                     <CheckboxGroup
                       fieldName="groomingTolerance"
                       options={groomingOptions}
@@ -857,7 +858,7 @@ function AdoptionRequestPage() {
                 )}
 
                 <div className="adoption-request-group adoption-request-full">
-                  <label>Special Needs Acceptance</label>
+                  <RequiredLabel>Special Needs Acceptance</RequiredLabel>
                   <select
                     name="specialNeedsAcceptance"
                     value={formData.specialNeedsAcceptance}
@@ -892,7 +893,7 @@ function AdoptionRequestPage() {
                     <h4>Home</h4>
                     <p><strong>Indoor Space:</strong> {formData.indoorSpace || "-"}</p>
                     <p><strong>Living Space:</strong> {formData.livingSpace === "Other" ? formData.livingSpaceOther || "Other" : formData.livingSpace || "-"}</p>
-                    <p><strong>Housing Status:</strong> {formData.housingStatus || "-"}</p>
+                    <p><strong>Housing Status:</strong> {formData.housingStatus || "Not Specified"}</p>
                     <p><strong>Garden:</strong> {formData.hasGarden || "-"}</p>
                     <p><strong>Outdoor Access:</strong> {formData.outdoorAccess || "-"}</p>
                   </div>
@@ -908,21 +909,21 @@ function AdoptionRequestPage() {
                     <h4>Household</h4>
                     <p><strong>Household Type:</strong> {formData.householdType || "-"}</p>
                     <p><strong>Children:</strong> {formData.hasChildren || "-"}</p>
-                    <p><strong>Children Age Group:</strong> {formData.childrenAgeGroup.join(", ") || "-"}</p>
+                    <p><strong>Children Age Group:</strong> {formData.childrenAgeGroup.join(", ") || "Not Specified"}</p>
                     <p><strong>Other Pets:</strong> {formData.hasOtherPets || "-"}</p>
-                    <p><strong>Other Pets Type:</strong> {formData.otherPetsType.join(", ") || "-"}</p>
+                    <p><strong>Other Pets Type:</strong> {formData.otherPetsType.join(", ") || "Not Specified"}</p>
                     {formData.otherPetsType.includes("Other") && (
-                      <p><strong>Other Pet Description:</strong> {formData.otherPetsTypeOther || "-"}</p>
+                      <p><strong>Other Pet Description:</strong> {formData.otherPetsTypeOther || "Not Specified"}</p>
                     )}
                   </div>
 
                   <div className="review-box">
                     <h4>Experience</h4>
-                    <p><strong>Primary Caretaker:</strong> {formData.primaryCaretaker === "Other" ? formData.primaryCaretakerOther || "Other" : formData.primaryCaretaker || "-"}</p>
+                    <p><strong>Primary Caretaker:</strong> {formData.primaryCaretaker || "Me"}</p>
                     <p><strong>Previous Experience:</strong> {formData.hasPreviousExperience || "-"}</p>
-                    <p><strong>Previous Pet Types:</strong> {formData.previousPetTypes.join(", ") || "-"}</p>
+                    <p><strong>Previous Pet Types:</strong> {formData.previousPetTypes.join(", ") || "Not Specified"}</p>
                     {formData.previousPetTypes.includes("Other") && (
-                      <p><strong>Other Previous Pet:</strong> {formData.previousPetTypesOther || "-"}</p>
+                      <p><strong>Other Previous Pet:</strong> {formData.previousPetTypesOther || "Not Specified"}</p>
                     )}
                   </div>
 
@@ -987,7 +988,7 @@ function AdoptionRequestPage() {
                     <button
                       type="button"
                       className="adoption-submit-btn"
-                      onClick={() => navigate("/matches")}
+                      onClick={() => navigate("/compatible-animals")}
                     >
                       Submit and Go to Matches
                     </button>
@@ -998,6 +999,10 @@ function AdoptionRequestPage() {
           </form>
         </section>
       </main>
+
+      <div className="required-field-note">
+        <span className="required-star">*</span> indicates required fields
+      </div>
 
       <Footer />
 
