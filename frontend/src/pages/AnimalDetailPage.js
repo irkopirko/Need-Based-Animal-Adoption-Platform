@@ -12,10 +12,9 @@ function AnimalDetailPage() {
   const [selectedImage, setSelectedImage] = useState("");
   const [saved, setSaved] = useState(false);
 
-  const storedUser = localStorage.getItem("paviaUser");
-  const user = storedUser ? JSON.parse(storedUser) : null;
-  const isOwner = user?.role === "owner";
-  const isAdopter = user?.role === "adopter";
+   const user = getStoredUser();
+    const isOwner = user?.role === "OWNER";
+    const isAdopter = user?.role === "ADOPTER";
 
   useEffect(() => {
     const fetchAnimal = async () => {

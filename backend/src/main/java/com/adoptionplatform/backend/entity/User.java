@@ -26,6 +26,12 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
+    @Column(nullable = false)
+    private boolean emailVerified = false;
+
+    private String emailVerificationCode;
+    private Long emailVerificationExpiresAt;
+
     public User() {}
 
     public Long getId() {
@@ -78,5 +84,29 @@ public class User {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
+
+    public String getEmailVerificationCode() {
+        return emailVerificationCode;
+    }
+
+    public void setEmailVerificationCode(String emailVerificationCode) {
+        this.emailVerificationCode = emailVerificationCode;
+    }
+
+    public Long getEmailVerificationExpiresAt() {
+        return emailVerificationExpiresAt;
+    }
+
+    public void setEmailVerificationExpiresAt(Long emailVerificationExpiresAt) {
+        this.emailVerificationExpiresAt = emailVerificationExpiresAt;
     }
 }

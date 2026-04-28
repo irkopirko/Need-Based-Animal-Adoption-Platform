@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Navbar.css";
+import { getHomePathByRole, getStoredUser, normalizeRole } from "../utils/auth";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -9,34 +10,16 @@ function Navbar() {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("paviaUser");
-
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    } else {
-      setUser(null);
-    }
+    setUser(getStoredUser());
   }, []);
 
   const isLoggedIn = !!user;
+  const normalizedRole = normalizeRole(user?.role);
 
   const goHome = () => {
-    if (!user) {
-      navigate("/");
-      return;
-    }
-
-    if (user.role === "adopter") {
-      navigate("/adopter-home");
-      return;
-    }
-
-    if (user.role === "owner") {
-      navigate("/owner-home");
-      return;
-    }
-
-    navigate("/");
+    const activeUser = getStoredUser();
+    setUser(activeUser);
+    navigate(getHomePathByRole(activeUser?.role));
   };
 
   const goRegister = () => navigate("/register");
@@ -62,20 +45,22 @@ function Navbar() {
   const getMenuItems = () => {
     if (!user) return [];
 
-    if (user.role === "owner") {
+    if (normalizedRole === "OWNER") {
       return [
-        { label: "My Animal Listings", path: "/owner-home" },
+        { label: "Owner Homepage", path: "/ownerhomepage" },
+        { label: "Register Animal", path: "/register-animal" },
+        { label: "Manage Requests", path: "/owner-requests" },
         { label: "Messages", path: "/owner-messages" },
-        { label: "Adoption Inquiries", path: "/owner-inquiries" },
-        { label: "Account Settings", path: "/owner-profile" }
+        { label: "My Animal Listings", path: "/ownerhomepage" }
       ];
     }
 
     return [
+      { label: "Adopter Homepage", path: "/adopterhomepage" },
+      { label: "Create Adoption Request", path: "/adoption-request" },
+      { label: "Compatible Animals", path: "/matches" },
       { label: "Saved Animals", path: "/saved-animals" },
-      { label: "My Adoption Requests", path: "/adoption-request" },
-      { label: "Messages", path: "/adopter-messages" },
-      { label: "Account Settings", path: "/adopter-profile" }
+      { label: "Messages", path: "/adopter-messages" }
     ];
   };
 
@@ -121,7 +106,7 @@ function Navbar() {
           </button>
         )}
 
-        {isLoggedIn && user?.role === "adopter" && (
+        {isLoggedIn && normalizedRole === "ADOPTER" && (
           <button
             type="button"
             className="navbar-link-btn"
@@ -131,7 +116,7 @@ function Navbar() {
           </button>
         )}
 
-        {isLoggedIn && user?.role === "owner" && (
+        {isLoggedIn && normalizedRole === "OWNER" && (
           <button
             type="button"
             className="navbar-link-btn"
@@ -179,7 +164,7 @@ function Navbar() {
                 <div className="nav-profile-menu-head">
                   <p className="nav-profile-name">My Account</p>
                   <p className="nav-profile-role">
-                    {user?.role === "owner" ? "Owner" : "Adopter"}
+                    {normalizedRole === "OWNER" ? "Owner" : "Adopter"}
                   </p>
                 </div>
 

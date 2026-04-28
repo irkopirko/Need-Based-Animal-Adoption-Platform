@@ -15,6 +15,9 @@ import AnimalDetailPage from "./pages/AnimalDetailPage";
 import RegisterAnimalPage from "./pages/RegisterAnimalPage";
 import CompatibleAnimalsPage from "./pages/CompatibleAnimalsPage";
 import MatchResultsPage from "./pages/MatchResultsPage";
+import Verify2FAPage from "./pages/Verify2FAPage";
+
+
 function App() {
   return (
     <Router>
@@ -22,9 +25,10 @@ function App() {
         <Route path="/matches" element={<MatchResultsPage />} />
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
+         <Route path="/verify-email" element={<Verify2FAPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="/adopter-home" element={<AdopterHomePage />} />
-        <Route path="/owner-home" element={<OwnerHomePage />} />
+        <Route path="/adopterhomepage" element={<AdopterHomePage />} />
+        <Route path="/ownerhomepage" element={<OwnerHomePage />} />
         <Route path="/adoption-request" element={<AdoptionRequestPage />} />
         <Route path="/about" element={<AboutUsPage />} />
         <Route path="/adopt" element={<GuestAdoptPage />} />

@@ -32,6 +32,7 @@ public class AnimalService {
     public List<Animal> getCompatibleAnimals(Double threshold) {
         return animalRepository.findByCompatibilityScoreGreaterThanEqual(threshold);
     }
+
     public Animal updateAnimal(Long id, Animal updatedAnimal) {
         Animal existingAnimal = getAnimalById(id);
 
@@ -52,8 +53,8 @@ public class AnimalService {
 
         return animalRepository.save(existingAnimal);
     }
-    public Animal createAnimal(AnimalRequest request) {
 
+    public Animal createAnimal(AnimalRequest request) {
         Animal animal = new Animal();
         animal.setName(request.getName());
         animal.setAnimalType(request.getAnimalType());

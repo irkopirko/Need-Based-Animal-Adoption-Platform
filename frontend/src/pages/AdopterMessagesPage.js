@@ -65,7 +65,7 @@ function AdopterMessagesPage() {
             </p>
             <button
               className="messages-primary-btn"
-              onClick={() => navigate("/adopter-home")}
+              onClick={() => navigate("/adopterhomepage")}
             >
               View Compatible Animals
             </button>
@@ -90,7 +90,7 @@ function AdopterMessagesPage() {
             </p>
             <button
               className="messages-primary-btn"
-              onClick={() => navigate("/adopter-home")}
+              onClick={() => navigate("/adopterhomepage")}
             >
               Explore Compatible Animals
             </button>

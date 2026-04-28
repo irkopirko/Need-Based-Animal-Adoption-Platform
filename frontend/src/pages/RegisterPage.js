@@ -1,9 +1,12 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./RegisterPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { getApiBaseUrl, isValidEmail } from "../utils/auth";
 
 function RegisterPage() {
+  const navigate = useNavigate();
   const [role, setRole] = useState("ADOPTER");
   const [showPassword, setShowPassword] = useState(false);
   const [message, setMessage] = useState("");
@@ -14,7 +17,7 @@ function RegisterPage() {
     password: "",
     location: "",
     phone: "",
-    agreeToTerms: false,
+    agreeToTerms: false
   });
 
   const [errors, setErrors] = useState({
@@ -23,7 +26,7 @@ function RegisterPage() {
     password: false,
     location: false,
     phone: false,
-    agreeToTerms: false,
+    agreeToTerms: false
   });
 
   const [showToast, setShowToast] = useState(false);
@@ -33,12 +36,12 @@ function RegisterPage() {
 
     setFormData({
       ...formData,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : value
     });
 
     setErrors({
       ...errors,
-      [name]: false,
+      [name]: false
     });
   };
 
@@ -52,7 +55,7 @@ function RegisterPage() {
       password: false,
       location: false,
       phone: false,
-      agreeToTerms: false,
+      agreeToTerms: false
     };
 
     let hasError = false;
@@ -62,9 +65,13 @@ function RegisterPage() {
       hasError = true;
     }
 
-    if (formData.email.trim() === "" || !formData.email.includes("@")) {
+    if (!isValidEmail(formData.email)) {
       newErrors.email = true;
       hasError = true;
+      const invalidEmailMessage =
+        "Invalid email format. Please check your email address.";
+      setMessage(invalidEmailMessage);
+      window.alert(invalidEmailMessage);
     }
 
     if (formData.password.trim() === "") {
@@ -98,53 +105,65 @@ function RegisterPage() {
     }
 
     const userData = {
-      role: role,
+      role,
       fullName: formData.fullName,
       email: formData.email,
       password: formData.password,
       location: formData.location,
-      phone: formData.phone,
+      phone: formData.phone
     };
 
+    const apiBaseUrl = getApiBaseUrl();
+
     try {
-      const response = await fetch("http://localhost:8080/api/auth/register", {
+      const response = await fetch(`${apiBaseUrl}/api/auth/register`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(userData),
+        body: JSON.stringify(userData)
       });
 
       const result = await response.json();
+
+      if (result.error === "Invalid email format" || result.error === "Invalid email domain") {
+        const invalidEmailMessage =
+          "Invalid email format. Please check your email address.";
+        setMessage(invalidEmailMessage);
+        window.alert(invalidEmailMessage);
+        return;
+      }
+
+      if (result.error === "Email is already registered") {
+        const duplicateEmailMessage =
+          "An account with this email already exists. Please log in.";
+        setMessage(duplicateEmailMessage);
+        window.alert(duplicateEmailMessage);
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      if (result.error === "Could not send verification email. Please try again.") {
+        setMessage(result.error);
+        window.alert(result.error);
+        return;
+      }
 
       if (!response.ok) {
         setMessage(result.error || "Registration failed.");
         return;
       }
 
-      console.log("Backend response:", result);
-      setMessage("Account created successfully!");
-
-      setFormData({
-        fullName: "",
-        email: "",
-        password: "",
-        location: "",
-        phone: "",
-        agreeToTerms: false,
-      });
-
-      setErrors({
-        fullName: false,
-        email: false,
-        password: false,
-        location: false,
-        phone: false,
-        agreeToTerms: false,
+      // Account is NOT created here. Users must verify email first.
+      navigate("/verify-email", {
+        state: { email: formData.email.trim() },
+        replace: true
       });
     } catch (error) {
       console.error("Error while sending register request:", error);
-      setMessage("Could not connect to backend.");
+      setMessage(
+        `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
+      );
     }
   };
 
@@ -180,9 +199,9 @@ function RegisterPage() {
           <button
             type="button"
             className={`register-role-card ${
-              role === "SHELTER_OWNER" ? "register-role-card-active" : ""
+              role === "OWNER" ? "register-role-card-active" : ""
             }`}
-            onClick={() => setRole("SHELTER_OWNER")}
+            onClick={() => setRole("OWNER")}
           >
             <div className="register-role-icon register-role-icon-gray"></div>
             <h3>I am a Shelter / Owner</h3>

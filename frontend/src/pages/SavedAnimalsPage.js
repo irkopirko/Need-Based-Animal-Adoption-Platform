@@ -97,7 +97,7 @@ function SavedAnimalsPage() {
   };
 
   const goToCompatibleAnimals = () => {
-    navigate("/adopter-home");
+    navigate("/adopterhomepage");
   };
 
   return (

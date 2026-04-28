@@ -95,7 +95,7 @@ function OwnerManageRequestsPage() {
   };
 
   const goToListings = () => {
-    navigate("/owner-home");
+    navigate("/ownerhomepage");
   };
 
   const goToListingDetail = (listingId) => {

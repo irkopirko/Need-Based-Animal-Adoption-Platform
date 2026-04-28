@@ -81,7 +81,7 @@ function OwnerMessagesPage() {
             </p>
             <button
               className="owner-primary-btn"
-              onClick={() => navigate("/owner-home")}
+              onClick={() => navigate("/ownerhomepage")}
             >
               View My Listings
             </button>

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./LoginPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { getHomePathByRole, isValidEmail, normalizeRole } from "../utils/auth";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -25,8 +26,11 @@ function LoginPage() {
       return;
     }
 
-    if (!email.includes("@")) {
-      setMessage("Please enter a valid email.");
+    if (!isValidEmail(email)) {
+      const invalidEmailMessage =
+        "Invalid email format. Please check your email address.";
+      setMessage(invalidEmailMessage);
+      window.alert(invalidEmailMessage);
       return;
     }
 
@@ -44,8 +48,40 @@ function LoginPage() {
 
       const data = await response.json();
 
+      if (data.error === "Invalid email format" || data.error === "Invalid email domain") {
+        const invalidEmailMessage =
+          "Invalid email format. Please check your email address.";
+        setMessage(invalidEmailMessage);
+        window.alert(invalidEmailMessage);
+        return;
+      }
+
+      if (data.error === "User not found") {
+        const userNotFoundMessage =
+          "Account not found. Please create an account first.";
+        setMessage(userNotFoundMessage);
+        window.alert(userNotFoundMessage);
+        return;
+      }
+
+      if (data.error === "Please verify your email before logging in.") {
+        window.alert("Please verify your email before logging in.");
+        navigate("/verify-email", {
+          state: { email: email.trim() },
+          replace: true
+        });
+        return;
+      }
+
       if (!response.ok) {
         setMessage(data.error || "User not found or password is incorrect.");
+        return;
+      }
+
+      const resolvedRole = normalizeRole(data.role);
+
+      if (!resolvedRole) {
+        setMessage("User role could not be determined. Please try again.");
         return;
       }
 
@@ -53,17 +89,11 @@ function LoginPage() {
         "paviaUser",
         JSON.stringify({
           email: email.trim(),
-          role: data.role
+          role: resolvedRole
         })
       );
 
-      if (data.role === "ADOPTER") {
-        navigate("/adopter-home");
-      } else if (data.role === "SHELTER_OWNER") {
-        navigate("/owner-home");
-      } else {
-        navigate("/");
-      }
+      navigate(getHomePathByRole(resolvedRole), { replace: true });
     } catch (error) {
       console.error(error);
       setMessage("Could not connect to backend.");
