@@ -3,13 +3,19 @@ import { useNavigate } from "react-router-dom";
 import "./RegisterPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getApiBaseUrl, isValidEmail } from "../utils/auth";
+import {
+  getApiBaseUrl,
+  getMissingPasswordRequirements,
+  isPasswordValid,
+  isValidEmail
+} from "../utils/auth";
+import { usePopup } from "../components/PopupProvider";
 
 function RegisterPage() {
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
   const [role, setRole] = useState("ADOPTER");
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState("");
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -29,7 +35,7 @@ function RegisterPage() {
     agreeToTerms: false
   });
 
-  const [showToast, setShowToast] = useState(false);
+  const missingPasswordRequirements = getMissingPasswordRequirements(formData.password);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -47,8 +53,6 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
-
     const newErrors = {
       fullName: false,
       email: false,
@@ -70,11 +74,10 @@ function RegisterPage() {
       hasError = true;
       const invalidEmailMessage =
         "Invalid email format. Please check your email address.";
-      setMessage(invalidEmailMessage);
-      window.alert(invalidEmailMessage);
+      showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
     }
 
-    if (formData.password.trim() === "") {
+    if (formData.password.trim() === "" || !isPasswordValid(formData.password)) {
       newErrors.password = true;
       hasError = true;
     }
@@ -97,10 +100,11 @@ function RegisterPage() {
     setErrors(newErrors);
 
     if (hasError) {
-      setShowToast(true);
-      setTimeout(() => {
-        setShowToast(false);
-      }, 3000);
+      showPopup({
+        type: "warning",
+        title: "Form Incomplete",
+        message: "Please complete all required fields with valid values."
+      });
       return;
     }
 
@@ -129,28 +133,29 @@ function RegisterPage() {
       if (result.error === "Invalid email format" || result.error === "Invalid email domain") {
         const invalidEmailMessage =
           "Invalid email format. Please check your email address.";
-        setMessage(invalidEmailMessage);
-        window.alert(invalidEmailMessage);
+        showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
         return;
       }
 
       if (result.error === "Email is already registered") {
         const duplicateEmailMessage =
           "An account with this email already exists. Please log in.";
-        setMessage(duplicateEmailMessage);
-        window.alert(duplicateEmailMessage);
+        showPopup({ type: "info", title: "Account Exists", message: duplicateEmailMessage });
         navigate("/login", { replace: true });
         return;
       }
 
       if (result.error === "Could not send verification email. Please try again.") {
-        setMessage(result.error);
-        window.alert(result.error);
+        showPopup({ type: "error", title: "Email Error", message: result.error });
         return;
       }
 
       if (!response.ok) {
-        setMessage(result.error || "Registration failed.");
+        showPopup({
+          type: "error",
+          title: "Registration Failed",
+          message: result.error || "Registration failed."
+        });
         return;
       }
 
@@ -161,9 +166,11 @@ function RegisterPage() {
       });
     } catch (error) {
       console.error("Error while sending register request:", error);
-      setMessage(
-        `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
-      );
+      showPopup({
+        type: "error",
+        title: "Connection Error",
+        message: `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
+      });
     }
   };
 
@@ -221,8 +228,6 @@ function RegisterPage() {
             Tell us a bit about yourself to get started.
           </p>
 
-          {message !== "" && <div className="login-message">{message}</div>}
-
           <form onSubmit={handleSubmit}>
             <div className="register-form-grid">
               <div className="register-input-group">
@@ -271,6 +276,15 @@ function RegisterPage() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
+                {missingPasswordRequirements.length > 0 && formData.password.length > 0 && (
+                  <div className="password-requirements-box">
+                    {missingPasswordRequirements.map((requirement) => (
+                      <p key={requirement} className="password-requirement-item">
+                        {requirement}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="register-input-group">
@@ -329,11 +343,6 @@ function RegisterPage() {
 
       <Footer />
 
-      {showToast && (
-        <div className="toast">
-          The required fields must be completed.
-        </div>
-      )}
     </div>
   );
 }

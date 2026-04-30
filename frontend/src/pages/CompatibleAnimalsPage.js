@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./CompatibleAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { usePopup } from "../components/PopupProvider";
 
 function CompatibleAnimalsPage() {
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   const [animals, setAnimals] = useState([]);
   const [savedIds, setSavedIds] = useState([]);
@@ -39,6 +41,11 @@ function CompatibleAnimalsPage() {
         setAnimals(data);
       } catch (error) {
         console.error("Error fetching compatible animals:", error);
+        showPopup({
+          type: "critical",
+          title: "Loading Failed",
+          message: "Compatible animals could not be loaded from backend."
+        });
       } finally {
         setLoading(false);
       }
@@ -47,39 +54,45 @@ function CompatibleAnimalsPage() {
     fetchCompatibleAnimals();
   }, [hasAdoptionRequest]);
 
-  const filteredAnimals = useMemo(() => {
-    let result = [...animals];
+  let filteredAnimals = [...animals];
 
-    if (typeFilter !== "All") {
-      result = result.filter((animal) => animal.animalType === typeFilter);
-    }
+  if (typeFilter !== "All") {
+    filteredAnimals = filteredAnimals.filter((animal) => animal.animalType === typeFilter);
+  }
 
-    if (sortBy === "Highest Match") {
-      result.sort(
-        (a, b) => (b.compatibilityScore || 0) - (a.compatibilityScore || 0)
-      );
-    }
+  if (sortBy === "Highest Match") {
+    filteredAnimals.sort(
+      (a, b) => (b.compatibilityScore || 0) - (a.compatibilityScore || 0)
+    );
+  }
 
-    if (sortBy === "Lowest Match") {
-      result.sort(
-        (a, b) => (a.compatibilityScore || 0) - (b.compatibilityScore || 0)
-      );
-    }
+  if (sortBy === "Lowest Match") {
+    filteredAnimals.sort(
+      (a, b) => (a.compatibilityScore || 0) - (b.compatibilityScore || 0)
+    );
+  }
 
-    if (sortBy === "Name") {
-      result.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
-    return result;
-  }, [animals, sortBy, typeFilter]);
+  if (sortBy === "Name") {
+    filteredAnimals.sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   const handleSave = (animalId) => {
     if (savedIds.includes(animalId)) {
       setSavedIds(savedIds.filter((id) => id !== animalId));
+      showPopup({
+        type: "warning",
+        title: "Removed From Saved",
+        message: "Animal removed from your saved list."
+      });
       return;
     }
 
     setSavedIds([...savedIds, animalId]);
+    showPopup({
+      type: "success",
+      title: "Saved",
+      message: "Animal added to your saved list."
+    });
   };
 
   const goToAnimalDetail = (animalId) => {

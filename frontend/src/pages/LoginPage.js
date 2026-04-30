@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import "./LoginPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getHomePathByRole, isValidEmail, normalizeRole } from "../utils/auth";
+import { getApiBaseUrl, isValidEmail } from "../utils/auth";
+import { usePopup } from "../components/PopupProvider";
 
 function LoginPage() {
   const navigate = useNavigate();
@@ -11,7 +12,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [message, setMessage] = useState("");
+  const { showPopup } = usePopup();
 
   const goSignup = () => {
     navigate("/register");
@@ -19,23 +20,25 @@ function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage("");
-
     if (email.trim() === "" || password.trim() === "") {
-      setMessage("Email and password cannot be empty.");
+      showPopup({
+        type: "warning",
+        title: "Missing Fields",
+        message: "Email and password cannot be empty."
+      });
       return;
     }
 
     if (!isValidEmail(email)) {
       const invalidEmailMessage =
         "Invalid email format. Please check your email address.";
-      setMessage(invalidEmailMessage);
-      window.alert(invalidEmailMessage);
+      showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
       return;
     }
 
     try {
-      const response = await fetch("http://localhost:8080/api/auth/login", {
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(`${apiBaseUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -51,21 +54,23 @@ function LoginPage() {
       if (data.error === "Invalid email format" || data.error === "Invalid email domain") {
         const invalidEmailMessage =
           "Invalid email format. Please check your email address.";
-        setMessage(invalidEmailMessage);
-        window.alert(invalidEmailMessage);
+        showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
         return;
       }
 
       if (data.error === "User not found") {
         const userNotFoundMessage =
           "Account not found. Please create an account first.";
-        setMessage(userNotFoundMessage);
-        window.alert(userNotFoundMessage);
+        showPopup({ type: "error", title: "Account Not Found", message: userNotFoundMessage });
         return;
       }
 
       if (data.error === "Please verify your email before logging in.") {
-        window.alert("Please verify your email before logging in.");
+        showPopup({
+          type: "info",
+          title: "Email Verification Required",
+          message: "Please verify your email before logging in."
+        });
         navigate("/verify-email", {
           state: { email: email.trim() },
           replace: true
@@ -74,30 +79,25 @@ function LoginPage() {
       }
 
       if (!response.ok) {
-        setMessage(data.error || "User not found or password is incorrect.");
+        showPopup({
+          type: "error",
+          title: "Login Failed",
+          message: data.error || "User not found or password is incorrect."
+        });
         return;
       }
 
-      const resolvedRole = normalizeRole(data.role);
-
-      if (!resolvedRole) {
-        setMessage("User role could not be determined. Please try again.");
-        return;
-      }
-
-      localStorage.setItem(
-        "paviaUser",
-        JSON.stringify({
-          email: email.trim(),
-          role: data.role,
-          userId:Number(data.userId)
-        })
-      );
-
-      navigate(getHomePathByRole(resolvedRole), { replace: true });
+      navigate("/verify-email", {
+        state: { email: email.trim(), mode: "login" },
+        replace: true
+      });
     } catch (error) {
       console.error(error);
-      setMessage("Could not connect to backend.");
+      showPopup({
+        type: "error",
+        title: "Connection Error",
+        message: "Could not connect to backend."
+      });
     }
   };
 
@@ -133,10 +133,6 @@ function LoginPage() {
                 Enter your email and password to continue.
               </p>
 
-              {message !== "" && (
-                <div className="login-message">{message}</div>
-              )}
-
               <form onSubmit={handleSubmit}>
                 <label className="login-label">
                   Email
@@ -168,6 +164,23 @@ function LoginPage() {
                     </button>
                   </div>
                 </label>
+
+                <div className="login-forgot-row">
+                  <span className="login-forgot-label">Forgot password?</span>{" "}
+                  <span
+                    className="login-forgot-link"
+                    onClick={() => navigate("/forgot-password")}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        navigate("/forgot-password");
+                      }
+                    }}
+                  >
+                    Reset your password.
+                  </span>
+                </div>
 
                 <button type="submit" className="login-submit-btn">
                   Log In

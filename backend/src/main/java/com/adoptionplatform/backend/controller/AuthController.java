@@ -3,6 +3,7 @@ package com.adoptionplatform.backend.controller;
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
 import com.adoptionplatform.backend.dto.ResendVerificationRequest;
+import com.adoptionplatform.backend.dto.ResetPasswordRequest;
 import com.adoptionplatform.backend.dto.Verify2FARequest;
 import com.adoptionplatform.backend.service.AuthService;
 import org.springframework.http.ResponseEntity;
@@ -51,6 +52,55 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
         Map<String, String> response = authService.login(request);
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/verify-login")
+    public ResponseEntity<Map<String, String>> verifyLogin(@RequestBody Verify2FARequest request) {
+        Map<String, String> response = authService.verifyLoginCode(request.getEmail(), request.getCode());
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/login/resend")
+    public ResponseEntity<Map<String, String>> resendLoginCode(@RequestBody ResendVerificationRequest request) {
+        Map<String, String> response = authService.resendLoginCode(request.getEmail());
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password/request")
+    public ResponseEntity<Map<String, String>> requestPasswordReset(@RequestBody ResendVerificationRequest request) {
+        Map<String, String> response = authService.requestPasswordResetCode(request.getEmail());
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password/verify")
+    public ResponseEntity<Map<String, String>> verifyPasswordReset(@RequestBody Verify2FARequest request) {
+        Map<String, String> response = authService.verifyPasswordResetCode(request.getEmail(), request.getCode());
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<Map<String, String>> resetPassword(@RequestBody ResetPasswordRequest request) {
+        Map<String, String> response = authService.resetPassword(
+                request.getEmail(),
+                request.getNewPassword(),
+                request.getConfirmPassword()
+        );
         if (response.containsKey("error")) {
             return ResponseEntity.badRequest().body(response);
         }

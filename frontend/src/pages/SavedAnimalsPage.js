@@ -7,9 +7,11 @@ import animalSlide1 from "../images/animalSlide1.jpg";
 import animalSlide2 from "../images/animalSlide2.jpg";
 import animalSlide3 from "../images/animalSlide3.jpg";
 import animalSlide4 from "../images/animalSlide4.jpg";
+import { usePopup } from "../components/PopupProvider";
 
 function SavedAnimalsPage() {
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   const [adoptionRequestExists] = useState(false);
   const [savedAnimals, setSavedAnimals] = useState([
@@ -86,6 +88,11 @@ function SavedAnimalsPage() {
 
   const handleRemove = (id) => {
     setSavedAnimals((prev) => prev.filter((animal) => animal.id !== id));
+    showPopup({
+      type: "warning",
+      title: "Removed",
+      message: "Animal removed from saved list."
+    });
   };
 
   const goToAnimalDetail = (id) => {

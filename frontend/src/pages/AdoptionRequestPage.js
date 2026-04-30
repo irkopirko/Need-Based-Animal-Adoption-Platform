@@ -3,9 +3,11 @@ import "./AdoptionRequestPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useNavigate } from "react-router-dom";
+import { usePopup } from "../components/PopupProvider";
 
 function AdoptionRequestPage() {
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   const defaultFormData = {
     indoorSpace: "",
@@ -39,9 +41,6 @@ function AdoptionRequestPage() {
 
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState(defaultFormData);
-  const [showToast, setShowToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState("");
-  const [toastType, setToastType] = useState("success");
   const [errors, setErrors] = useState({});
   const [requestSaved, setRequestSaved] = useState(false);
 
@@ -97,16 +96,6 @@ function AdoptionRequestPage() {
           : formData.previousPetTypesOther,
       notes: formData.notes.trim() === "" ? "No additional notes" : formData.notes
     };
-  };
-
-  const triggerToast = (message, type = "success") => {
-    setToastMessage(message);
-    setToastType(type);
-    setShowToast(true);
-
-    setTimeout(() => {
-      setShowToast(false);
-    }, 2600);
   };
 
   const handleChange = (e) => {
@@ -305,7 +294,11 @@ function AdoptionRequestPage() {
     const valid = validateCurrentStep();
 
     if (!valid) {
-      triggerToast("Required fields must be completed.", "error");
+      showPopup({
+        type: "warning",
+        title: "Required Fields",
+        message: "Required fields must be completed."
+      });
       return;
     }
 
@@ -329,7 +322,11 @@ function AdoptionRequestPage() {
   const valid = validateCurrentStep();
 
   if (!valid) {
-    triggerToast("Required fields must be completed.", "error");
+    showPopup({
+      type: "warning",
+      title: "Required Fields",
+      message: "Required fields must be completed."
+    });
     return;
   }
 
@@ -383,10 +380,18 @@ function AdoptionRequestPage() {
     localStorage.removeItem("editingRequestId");
 
     setRequestSaved(true);
-    triggerToast("Adoption request saved successfully.", "success");
+    showPopup({
+      type: "success",
+      title: "Request Saved",
+      message: "Adoption request saved successfully."
+    });
   } catch (error) {
     console.error(error);
-    triggerToast("Backend connection failed. Request was not saved.", "error");
+    showPopup({
+      type: "critical",
+      title: "Save Failed",
+      message: "Backend connection failed. Request was not saved."
+    });
   }
 };
 
@@ -1025,11 +1030,6 @@ function AdoptionRequestPage() {
 
       <Footer />
 
-      {showToast && (
-        <div className={`toast ${toastType}`}>
-          {toastMessage}
-        </div>
-      )}
     </div>
   );
 }

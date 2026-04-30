@@ -5,14 +5,16 @@ import Footer from "../components/Footer";
 import "./LoginPage.css";
 import "./Verify2FAPage.css";
 import { getApiBaseUrl, getHomePathByRole, normalizeRole } from "../utils/auth";
+import { usePopup } from "../components/PopupProvider";
 
 function Verify2FAPage() {
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
   const location = useLocation();
   const email = location.state?.email || "";
+  const mode = location.state?.mode || "register";
 
   const [codeDigits, setCodeDigits] = useState(["", "", "", "", "", ""]);
-  const [message, setMessage] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const inputRefs = useRef([]);
@@ -66,23 +68,35 @@ function Verify2FAPage() {
 
   const handleVerify = async (e) => {
     e.preventDefault();
-    setMessage("");
-
     if (!email) {
-      setMessage("Session expired. Please register again.");
+      showPopup({
+        type: "warning",
+        title: "Session Expired",
+        message: "Session expired. Please register again."
+      });
       return;
     }
 
     const code = codeDigits.join("");
     if (code.length !== 6) {
-      setMessage("Please enter the full 6-digit verification code.");
+      showPopup({
+        type: "warning",
+        title: "Invalid Code",
+        message: "Please enter the full 6-digit verification code."
+      });
       return;
     }
 
     const apiBaseUrl = getApiBaseUrl();
 
+    const verifyEndpointByMode = {
+      register: "/api/auth/verify-email",
+      login: "/api/auth/verify-login",
+      forgotPassword: "/api/auth/forgot-password/verify"
+    };
+
     try {
-      const response = await fetch(`${apiBaseUrl}/api/auth/verify-email`, {
+      const response = await fetch(`${apiBaseUrl}${verifyEndpointByMode[mode]}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -96,13 +110,29 @@ function Verify2FAPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.error || "Verification failed.");
+        showPopup({
+          type: "error",
+          title: "Verification Failed",
+          message: data.error || "Verification failed."
+        });
+        return;
+      }
+
+      if (mode === "forgotPassword") {
+        navigate("/reset-password/new", {
+          state: { email },
+          replace: true
+        });
         return;
       }
 
       const resolvedRole = normalizeRole(data.role);
       if (!resolvedRole) {
-        setMessage("User role could not be determined. Please try again.");
+        showPopup({
+          type: "error",
+          title: "Role Error",
+          message: "User role could not be determined. Please try again."
+        });
         return;
       }
 
@@ -110,17 +140,27 @@ function Verify2FAPage() {
         "paviaUser",
         JSON.stringify({
           email,
-          role: resolvedRole
+          role: resolvedRole,
+          userId: Number(data.userId)
         })
       );
 
-      window.alert("Account created successfully.");
+      showPopup({
+        type: "success",
+        title: mode === "register" ? "Account Created" : "Login Successful",
+        message:
+          mode === "register"
+            ? "Your account has been created successfully."
+            : "You have logged in successfully."
+      });
       navigate(getHomePathByRole(resolvedRole), { replace: true });
     } catch (error) {
       console.error(error);
-      setMessage(
-        `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
-      );
+      showPopup({
+        type: "error",
+        title: "Connection Error",
+        message: `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
+      });
     }
   };
 
@@ -131,8 +171,14 @@ function Verify2FAPage() {
 
     const apiBaseUrl = getApiBaseUrl();
 
+    const resendEndpointByMode = {
+      register: "/api/auth/resend-verification",
+      login: "/api/auth/login/resend",
+      forgotPassword: "/api/auth/forgot-password/request"
+    };
+
     try {
-      const response = await fetch(`${apiBaseUrl}/api/auth/resend-verification`, {
+      const response = await fetch(`${apiBaseUrl}${resendEndpointByMode[mode]}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -143,19 +189,29 @@ function Verify2FAPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setMessage(data.error || "Could not resend verification code.");
+        showPopup({
+          type: "error",
+          title: "Resend Failed",
+          message: data.error || "Could not resend verification code."
+        });
         return;
       }
 
-      setMessage("A new verification code has been sent to your email.");
+      showPopup({
+        type: "success",
+        title: "Code Sent",
+        message: "A new verification code has been sent to your email."
+      });
       setResendCooldown(30);
       setCodeDigits(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } catch (error) {
       console.error(error);
-      setMessage(
-        `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
-      );
+      showPopup({
+        type: "error",
+        title: "Connection Error",
+        message: `Could not connect to backend at ${apiBaseUrl}. Check backend status/CORS/API URL.`
+      });
     }
   };
 
@@ -169,9 +225,9 @@ function Verify2FAPage() {
             <div className="login-left-overlay"></div>
             <div className="login-left-text">
               <p className="login-left-tag">Email Verification</p>
-              <h2>Verify your account</h2>
+              <h2>{mode === "login" ? "Verify your login" : "Verify your account"}</h2>
               <p className="login-left-desc">
-                Enter the 6-digit code sent to your email to create your account.
+                Enter the 6-digit code sent to your email.
               </p>
             </div>
           </div>
@@ -183,8 +239,6 @@ function Verify2FAPage() {
               <p className="login-subtitle">
                 {email ? `Code sent to ${email}` : "Please go back and register again."}
               </p>
-
-              {message !== "" && <div className="login-message">{message}</div>}
 
               <form onSubmit={handleVerify}>
                 <label className="login-label">
@@ -210,7 +264,7 @@ function Verify2FAPage() {
                 </label>
 
                 <button type="submit" className="login-submit-btn">
-                  Verify Email
+                  {mode === "login" ? "Verify Login" : "Verify Code"}
                 </button>
               </form>
 

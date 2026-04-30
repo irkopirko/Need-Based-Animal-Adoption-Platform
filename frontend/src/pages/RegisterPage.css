@@ -234,6 +234,24 @@
   font-weight: 700;
   cursor: pointer;
 }
+.password-requirements-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius:10px;
+  border: 1px solid #f0c8c8;
+  background: #fff5f5;
+}
+
+.password-requirement-item {
+  margin: 0;
+  color: #c62828;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.password-requirement-item + .password-requirement-item {
+  margin-top: 4px;
+}
 
 .input-error {
   border: 2px solid #e53935 !important;
