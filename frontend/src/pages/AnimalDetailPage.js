@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 function AnimalDetailPage() {
+  const user =JSON.parse(localStorage.getItem("paviaUser"));
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -12,7 +13,9 @@ function AnimalDetailPage() {
   const [selectedImage, setSelectedImage] = useState("");
   const [saved, setSaved] = useState(false);
 
-   const user = getStoredUser();
+const getStoredUser = () => {
+  return JSON.parse(localStorage.getItem("paviaUser"));
+};
     const isOwner = user?.role === "OWNER";
     const isAdopter = user?.role === "ADOPTER";
 

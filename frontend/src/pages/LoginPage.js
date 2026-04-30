@@ -89,7 +89,8 @@ function LoginPage() {
         "paviaUser",
         JSON.stringify({
           email: email.trim(),
-          role: resolvedRole
+          role: data.role,
+          userId:Number(data.userId)
         })
       );
 

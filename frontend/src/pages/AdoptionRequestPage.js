@@ -323,53 +323,72 @@ function AdoptionRequestPage() {
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    const valid = validateCurrentStep();
+  const valid = validateCurrentStep();
 
-    if (!valid) {
-      triggerToast("Required fields must be completed.", "error");
-      return;
+  if (!valid) {
+    triggerToast("Required fields must be completed.", "error");
+    return;
+  }
+
+  setErrors({});
+
+  try {
+    const user = JSON.parse(localStorage.getItem("paviaUser"));
+
+    const response = await fetch("http://localhost:8080/api/adoption-requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        ...formData,
+        userId: user?.userId || 1
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("Adoption request could not be saved to database.");
     }
 
-    const completedFormData = applyDefaultValues();
+    const savedRequest = await response.json();
+    console.log("Saved adoption request:", savedRequest);
 
     const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
     const editingId = localStorage.getItem("editingRequestId");
 
-    let updatedRequests = [];
+    let updatedRequests;
 
     if (editingId) {
       updatedRequests = storedRequests.map((item) =>
         String(item.id) === String(editingId)
-          ? {
-              ...completedFormData,
-              id: item.id,
-              createdAt: item.createdAt || new Date().toISOString()
-            }
+          ? { ...formData, id: item.id, createdAt: item.createdAt }
           : item
       );
     } else {
-      const newRequest = {
-        ...completedFormData,
-        id: Date.now(),
-        createdAt: new Date().toISOString()
-      };
-
-      updatedRequests = [...storedRequests, newRequest];
+      updatedRequests = [
+        ...storedRequests,
+        {
+          ...formData,
+          id: savedRequest.id || Date.now(),
+          createdAt: savedRequest.createdAt || new Date().toISOString()
+        }
+      ];
     }
 
     localStorage.setItem("adoptionRequests", JSON.stringify(updatedRequests));
-    localStorage.setItem("adoptionRequest", JSON.stringify(completedFormData));
-    localStorage.setItem("adoptionRequestCompleted", "true");
+    localStorage.setItem("adoptionRequest", JSON.stringify(formData));
     localStorage.removeItem("editingRequestId");
 
-    setFormData(completedFormData);
-    setErrors({});
     setRequestSaved(true);
     triggerToast("Adoption request saved successfully.", "success");
-  };
+  } catch (error) {
+    console.error(error);
+    triggerToast("Backend connection failed. Request was not saved.", "error");
+  }
+};
 
   const getStepClass = (stepNumber) => {
     if (stepNumber < step) {
