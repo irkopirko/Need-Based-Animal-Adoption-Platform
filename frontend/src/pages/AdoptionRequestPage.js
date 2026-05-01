@@ -335,6 +335,15 @@ function AdoptionRequestPage() {
   try {
     const user = JSON.parse(localStorage.getItem("paviaUser"));
 
+    if (user?.userId) {
+      showPopup({
+        type: "error",
+        title: "User Error",
+        message: "User information could not be found. Please log-in again."
+      })
+      return;
+    }
+
     const response = await fetch("http://localhost:8080/api/adoption-requests", {
       method: "POST",
       headers: {
@@ -342,7 +351,7 @@ function AdoptionRequestPage() {
       },
       body: JSON.stringify({
         ...formData,
-        userId: user?.userId || 1
+        userId: user?.userId 
       })
     });
 

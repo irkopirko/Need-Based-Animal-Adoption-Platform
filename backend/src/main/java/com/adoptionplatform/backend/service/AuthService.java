@@ -6,6 +6,10 @@ import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
 import com.adoptionplatform.backend.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import com.adoptionplatform.backend.entity.LoginLog;
+import com.adoptionplatform.backend.repository.LoginLogRepository;
+import java.time.LocalDateTime;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -25,8 +29,17 @@ import java.util.regex.Pattern;
 @Service
 public class AuthService {
 
+    @Autowired
+private LoginLogRepository loginLogRepository;
+
+@Autowired
+private UserRepository userRepository;
+
+@Autowired
+private EmailService emailService;
+    /*private final LoginLogRepository loginLogRepository;
     private final UserRepository userRepository;
-    private final EmailService emailService;
+    private final EmailService emailService;*/
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long EMAIL_VERIFICATION_EXPIRY_MS = 10 * 60 * 1000;
     private final Map<String, PendingRegistration> pendingRegistrations = new ConcurrentHashMap<>();
@@ -40,11 +53,12 @@ public class AuthService {
     private static final Pattern DIGIT_PATTERN = Pattern.compile(".*\\d.*");
     private static final Pattern SPECIAL_PATTERN = Pattern.compile(".*[^A-Za-z0-9].*");
 
-    public AuthService(UserRepository userRepository, EmailService emailService) {
+    /*public AuthService(UserRepository userRepository, EmailService emailService, LoginLogRepository loginlogRepository) {
         this.userRepository = userRepository;
         this.emailService = emailService;
-    }
-
+        this.loginLogRepository=LoginLogRepository;
+    } */
+   
     public Map<String, String> register(RegisterRequest request) {
         Map<String, String> response = new HashMap<>();
         String email = normalizeEmail(request.getEmail());
@@ -130,19 +144,23 @@ public class AuthService {
         Optional<User> userOptional = userRepository.findByEmail(email);
 
         if (userOptional.isEmpty()) {
+            saveLoginLog(null, request.getEmail(), null, false, "User not found");
             response.put("error", "User not found");
             return response;
         }
-
-        User user = userOptional.get();
+            User user = userOptional.get();//
 
         if (!user.getPassword().equals(request.getPassword())) {
+            saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), false, "Wrong password");
             response.put("error", "Wrong password");
             return response;
         }
 
         String loginCode = generateTwoFaCode();
         pendingLogins.put(email, new PendingLogin(loginCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS));
+         //success
+        saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), true, "Login successful");
+
 
         try {
             emailService.sendLoginCode(email, loginCode);
@@ -573,5 +591,17 @@ public class AuthService {
             this.verified = verified;
         }
     }
+    private void saveLoginLog(Long userId, String email, String role, boolean successful, String message) {
+    LoginLog log = new LoginLog();
+    log.setUserId(userId);
+    log.setEmail(email);
+    log.setRole(role);
+    log.setSuccessful(successful);
+    log.setMessage(message);
+    log.setLoginTime(LocalDateTime.now());
+
+    loginLogRepository.save(log);
+}
+
 
 }
