@@ -2,16 +2,13 @@ package com.adoptionplatform.backend.service;
 
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
+import com.adoptionplatform.backend.entity.LoginLog;
 import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
-import com.adoptionplatform.backend.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import com.adoptionplatform.backend.entity.LoginLog;
 import com.adoptionplatform.backend.repository.LoginLogRepository;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-
+import com.adoptionplatform.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -20,6 +17,8 @@ import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
 import java.net.InetAddress;
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Locale;
@@ -32,35 +31,30 @@ import java.util.regex.Pattern;
 public class AuthService {
 
     @Autowired
-private LoginLogRepository loginLogRepository;
+    private LoginLogRepository loginLogRepository;
 
-@Autowired
-private UserRepository userRepository;
+    @Autowired
+    private UserRepository userRepository;
 
-@Autowired
-private EmailService emailService;
-    /*private final LoginLogRepository loginLogRepository;
-    private final UserRepository userRepository;
-    private final EmailService emailService;*/
+    @Autowired
+    private EmailService emailService;
+
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long EMAIL_VERIFICATION_EXPIRY_MS = 10 * 60 * 1000;
+
     private final Map<String, PendingRegistration> pendingRegistrations = new ConcurrentHashMap<>();
     private final Map<String, PendingLogin> pendingLogins = new ConcurrentHashMap<>();
     private final Map<String, PendingPasswordReset> pendingPasswordResets = new ConcurrentHashMap<>();
+
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
             "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
     );
+
     private static final Pattern UPPERCASE_PATTERN = Pattern.compile(".*[A-Z].*");
     private static final Pattern LOWERCASE_PATTERN = Pattern.compile(".*[a-z].*");
     private static final Pattern DIGIT_PATTERN = Pattern.compile(".*\\d.*");
     private static final Pattern SPECIAL_PATTERN = Pattern.compile(".*[^A-Za-z0-9].*");
 
-    /*public AuthService(UserRepository userRepository, EmailService emailService, LoginLogRepository loginlogRepository) {
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-        this.loginLogRepository=LoginLogRepository;
-    } */
-   
     public Map<String, String> register(RegisterRequest request) {
         Map<String, String> response = new HashMap<>();
         String email = normalizeEmail(request.getEmail());
@@ -101,6 +95,7 @@ private EmailService emailService;
         }
 
         String verificationCode = generateTwoFaCode();
+
         pendingRegistrations.put(
                 email,
                 new PendingRegistration(
@@ -114,7 +109,8 @@ private EmailService emailService;
                 )
         );
 
-       try {
+        try {
+            System.out.println("MAIL GONDERILIYOR: " + email);
             emailService.sendVerificationCode(email, verificationCode);
         } catch (Exception exception) {
             exception.printStackTrace();
@@ -122,7 +118,6 @@ private EmailService emailService;
             response.put("error", "MAIL_ERROR: " + exception.getClass().getSimpleName() + " - " + exception.getMessage());
             return response;
         }
-        
 
         response.put("message", "Registration successful. Please verify your email.");
         response.put("requiresVerification", "true");
@@ -151,7 +146,8 @@ private EmailService emailService;
             response.put("error", "User not found");
             return response;
         }
-            User user = userOptional.get();//
+
+        User user = userOptional.get();
 
         if (!user.getPassword().equals(request.getPassword())) {
             saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), false, "Wrong password");
@@ -160,15 +156,17 @@ private EmailService emailService;
         }
 
         String loginCode = generateTwoFaCode();
-        pendingLogins.put(email, new PendingLogin(loginCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS));
-         //success
-        saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), true, "Login successful");
 
+        pendingLogins.put(
+                email,
+                new PendingLogin(loginCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS)
+        );
 
         try {
             emailService.sendLoginCode(email, loginCode);
         } catch (Exception exception) {
             pendingLogins.remove(email);
+            saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), false, "Could not send login verification code");
             response.put("error", "Could not send login verification code.");
             return response;
         }
@@ -194,31 +192,75 @@ private EmailService emailService;
         }
 
         PendingLogin pendingLogin = pendingLogins.get(email);
+
         if (pendingLogin == null) {
+            saveLoginLog(null, email, null, false, "Login verification session not found");
             response.put("error", "Login verification session not found. Please login again.");
             return response;
         }
 
         if (System.currentTimeMillis() > pendingLogin.expiresAt) {
             pendingLogins.remove(email);
+
+            Optional<User> expiredUserOptional = userRepository.findByEmail(email);
+
+            if (expiredUserOptional.isPresent()) {
+                User expiredUser = expiredUserOptional.get();
+                saveLoginLog(
+                        expiredUser.getId(),
+                        expiredUser.getEmail(),
+                        expiredUser.getRole().toString(),
+                        false,
+                        "Verification code expired"
+                );
+            } else {
+                saveLoginLog(null, email, null, false, "Verification code expired");
+            }
+
             response.put("error", "Verification code expired. Please login again.");
             return response;
         }
 
         if (!pendingLogin.code.equals(codeInput.trim())) {
+            Optional<User> failedUserOptional = userRepository.findByEmail(email);
+
+            if (failedUserOptional.isPresent()) {
+                User failedUser = failedUserOptional.get();
+                saveLoginLog(
+                        failedUser.getId(),
+                        failedUser.getEmail(),
+                        failedUser.getRole().toString(),
+                        false,
+                        "Invalid verification code"
+                );
+            } else {
+                saveLoginLog(null, email, null, false, "Invalid verification code");
+            }
+
             response.put("error", "Invalid verification code");
             return response;
         }
 
         Optional<User> userOptional = userRepository.findByEmail(email);
+
         if (userOptional.isEmpty()) {
             pendingLogins.remove(email);
+            saveLoginLog(null, email, null, false, "User not found after verification");
             response.put("error", "User not found");
             return response;
         }
 
         User user = userOptional.get();
         pendingLogins.remove(email);
+
+        saveLoginLog(
+                user.getId(),
+                user.getEmail(),
+                user.getRole().toString(),
+                true,
+                "Login successful"
+        );
+
         response.put("message", "Login successful");
         response.put("role", user.getRole().name());
         response.put("fullName", user.getFullName());
@@ -242,7 +284,11 @@ private EmailService emailService;
         }
 
         String loginCode = generateTwoFaCode();
-        pendingLogins.put(email, new PendingLogin(loginCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS));
+
+        pendingLogins.put(
+                email,
+                new PendingLogin(loginCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS)
+        );
 
         try {
             emailService.sendLoginCode(email, loginCode);
@@ -304,12 +350,14 @@ private EmailService emailService;
         user.setEmailVerificationCode(null);
         user.setEmailVerificationExpiresAt(null);
         user.setRegistrationTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
+
         userRepository.save(user);
         pendingRegistrations.remove(email);
 
         response.put("message", "Email verified successfully");
         response.put("role", user.getRole().name());
         response.put("fullName", user.getFullName());
+        response.put("userId", String.valueOf(user.getId()));
         return response;
     }
 
@@ -335,6 +383,7 @@ private EmailService emailService;
         }
 
         String newCode = generateTwoFaCode();
+
         PendingRegistration refreshed = new PendingRegistration(
                 pendingRegistration.fullName,
                 pendingRegistration.password,
@@ -344,6 +393,7 @@ private EmailService emailService;
                 newCode,
                 System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS
         );
+
         pendingRegistrations.put(email, refreshed);
 
         try {
@@ -373,7 +423,11 @@ private EmailService emailService;
         }
 
         String resetCode = generateTwoFaCode();
-        pendingPasswordResets.put(email, new PendingPasswordReset(resetCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS, false));
+
+        pendingPasswordResets.put(
+                email,
+                new PendingPasswordReset(resetCode, System.currentTimeMillis() + EMAIL_VERIFICATION_EXPIRY_MS, false)
+        );
 
         try {
             emailService.sendPasswordResetCode(email, resetCode);
@@ -418,13 +472,18 @@ private EmailService emailService;
             return response;
         }
 
-        pendingPasswordResets.put(email, new PendingPasswordReset(pendingReset.code, pendingReset.expiresAt, true));
+        pendingPasswordResets.put(
+                email,
+                new PendingPasswordReset(pendingReset.code, pendingReset.expiresAt, true)
+        );
+
         response.put("message", "Code verified successfully.");
         return response;
     }
 
     public Map<String, String> resetPassword(String emailInput, String newPasswordInput, String confirmPasswordInput) {
         Map<String, String> response = new HashMap<>();
+
         String email = normalizeEmail(emailInput);
         String newPassword = newPasswordInput == null ? "" : newPasswordInput.trim();
         String confirmPassword = confirmPasswordInput == null ? "" : confirmPasswordInput.trim();
@@ -472,6 +531,7 @@ private EmailService emailService;
         User user = userOptional.get();
         user.setPassword(newPassword);
         userRepository.save(user);
+
         pendingPasswordResets.remove(email);
 
         response.put("message", "Password updated successfully.");
@@ -480,21 +540,27 @@ private EmailService emailService;
 
     private String getPasswordValidationError(String passwordInput) {
         String password = passwordInput == null ? "" : passwordInput;
+
         if (password.length() < 8) {
             return "Password must be at least 8 characters.";
         }
+
         if (!UPPERCASE_PATTERN.matcher(password).matches()) {
             return "Password must include at least one uppercase letter.";
         }
+
         if (!LOWERCASE_PATTERN.matcher(password).matches()) {
             return "Password must include at least one lowercase letter.";
         }
+
         if (!DIGIT_PATTERN.matcher(password).matches()) {
             return "Password must include at least one number.";
         }
+
         if (!SPECIAL_PATTERN.matcher(password).matches()) {
             return "Password must include at least one special character.";
         }
+
         return null;
     }
 
@@ -506,28 +572,32 @@ private EmailService emailService;
         if (rawEmail == null) {
             return "";
         }
+
         return rawEmail.trim().toLowerCase(Locale.ROOT);
     }
 
     private boolean hasResolvableDomain(String email) {
         int atIndex = email.lastIndexOf('@');
+
         if (atIndex < 0 || atIndex == email.length() - 1) {
             return false;
         }
 
         String domain = email.substring(atIndex + 1);
+
         return hasMxRecord(domain) || hasARecord(domain);
     }
-    
-     
 
     private boolean hasMxRecord(String domain) {
         try {
             Hashtable<String, String> env = new Hashtable<>();
             env.put("java.naming.factory.initial", "com.sun.jndi.dns.DnsContextFactory");
+
             DirContext context = new InitialDirContext(env);
             Attributes attributes = context.getAttributes(domain, new String[]{"MX"});
+
             NamingEnumeration<?> servers = attributes.get("MX").getAll();
+
             return servers.hasMore();
         } catch (NamingException | NullPointerException ignored) {
             return false;
@@ -546,6 +616,19 @@ private EmailService emailService;
     private String generateTwoFaCode() {
         int code = 100000 + RANDOM.nextInt(900000);
         return String.valueOf(code);
+    }
+
+    private void saveLoginLog(Long userId, String email, String role, boolean successful, String message) {
+        LoginLog log = new LoginLog();
+
+        log.setUserId(userId);
+        log.setEmail(email);
+        log.setRole(role);
+        log.setSuccessful(successful);
+        log.setMessage(message);
+        log.setLoginTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
+
+        loginLogRepository.save(log);
     }
 
     private static class PendingRegistration {
@@ -597,17 +680,4 @@ private EmailService emailService;
             this.verified = verified;
         }
     }
-    private void saveLoginLog(Long userId, String email, String role, boolean successful, String message) {
-    LoginLog log = new LoginLog();
-    log.setUserId(userId);
-    log.setEmail(email);
-    log.setRole(role);
-    log.setSuccessful(successful);
-    log.setMessage(message);
-    log.setLoginTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
-
-    loginLogRepository.save(log);
-}
-
-
 }
