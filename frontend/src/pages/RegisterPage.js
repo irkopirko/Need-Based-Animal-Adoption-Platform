@@ -37,19 +37,56 @@ function RegisterPage() {
 
   const missingPasswordRequirements = getMissingPasswordRequirements(formData.password);
 
-  const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+  const formatTurkishPhone = (value) => {
+  let digits = value.replace(/\D/g, "");
 
+  if (digits.startsWith("90")) {
+    digits = digits.slice(2);
+  }
+
+  if (digits.startsWith("0")) {
+    digits = digits.slice(1);
+  }
+
+  digits = digits.slice(0, 10);
+
+  let formatted = "+90";
+
+  if (digits.length > 0) formatted += " " + digits.slice(0, 3);
+  if (digits.length > 3) formatted += " " + digits.slice(3, 6);
+  if (digits.length > 6) formatted += " " + digits.slice(6, 8);
+  if (digits.length > 8) formatted += " " + digits.slice(8, 10);
+
+  return formatted;
+};
+
+  const handleChange = (e) => {
+  const { name, value, type, checked } = e.target;
+
+  if (name === "phone") {
     setFormData({
       ...formData,
-      [name]: type === "checkbox" ? checked : value
+      phone: formatTurkishPhone(value),
     });
 
     setErrors({
       ...errors,
-      [name]: false
+      phone: false,
     });
-  };
+
+    return;
+  }
+
+  setFormData({
+    ...formData,
+    [name]: type === "checkbox" ? checked : value,
+  });
+
+  setErrors({
+    ...errors,
+    [name]: false,
+  });
+};
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -92,6 +129,13 @@ function RegisterPage() {
       hasError = true;
     }
 
+    const phoneDigits = formData.phone.replace(/\D/g, "");
+
+    if (!/^905\d{9}$/.test(phoneDigits)) {
+      newErrors.phone = true;
+      hasError = true;
+    }
+
     if (!formData.agreeToTerms) {
       newErrors.agreeToTerms = true;
       hasError = true;
@@ -114,7 +158,7 @@ function RegisterPage() {
       email: formData.email,
       password: formData.password,
       location: formData.location,
-      phone: formData.phone
+      phone: "+" + formData.phone.replace(/\D/g, ""),
     };
 
     const apiBaseUrl = getApiBaseUrl();
@@ -304,13 +348,14 @@ function RegisterPage() {
             <div className="register-input-group register-full-width-group">
               <label htmlFor="phone">Phone Number</label>
               <input
-                id="phone"
-                type="text"
-                name="phone"
-                placeholder="+90 (555) 000-00-00"
-                value={formData.phone}
-                onChange={handleChange}
-                className={errors.phone ? "input-error" : ""}
+                  id="phone"
+                  type="text"
+                  name="phone"
+                  placeholder="+90 5xx xxx xx xx"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  maxLength={17}
+                  className={errors.phone ? "input-error" : ""}
               />
             </div>
 

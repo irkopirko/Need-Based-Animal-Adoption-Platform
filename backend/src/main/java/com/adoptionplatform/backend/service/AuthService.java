@@ -50,8 +50,8 @@ public class AuthService {
             "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
     );
 
-    private static final Pattern UPPERCASE_PATTERN = Pattern.compile(".*[A-Z].*");
-    private static final Pattern LOWERCASE_PATTERN = Pattern.compile(".*[a-z].*");
+    private static final Pattern UPPERCASE_PATTERN = Pattern.compile(".*\\p{Lu}.*");
+    private static final Pattern LOWERCASE_PATTERN = Pattern.compile(".*\\p{Ll}.*");
     private static final Pattern DIGIT_PATTERN = Pattern.compile(".*\\d.*");
     private static final Pattern SPECIAL_PATTERN = Pattern.compile(".*[^A-Za-z0-9].*");
 
