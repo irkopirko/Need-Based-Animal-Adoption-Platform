@@ -114,7 +114,7 @@ private EmailService emailService;
                 )
         );
 
-        try {
+       try {
             emailService.sendVerificationCode(email, verificationCode);
         } catch (Exception exception) {
             exception.printStackTrace();
@@ -122,6 +122,7 @@ private EmailService emailService;
             response.put("error", "MAIL_ERROR: " + exception.getClass().getSimpleName() + " - " + exception.getMessage());
             return response;
         }
+        
 
         response.put("message", "Registration successful. Please verify your email.");
         response.put("requiresVerification", "true");
@@ -508,7 +509,7 @@ private EmailService emailService;
         return rawEmail.trim().toLowerCase(Locale.ROOT);
     }
 
-   /*  private boolean hasResolvableDomain(String email) {
+    private boolean hasResolvableDomain(String email) {
         int atIndex = email.lastIndexOf('@');
         if (atIndex < 0 || atIndex == email.length() - 1) {
             return false;
@@ -516,18 +517,9 @@ private EmailService emailService;
 
         String domain = email.substring(atIndex + 1);
         return hasMxRecord(domain) || hasARecord(domain);
-    }*/
-   private boolean hasResolvableDomain(String email) {
-    int atIndex = email.lastIndexOf('@');
-    if (atIndex < 0 || atIndex == email.length() - 1) {
-        return false;
     }
-
-    String domain = email.substring(atIndex + 1);
-
-    //domain formatı düzgün mü kontrol
-    return domain.contains(".") && domain.length() >= 3;
-}
+    
+     
 
     private boolean hasMxRecord(String domain) {
         try {

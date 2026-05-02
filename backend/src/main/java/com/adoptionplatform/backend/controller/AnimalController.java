@@ -5,6 +5,10 @@ import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.service.AnimalService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 import java.util.List;
 
@@ -52,4 +56,13 @@ public class AnimalController {
     public void deleteAnimal(@PathVariable Long id) {
         animalService.deleteAnimal(id);
     }
+
+    @PostMapping(value = "/create-with-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<Animal> createAnimalWithImages(
+        @RequestPart("animal") AnimalRequest request,
+        @RequestPart("images") List<MultipartFile> images
+) {
+    Animal savedAnimal = animalService.createAnimalWithImages(request, images);
+    return ResponseEntity.ok(savedAnimal);
+}
 }

@@ -11,6 +11,7 @@ public class AnimalRequest {
     private String groomingNeed;
     private String specialNeeds;
     private String description;
+    private String housingLocation;     //home or shelter
     public AnimalRequest() {
     }
     public String getName() {
@@ -98,5 +99,13 @@ public class AnimalRequest {
     }
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getHousingLocation() {
+        return housingLocation;
+    }
+
+    public void setHousingLocation(String housingLocation) {
+        this.housingLocation = housingLocation;
     }
 }

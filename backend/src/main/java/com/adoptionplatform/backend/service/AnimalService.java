@@ -4,6 +4,15 @@ import com.adoptionplatform.backend.dto.AnimalRequest;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -71,9 +80,39 @@ public class AnimalService {
         animal.setGroomingNeed(request.getGroomingNeed());
         animal.setSpecialNeeds(request.getSpecialNeeds());
         animal.setDescription(request.getDescription());
+        animal.setHousingLocation(request.getHousingLocation());
 
         return animalRepository.save(animal);
     }
+
+    public Animal createAnimalWithImages(AnimalRequest request, List<MultipartFile> images) {
+    Animal animal = createAnimal(request);
+
+    List<String> imageUrls = new ArrayList<>();
+
+    try {
+        Path uploadPath = Paths.get("uploads/animals");
+
+        if (!Files.exists(uploadPath)) {
+            Files.createDirectories(uploadPath);
+        }
+
+        for (MultipartFile image : images) {
+            String fileName = UUID.randomUUID() + "_" + image.getOriginalFilename();
+            Path filePath = uploadPath.resolve(fileName);
+
+            Files.copy(image.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            imageUrls.add("/uploads/animals/" + fileName);
+        }
+
+        animal.setImages(imageUrls);
+        return animalRepository.save(animal);
+
+    } catch (IOException e) {
+        throw new RuntimeException("Image upload failed", e);
+    }
+}
 
     public void deleteAnimal(Long id) {
         animalRepository.deleteById(id);

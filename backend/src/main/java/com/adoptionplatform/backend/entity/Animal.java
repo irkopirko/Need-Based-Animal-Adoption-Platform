@@ -1,7 +1,11 @@
 package com.adoptionplatform.backend.entity;
 import jakarta.persistence.*;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "animals")
@@ -23,11 +27,12 @@ public class Animal {
     private String description;
     private String listingStatus;
     private Double compatibilityScore;
+    private String housingLocation; //home or shelter??
 
     @ElementCollection
     @CollectionTable(name = "animal_images", joinColumns = @JoinColumn(name = "animal_id"))
     @Column(name = "image_url")
-    private List<String> images;
+    private List<String> images=new ArrayList<>();
 
     public Animal() {
     }
@@ -91,6 +96,14 @@ public class Animal {
     public List<String> getImages() {
         return images;
     }
+
+    public String getHousingLocation() {
+    return housingLocation;
+}
+
+public void setHousingLocation(String housingLocation) {
+    this.housingLocation = housingLocation;
+}
 
     public void setId(Long id) {
         this.id = id;
@@ -159,4 +172,6 @@ public LocalDateTime getRegisterTime() {
 public void setRegisterTime(LocalDateTime registerTime) {
     this.registerTime = registerTime;
 }
+
+
 }
