@@ -17,6 +17,9 @@ public class MatchResultDto {
     private String coverImageUrl;
     private List<String> highlightTags;
     private String ageDisplay;
+    private boolean isSaved;
+
+
 
     public MatchResultDto() {
     }
@@ -97,5 +100,13 @@ public String getAgeDisplay() {
 
 public void setAgeDisplay(String ageDisplay) {
     this.ageDisplay = ageDisplay;
+}
+
+public boolean isSaved() {
+    return isSaved;
+}
+
+public void setSaved(boolean saved) {
+    isSaved = saved;
 }
 }

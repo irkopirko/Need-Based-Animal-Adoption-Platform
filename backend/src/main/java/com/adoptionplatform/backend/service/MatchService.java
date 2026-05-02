@@ -6,6 +6,7 @@ import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import org.springframework.stereotype.Service;
+import com.adoptionplatform.backend.repository.SavedAnimalRepository;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,14 +17,17 @@ public class MatchService {
 
     private final AdoptionRequestRepository adoptionRequestRepository;
     private final AnimalRepository animalRepository;
+    private final SavedAnimalRepository savedRepo;
 
     public MatchService(
-            AdoptionRequestRepository adoptionRequestRepository,
-            AnimalRepository animalRepository
-    ) {
-        this.adoptionRequestRepository = adoptionRequestRepository;
-        this.animalRepository = animalRepository;
-    }
+        AdoptionRequestRepository adoptionRequestRepository,
+        AnimalRepository animalRepository,
+        SavedAnimalRepository savedAnimalRepository
+) {
+    this.adoptionRequestRepository = adoptionRequestRepository;
+    this.animalRepository = animalRepository;
+    this.savedRepo = savedAnimalRepository;
+}
 
     public List<MatchResultDto> getMatches(Long userId) {
         List<AdoptionRequest> requests = adoptionRequestRepository.findByUserId(userId);
@@ -58,6 +62,7 @@ public class MatchService {
 dto.setCoverImageUrl(getCoverImageUrl(animal));
 dto.setHighlightTags(getHighlightTags(animal));
 //dto.setAgeDisplay(getAgeDisplay(animal));
+dto.setSaved(savedRepo.existsByUserIdAndAnimalId(userId, animal.getId()));
 
 results.add(dto);
         }
