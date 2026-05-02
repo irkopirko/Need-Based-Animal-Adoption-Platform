@@ -1,51 +1,101 @@
 package com.adoptionplatform.backend.dto;
 
+import java.util.List;
+
 public class MatchResultDto {
 
     private Long animalId;
     private String name;
     private String animalType;
+    private String breed;
+    private String size;
+    private String ageGroup;
+    private String energyLevel;
+    private String housingLocation;
     private double matchPercentage;
+    private List<String> matchReasons;
+    private String coverImageUrl;
+    private List<String> highlightTags;
+    private String ageDisplay;
 
     public MatchResultDto() {
     }
 
-    public MatchResultDto(Long animalId, String name, String animalType, double matchPercentage) {
+    public MatchResultDto(
+            Long animalId,
+            String name,
+            String animalType,
+            String breed,
+            String size,
+            String ageGroup,
+            String energyLevel,
+            String housingLocation,
+            double matchPercentage,
+            List<String> matchReasons
+    ) {
         this.animalId = animalId;
         this.name = name;
         this.animalType = animalType;
+        this.breed = breed;
+        this.size = size;
+        this.ageGroup = ageGroup;
+        this.energyLevel = energyLevel;
+        this.housingLocation = housingLocation;
         this.matchPercentage = matchPercentage;
+        this.matchReasons = matchReasons;
     }
 
-    public Long getAnimalId() {
-        return animalId;
-    }
+    public Long getAnimalId() { return animalId; }
+    public void setAnimalId(Long animalId) { this.animalId = animalId; }
 
-    public void setAnimalId(Long animalId) {
-        this.animalId = animalId;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public String getName() {
-        return name;
-    }
+    public String getAnimalType() { return animalType; }
+    public void setAnimalType(String animalType) { this.animalType = animalType; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    public String getBreed() { return breed; }
+    public void setBreed(String breed) { this.breed = breed; }
 
-    public String getAnimalType() {
-        return animalType;
-    }
+    public String getSize() { return size; }
+    public void setSize(String size) { this.size = size; }
 
-    public void setAnimalType(String animalType) {
-        this.animalType = animalType;
-    }
+    public String getAgeGroup() { return ageGroup; }
+    public void setAgeGroup(String ageGroup) { this.ageGroup = ageGroup; }
 
-    public double getMatchPercentage() {
-        return matchPercentage;
-    }
+    public String getEnergyLevel() { return energyLevel; }
+    public void setEnergyLevel(String energyLevel) { this.energyLevel = energyLevel; }
 
-    public void setMatchPercentage(double matchPercentage) {
-        this.matchPercentage = matchPercentage;
-    }
+    public String getHousingLocation() { return housingLocation; }
+    public void setHousingLocation(String housingLocation) { this.housingLocation = housingLocation; }
+
+    public double getMatchPercentage() { return matchPercentage; }
+    public void setMatchPercentage(double matchPercentage) { this.matchPercentage = matchPercentage; }
+
+    public List<String> getMatchReasons() { return matchReasons; }
+    public void setMatchReasons(List<String> matchReasons) { this.matchReasons = matchReasons; }
+
+public String getCoverImageUrl() {
+    return coverImageUrl;
+}
+
+public void setCoverImageUrl(String coverImageUrl) {
+    this.coverImageUrl = coverImageUrl;
+}
+
+public List<String> getHighlightTags() {
+    return highlightTags;
+}
+
+public void setHighlightTags(List<String> highlightTags) {
+    this.highlightTags = highlightTags;
+
+}
+public String getAgeDisplay() {
+    return ageDisplay;
+}
+
+public void setAgeDisplay(String ageDisplay) {
+    this.ageDisplay = ageDisplay;
+}
 }

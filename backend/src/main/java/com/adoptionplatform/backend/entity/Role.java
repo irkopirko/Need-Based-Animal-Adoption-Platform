@@ -2,5 +2,6 @@ package com.adoptionplatform.backend.entity;
 
 public enum Role {
     ADOPTER,
-    OWNER
+    OWNER,
+    ADMIN
 }

@@ -40,6 +40,10 @@ function RegisterAnimalPage() {
     setImages(updatedImages);
   };
 
+const user = JSON.parse(localStorage.getItem("paviaUser"));
+
+
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -67,9 +71,21 @@ function RegisterAnimalPage() {
       goodWithChildren: formData.goodWithChildren.toUpperCase(),
       goodWithPets: formData.goodWithPets.toUpperCase(),
       description: formData.description,
-      housingLocation: formData.housingLocation
+      housingLocation: formData.housingLocation,
+      ownerId: user?.userId 
     };
+const formPayload = new FormData();
 
+formPayload.append(
+  "animal",
+  new Blob([JSON.stringify(payload)], {
+    type: "application/json",
+  })
+);
+
+images.forEach((image) => {
+  formPayload.append("images", image);
+});
     try {
       const formPayload = new FormData();
 
@@ -195,7 +211,7 @@ const response = await fetch("http://localhost:8080/api/animals/create-with-imag
                 <option value="No">No</option>
               </select>
 
-              {/* 🔥 YENİ EKLEDİĞİMİZ */}
+              {}
               <select name="housingLocation" onChange={handleChange} value={formData.housingLocation}>
                 <option value="">Where is the animal?</option>
                 <option value="Home">Home</option>

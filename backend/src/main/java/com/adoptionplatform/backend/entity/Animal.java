@@ -6,6 +6,10 @@ import java.util.List;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Column;
 
 @Entity
 @Table(name = "animals")
@@ -28,6 +32,7 @@ public class Animal {
     private String listingStatus;
     private Double compatibilityScore;
     private String housingLocation; //home or shelter??
+    private Long ownerId; //which shelter owner uploaded the animal
 
     @ElementCollection
     @CollectionTable(name = "animal_images", joinColumns = @JoinColumn(name = "animal_id"))
@@ -173,5 +178,12 @@ public void setRegisterTime(LocalDateTime registerTime) {
     this.registerTime = registerTime;
 }
 
+public Long getOwnerId() {
+    return ownerId;
+}
+
+public void setOwnerId(Long ownerId) {
+    this.ownerId = ownerId;
+}
 
 }
