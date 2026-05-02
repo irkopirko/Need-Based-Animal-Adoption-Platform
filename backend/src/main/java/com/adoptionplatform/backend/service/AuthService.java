@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import com.adoptionplatform.backend.entity.LoginLog;
 import com.adoptionplatform.backend.repository.LoginLogRepository;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+
 import org.springframework.beans.factory.annotation.Autowired;
 
 import javax.naming.NamingEnumeration;
@@ -300,6 +302,7 @@ private EmailService emailService;
         user.setEmailVerified(true);
         user.setEmailVerificationCode(null);
         user.setEmailVerificationExpiresAt(null);
+        user.setRegistrationTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
         userRepository.save(user);
         pendingRegistrations.remove(email);
 
@@ -505,7 +508,7 @@ private EmailService emailService;
         return rawEmail.trim().toLowerCase(Locale.ROOT);
     }
 
-    private boolean hasResolvableDomain(String email) {
+   /*  private boolean hasResolvableDomain(String email) {
         int atIndex = email.lastIndexOf('@');
         if (atIndex < 0 || atIndex == email.length() - 1) {
             return false;
@@ -513,7 +516,18 @@ private EmailService emailService;
 
         String domain = email.substring(atIndex + 1);
         return hasMxRecord(domain) || hasARecord(domain);
+    }*/
+   private boolean hasResolvableDomain(String email) {
+    int atIndex = email.lastIndexOf('@');
+    if (atIndex < 0 || atIndex == email.length() - 1) {
+        return false;
     }
+
+    String domain = email.substring(atIndex + 1);
+
+    //domain formatı düzgün mü kontrol
+    return domain.contains(".") && domain.length() >= 3;
+}
 
     private boolean hasMxRecord(String domain) {
         try {
@@ -598,7 +612,7 @@ private EmailService emailService;
     log.setRole(role);
     log.setSuccessful(successful);
     log.setMessage(message);
-    log.setLoginTime(LocalDateTime.now());
+    log.setLoginTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
 
     loginLogRepository.save(log);
 }

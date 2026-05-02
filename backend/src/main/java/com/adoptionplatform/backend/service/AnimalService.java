@@ -5,6 +5,8 @@ import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -26,6 +28,8 @@ public class AnimalService {
     }
 
     public Animal saveAnimal(Animal animal) {
+
+        animal.setRegisterTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
         return animalRepository.save(animal);
     }
 

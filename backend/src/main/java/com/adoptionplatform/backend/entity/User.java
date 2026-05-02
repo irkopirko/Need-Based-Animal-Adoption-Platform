@@ -1,6 +1,7 @@
 package com.adoptionplatform.backend.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -26,11 +27,13 @@ public class User {
     @Column(nullable = false)
     private Role role;
 
-    @Column(nullable = false)
+    @Column(name = "emailVerified")
     private boolean emailVerified = false;
 
     private String emailVerificationCode;
     private Long emailVerificationExpiresAt;
+
+    private LocalDateTime registrationTime;
 
     public User() {}
 
@@ -109,4 +112,12 @@ public class User {
     public void setEmailVerificationExpiresAt(Long emailVerificationExpiresAt) {
         this.emailVerificationExpiresAt = emailVerificationExpiresAt;
     }
+    
+public LocalDateTime getRegistrationTime() {
+    return registrationTime;
+}
+
+public void setRegistrationTime(LocalDateTime registrationTime) {
+    this.registrationTime = registrationTime;
+}
 }

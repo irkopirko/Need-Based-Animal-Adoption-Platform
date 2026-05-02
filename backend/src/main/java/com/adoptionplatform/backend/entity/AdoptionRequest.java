@@ -1,6 +1,7 @@
 package com.adoptionplatform.backend.entity;
 
 import jakarta.persistence.*;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "adoption_requests")
@@ -153,5 +154,15 @@ public void setSpecialNeedsAcceptance(String specialNeedsAcceptance) { this.spec
 
 public String getNotes() { return notes; }
 public void setNotes(String notes) { this.notes = notes; }
+
+private LocalDateTime requestTime;
+
+public LocalDateTime getRequestTime() {
+    return requestTime;
+}
+
+public void setRequestTime(LocalDateTime requestTime) {
+    this.requestTime = requestTime;
+}
 
 }

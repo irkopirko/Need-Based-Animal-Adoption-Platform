@@ -1,6 +1,7 @@
 package com.adoptionplatform.backend.entity;
 import jakarta.persistence.*;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "animals")
@@ -150,4 +151,12 @@ public class Animal {
     public void setImages(List<String> images) {
         this.images = images;
     }
+    private LocalDateTime registerTime;
+public LocalDateTime getRegisterTime() {
+    return registerTime;
+}
+
+public void setRegisterTime(LocalDateTime registerTime) {
+    this.registerTime = registerTime;
+}
 }

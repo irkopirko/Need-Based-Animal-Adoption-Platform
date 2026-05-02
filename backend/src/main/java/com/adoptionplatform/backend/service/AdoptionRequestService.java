@@ -5,6 +5,8 @@ import com.adoptionplatform.backend.entity.AdoptionRequest;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.StringJoiner;
 
@@ -61,7 +63,7 @@ public class AdoptionRequestService {
 
         request.setSpecialNeedsAcceptance(defaultText(dto.getSpecialNeedsAcceptance(), "Yes, No, Depends on the case"));
         request.setNotes(dto.getNotes());
-
+        request.setRequestTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
         return adoptionRequestRepository.save(request);
     }
 
