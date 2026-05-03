@@ -9,6 +9,7 @@ import com.adoptionplatform.backend.repository.LoginLogRepository;
 import com.adoptionplatform.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
@@ -32,6 +33,9 @@ public class AuthService {
 
     @Autowired
     private LoginLogRepository loginLogRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private UserRepository userRepository;
@@ -149,7 +153,25 @@ public class AuthService {
 
         User user = userOptional.get();
 
-        if (!user.getPassword().equals(request.getPassword())) {
+        /*if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), false, "Wrong password");
+            response.put("error", "Wrong password");
+            return response;
+        }*/
+        boolean passwordMatches;
+
+        if (user.getPassword().startsWith("$2a$") || user.getPassword().startsWith("$2b$")) {
+            passwordMatches = passwordEncoder.matches(request.getPassword(), user.getPassword());
+        } else {
+        passwordMatches = user.getPassword().equals(request.getPassword());
+
+            if (passwordMatches) {
+                user.setPassword(passwordEncoder.encode(request.getPassword()));
+                userRepository.save(user);
+            }
+        }
+
+        if (!passwordMatches) {
             saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), false, "Wrong password");
             response.put("error", "Wrong password");
             return response;
@@ -342,7 +364,7 @@ public class AuthService {
         User user = new User();
         user.setFullName(pendingRegistration.fullName);
         user.setEmail(email);
-        user.setPassword(pendingRegistration.password);
+        user.setPassword(passwordEncoder.encode(pendingRegistration.password));
         user.setLocation(pendingRegistration.location);
         user.setPhone(pendingRegistration.phone);
         user.setRole(pendingRegistration.role);

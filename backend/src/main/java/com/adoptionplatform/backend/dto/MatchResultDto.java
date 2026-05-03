@@ -20,7 +20,6 @@ public class MatchResultDto {
     private boolean isSaved;
 
 
-
     public MatchResultDto() {
     }
 
