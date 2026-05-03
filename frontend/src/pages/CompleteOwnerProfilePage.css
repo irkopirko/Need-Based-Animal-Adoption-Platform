@@ -1,0 +1,17 @@
+
+.complete-owner-profile .complete-profile-kicker {
+  color: #1565c0;
+}
+
+.complete-owner-profile .complete-profile-title {
+  color: #0d2137;
+}
+
+.complete-owner-profile .complete-profile-select {
+  min-height: 48px;
+  line-height: 1.35;
+}
+
+.complete-owner-profile .complete-profile-form {
+  gap: 20px;
+}

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.adoptionplatform.backend.entity.Animal;
@@ -19,6 +20,7 @@ import com.adoptionplatform.backend.repository.SavedAnimalRepository;
 
 @RestController
 @RequestMapping("/api/saved")
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class SavedAnimalController {
 
     private final SavedAnimalRepository repo;
@@ -29,7 +31,7 @@ public class SavedAnimalController {
         this.animalRepo = animalRepo;
     }
 
-    // ⭐ SAVE
+
     @PostMapping
     public ResponseEntity<?> saveAnimal(@RequestParam Long userId, @RequestParam Long animalId) {
 
@@ -47,7 +49,7 @@ public class SavedAnimalController {
         return ResponseEntity.ok("Saved");
     }
 
-    // ⭐ GET SAVED
+
     @GetMapping("/{userId}")
     public List<Animal> getSaved(@PathVariable Long userId) {
 
@@ -59,7 +61,7 @@ public class SavedAnimalController {
                 .toList();
     }
 
-    // ⭐ DELETE (unsave)
+
     @DeleteMapping
     public ResponseEntity<?> unsave(@RequestParam Long userId, @RequestParam Long animalId) {
 

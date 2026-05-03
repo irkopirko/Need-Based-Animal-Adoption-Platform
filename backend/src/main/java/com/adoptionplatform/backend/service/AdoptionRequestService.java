@@ -64,6 +64,20 @@ public class AdoptionRequestService {
         request.setSpecialNeedsAcceptance(defaultText(dto.getSpecialNeedsAcceptance(), "Yes, No, Depends on the case"));
         request.setNotes(dto.getNotes());
         request.setRequestTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
+        request.setRequestPhase("DRAFT");
+        return adoptionRequestRepository.save(request);
+    }
+
+    public AdoptionRequest submitAdoptionRequest(Long id, Long userId) {
+        AdoptionRequest request = adoptionRequestRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Adoption request not found"));
+        if (request.getUserId() == null || !request.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Not allowed to update this request");
+        }
+        if ("SUBMITTED".equals(request.getRequestPhase())) {
+            return request;
+        }
+        request.setRequestPhase("SUBMITTED");
         return adoptionRequestRepository.save(request);
     }
 

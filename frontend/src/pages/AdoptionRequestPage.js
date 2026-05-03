@@ -4,6 +4,12 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { useNavigate } from "react-router-dom";
 import { usePopup } from "../components/PopupProvider";
+import {
+  broadcastStoredUserRefresh,
+  getApiBaseUrl,
+  getStoredUser,
+  normalizeRole
+} from "../utils/auth";
 
 function AdoptionRequestPage() {
   const navigate = useNavigate();
@@ -43,23 +49,76 @@ function AdoptionRequestPage() {
   const [formData, setFormData] = useState(defaultFormData);
   const [errors, setErrors] = useState({});
   const [requestSaved, setRequestSaved] = useState(false);
+  const [lastSavedRequestId, setLastSavedRequestId] = useState(null);
+  const [bootstrapped, setBootstrapped] = useState(false);
 
   const totalSteps = 6;
 
   useEffect(() => {
-    const editingId = localStorage.getItem("editingRequestId");
-    const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
+    let cancelled = false;
 
-    if (editingId) {
-      const existingRequest = storedRequests.find(
-        (item) => String(item.id) === String(editingId)
-      );
-
-      if (existingRequest) {
-        setFormData(existingRequest);
+    const run = async () => {
+      const user = getStoredUser();
+      if (!user?.userId) {
+        navigate("/login", { replace: true });
+        return;
       }
-    }
-  }, []);
+
+      if (normalizeRole(user.role) === "ADOPTER") {
+        try {
+          const response = await fetch(
+            `${getApiBaseUrl()}/api/auth/profile/${user.userId}`
+          );
+          if (cancelled) {
+            return;
+          }
+          if (response.ok) {
+            const profile = await response.json();
+            const prev = getStoredUser() || {};
+            localStorage.setItem(
+              "paviaUser",
+              JSON.stringify({
+                ...prev,
+                adopterProfileCompleted: profile.adopterProfileCompleted
+              })
+            );
+            broadcastStoredUserRefresh();
+            if (!profile.adopterProfileCompleted) {
+              navigate("/complete-adopter-profile", { replace: true });
+              return;
+            }
+          }
+        } catch (err) {
+          console.error(err);
+        }
+      }
+
+      if (cancelled) {
+        return;
+      }
+
+      const editingId = localStorage.getItem("editingRequestId");
+      const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
+
+      if (editingId) {
+        const existingRequest = storedRequests.find(
+          (item) => String(item.id) === String(editingId)
+        );
+
+        if (existingRequest) {
+          setFormData(existingRequest);
+        }
+      }
+
+      setBootstrapped(true);
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const applyDefaultValues = () => {
     return {
@@ -333,25 +392,25 @@ function AdoptionRequestPage() {
   setErrors({});
 
   try {
-    const user = JSON.parse(localStorage.getItem("paviaUser"));
+    const user = getStoredUser();
 
-    if (user?.userId) {
+    if (!user?.userId) {
       showPopup({
         type: "error",
         title: "User Error",
-        message: "User information could not be found. Please log-in again."
-      })
+        message: "User information could not be found. Please log in again."
+      });
       return;
     }
 
-    const response = await fetch("http://localhost:8080/api/adoption-requests", {
+    const response = await fetch(`${getApiBaseUrl()}/api/adoption-requests`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         ...formData,
-        userId: user?.userId 
+        userId: user?.userId
       })
     });
 
@@ -361,6 +420,10 @@ function AdoptionRequestPage() {
 
     const savedRequest = await response.json();
     console.log("Saved adoption request:", savedRequest);
+
+    if (savedRequest?.id != null) {
+      setLastSavedRequestId(Number(savedRequest.id));
+    }
 
     const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
     const editingId = localStorage.getItem("editingRequestId");
@@ -416,6 +479,55 @@ function AdoptionRequestPage() {
     return "step-item step-upcoming";
   };
 
+  const finalizeAndGoToMatches = async () => {
+    try {
+      const user = getStoredUser();
+      let requestId = lastSavedRequestId;
+      if (!requestId && user?.userId) {
+        const listRes = await fetch(
+          `${getApiBaseUrl()}/api/adoption-requests/user/${user.userId}`
+        );
+        if (listRes.ok) {
+          const list = await listRes.json();
+          const draft = [...(list || [])]
+            .reverse()
+            .find((r) => !r.requestPhase || r.requestPhase === "DRAFT");
+          if (draft?.id != null) {
+            requestId = Number(draft.id);
+          }
+        }
+      }
+
+      if (requestId && user?.userId) {
+        const res = await fetch(
+          `${getApiBaseUrl()}/api/adoption-requests/${requestId}/submit`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: user.userId })
+          }
+        );
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          showPopup({
+            type: "error",
+            title: "Submit failed",
+            message: err.error || "Could not finalize your adoption request."
+          });
+          return;
+        }
+      }
+      navigate("/compatible-animals");
+    } catch (err) {
+      console.error(err);
+      showPopup({
+        type: "error",
+        title: "Error",
+        message: "Could not submit adoption request."
+      });
+    }
+  };
+
   const CheckboxGroup = ({ options, fieldName }) => (
     <div className="checkbox-grid">
       {options.map((option) => {
@@ -437,6 +549,20 @@ function AdoptionRequestPage() {
       })}
     </div>
   );
+
+  if (!bootstrapped) {
+    return (
+      <div className="adoption-request-page">
+        <Navbar />
+        <main className="adoption-request-main">
+          <p className="adoption-request-subtitle" style={{ padding: "32px 24px" }}>
+            Loading…
+          </p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="adoption-request-page">
@@ -1021,7 +1147,7 @@ function AdoptionRequestPage() {
                     <button
                       type="button"
                       className="adoption-submit-btn"
-                      onClick={() => navigate("/compatible-animals")}
+                      onClick={finalizeAndGoToMatches}
                     >
                       Submit and Go to Matches
                     </button>

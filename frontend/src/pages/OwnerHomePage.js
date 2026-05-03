@@ -1,12 +1,29 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./OwnerHomePage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import ownerHomeHeroImage from "../images/ownerHomeHeroImage.jpg";
+import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
 
 function OwnerHomePage() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (!stored?.userId || normalizeRole(stored.role) !== "OWNER") {
+      return;
+    }
+    const apiBaseUrl = getApiBaseUrl();
+    fetch(`${apiBaseUrl}/api/auth/profile/${stored.userId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (profile && profile.ownerProfileCompleted === false) {
+          navigate("/complete-owner-profile", { replace: true });
+        }
+      })
+      .catch(() => {});
+  }, [navigate]);
 
   const goToRegisterAnimal = () => {
     navigate("/register-animal");

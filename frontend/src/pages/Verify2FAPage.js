@@ -136,12 +136,22 @@ function Verify2FAPage() {
         return;
       }
 
+      const adopterProfileCompleted =
+        resolvedRole !== "ADOPTER" || data.adopterProfileCompleted === "true";
+      const ownerProfileCompleted =
+        resolvedRole !== "OWNER" || data.ownerProfileCompleted === "true";
+
       localStorage.setItem(
         "paviaUser",
         JSON.stringify({
           email,
           role: resolvedRole,
-          userId: Number(data.userId)
+          userId: Number(data.userId),
+          fullName: (data.fullName && String(data.fullName).trim()) || "",
+          adopterProfileCompleted,
+          ownerProfileCompleted,
+          ownerListingType:
+            resolvedRole === "OWNER" ? data.ownerListingType || "" : ""
         })
       );
 
@@ -153,7 +163,14 @@ function Verify2FAPage() {
             ? "Your account has been created successfully."
             : "You have logged in successfully."
       });
-      navigate(getHomePathByRole(resolvedRole), { replace: true });
+
+      if (resolvedRole === "ADOPTER" && !adopterProfileCompleted) {
+        navigate("/complete-adopter-profile", { replace: true });
+      } else if (resolvedRole === "OWNER" && !ownerProfileCompleted) {
+        navigate("/complete-owner-profile", { replace: true });
+      } else {
+        navigate(getHomePathByRole(resolvedRole), { replace: true });
+      }
     } catch (error) {
       console.error(error);
       showPopup({

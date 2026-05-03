@@ -114,32 +114,19 @@
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(180deg, #f5f5f2 0%, #e8e8e2 100%);
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 
-.nav-avatar-head {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #8d8d88;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.nav-avatar-body {
-  position: absolute;
-  width: 18px;
-  height: 10px;
-  border-radius: 10px 10px 0 0;
-  background: #8d8d88;
-  bottom: 5px;
-  left: 50%;
-  transform: translateX(-50%);
+.nav-profile-avatar-initials {
+  background: linear-gradient(135deg, #0ea5a4 0%, #2bd85d 100%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }
 
 .nav-profile-menu {
@@ -161,17 +148,49 @@
   margin-bottom: 6px;
 }
 
+.nav-profile-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-profile-menu-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0ea5a4 0%, #2bd85d 100%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .nav-profile-name {
   margin: 0;
   font-size: 14px;
   font-weight: 800;
   color: #171717;
+  word-break: break-word;
 }
 
 .nav-profile-role {
   margin: 4px 0 0;
   font-size: 12px;
   color: #7a7a7a;
+}
+
+.nav-profile-divider {
+  height: 1px;
+  margin: 6px 4px 8px;
+  background: #efefe9;
+}
+
+.nav-profile-item-icon-account {
+  background: #e8f6ff;
+  border: 1px solid #c5e4f7;
 }
 
 .nav-profile-item {

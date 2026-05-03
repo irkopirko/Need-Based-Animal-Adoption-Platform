@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import "./MatchResultsPage.css"; 
+import "./MatchResultsPage.css";
 import { useNavigate } from "react-router-dom";
+import { STRONG_MATCH_THRESHOLD } from "../utils/adopterJourney";
 
 function MatchResultsPage() {
   const [matches, setMatches] = useState([]);
@@ -55,7 +56,7 @@ function MatchResultsPage() {
     if (stored) {
       setRequestData(JSON.parse(stored));
     }
-  
+
     fetchData();
   }, [userId]);
 
@@ -68,7 +69,9 @@ function MatchResultsPage() {
           <p className="match-tag">Compatibility Results</p>
           <h1 className="match-title">Your Best Matches</h1>
           <p className="match-description">
-            Based on your preferences and lifestyle, these animals are the most compatible with you.
+            Based on your preferences and lifestyle, these animals are the most
+            compatible with you. Strong matches use a minimum compatibility score
+            of {STRONG_MATCH_THRESHOLD}% (inclusive).
           </p>
         </section>
 

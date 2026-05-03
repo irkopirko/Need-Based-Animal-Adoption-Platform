@@ -8,7 +8,16 @@ export function PopupProvider({ children }) {
   const getPopupIcon = (type) => {
     if (type === "success") return "✓";
     if (type === "info") return "i";
+    if (type === "warning") return "⚠";
+    if (type === "error" || type === "critical") return "!";
     return "!";
+  };
+
+  const getDefaultTitle = (type) => {
+    if (type === "success") return "Success";
+    if (type === "error" || type === "critical") return "Error";
+    if (type === "warning") return "Attention";
+    return "Notice";
   };
 
   const closePopup = () => {
@@ -30,7 +39,7 @@ export function PopupProvider({ children }) {
 
     setPopup({
       type,
-      title: title || (type === "success" ? "Success" : "Notice"),
+      title: title || getDefaultTitle(type),
       message: safeMessage,
       icon: getPopupIcon(type)
     });

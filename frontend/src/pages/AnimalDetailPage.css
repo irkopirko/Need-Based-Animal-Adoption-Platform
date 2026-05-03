@@ -18,7 +18,7 @@
   align-items: start;
 }
 
-/* LEFT SIDE - IMAGES */
+
 
 .animal-detail-main-image-wrap {
   position: relative;
@@ -84,7 +84,6 @@
   border-color: #28c95a;
 }
 
-/* RIGHT SIDE */
 
 .animal-detail-hero-right {
   background: #ffffff;
@@ -103,7 +102,18 @@
 .animal-breed {
   color: #666;
   font-size: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+}
+
+.animal-compatibility-threshold-note {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #3d5a45;
+  background: linear-gradient(180deg, #f7fcf8 0%, #eef9f0 100%);
+  border: 1px solid #dcefe0;
+  border-radius: 12px;
+  padding: 12px 14px;
 }
 
 .animal-info-grid {

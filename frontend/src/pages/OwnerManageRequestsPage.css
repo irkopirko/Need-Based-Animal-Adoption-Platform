@@ -504,6 +504,52 @@
   color: #616861;
 }
 
+.owner-requests-loading-msg {
+  padding: 48px 24px;
+  text-align: center;
+  color: #5f665f;
+}
+
+.owner-request-detail-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #626962;
+}
+
+.owner-request-get-contact-panel {
+  background: linear-gradient(180deg, #f7fcf8 0%, #eef9f0 100%);
+  border: 1px solid #dcefe0;
+  border-radius: 16px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+}
+
+.owner-request-get-contact-panel strong {
+  display: block;
+  font-size: 16px;
+  color: #1f8f46;
+  margin-bottom: 8px;
+}
+
+.owner-request-get-contact-panel p {
+  margin: 0 0 14px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #525952;
+}
+
+.owner-request-get-contact-btn {
+  height: 44px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #28c95a 0%, #0ea5a4 100%);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 @media (max-width: 1100px) {
   .owner-requests-layout,
   .owner-listings-grid {

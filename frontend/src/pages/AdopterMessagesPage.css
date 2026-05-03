@@ -1,3 +1,61 @@
+.adopter-messages-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f7f7f5 0%, #eef6ef 100%);
+}
+
+.messages-page-shell {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 56px;
+  box-sizing: border-box;
+}
+
+.messages-loading-msg {
+  padding: 48px 20px;
+  text-align: center;
+  color: #5f665f;
+  font-size: 16px;
+}
+
+.messages-page-hero {
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
+  border: 1px solid #e6ece4;
+  border-radius: 24px;
+  padding: 28px 26px;
+  margin-bottom: 20px;
+  box-shadow: 0 14px 34px rgba(16, 24, 16, 0.04);
+}
+
+.messages-page-hero-tag {
+  margin: 0 0 10px;
+  color: #1f8f46;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.messages-page-hero-title {
+  margin: 0 0 12px;
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -0.8px;
+  line-height: 1.05;
+  color: #171717;
+}
+
+.messages-page-hero-sub {
+  margin: 0;
+  max-width: 720px;
+  color: #606760;
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.messages-gate-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 8px 0 32px;
+}
+
 .messages-locked-main {
   min-height: 70vh;
   display: flex;
@@ -15,6 +73,11 @@
   padding: 40px;
   border: 1px solid #e4ebe2;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
+}
+
+.messages-locked-card-wide {
+  max-width: 720px;
+  width: 100%;
 }
 
 .messages-locked-badge {
@@ -77,11 +140,13 @@
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.04);
 }
 
-.conversation-image {
+.conversation-avatar-placeholder {
+  flex-shrink: 0;
   width: 70px;
   height: 90px;
-  object-fit: cover;
   border-radius: 12px;
+  background: linear-gradient(145deg, #e8f2ea 0%, #dcefe0 55%, #e2ebe4 100%);
+  border: 1px solid #e0ebe3;
 }
 
 .conversation-content h3 {

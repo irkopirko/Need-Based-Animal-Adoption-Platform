@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface AdoptionRequestRepository extends JpaRepository<AdoptionRequest, Long> {
     List<AdoptionRequest> findByUserId(Long userId);
+
+    boolean existsByUserIdAndRequestPhase(Long userId, String requestPhase);
 }

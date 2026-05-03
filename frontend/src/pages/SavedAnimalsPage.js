@@ -1,98 +1,122 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./SavedAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import animalSlide1 from "../images/animalSlide1.jpg";
-import animalSlide2 from "../images/animalSlide2.jpg";
-import animalSlide3 from "../images/animalSlide3.jpg";
-import animalSlide4 from "../images/animalSlide4.jpg";
 import { usePopup } from "../components/PopupProvider";
+import { getStoredUser, normalizeRole, getApiBaseUrl } from "../utils/auth";
+import {
+  loadAdopterJourneyState,
+  mergeSavedWithCompatibility,
+  STRONG_MATCH_THRESHOLD
+} from "../utils/adopterJourney";
 
 function SavedAnimalsPage() {
   const navigate = useNavigate();
   const { showPopup } = usePopup();
 
-  const [adoptionRequestExists] = useState(false);
-  const [savedAnimals, setSavedAnimals] = useState([
-    {
-      id: 1,
-      name: "Luna",
-      type: "Dog",
-      breed: "Golden Retriever",
-      age: "2 years",
-      size: "Large",
-      energy: "Medium",
-      compatibility: 92,
-      image: animalSlide1
-    },
-    {
-      id: 2,
-      name: "Milo",
-      type: "Cat",
-      breed: "British Shorthair",
-      age: "1 year",
-      size: "Small",
-      energy: "Low",
-      compatibility: 89,
-      image: animalSlide2
-    },
-    {
-      id: 3,
-      name: "Daisy",
-      type: "Dog",
-      breed: "Mixed Breed",
-      age: "3 years",
-      size: "Medium",
-      energy: "Medium",
-      compatibility: 87,
-      image: animalSlide3
-    },
-    {
-      id: 4,
-      name: "Nala",
-      type: "Cat",
-      breed: "Tabby",
-      age: "8 months",
-      size: "Small",
-      energy: "High",
-      compatibility: 85,
-      image: animalSlide4
+  const [loading, setLoading] = useState(true);
+  const [scenario, setScenario] = useState("LOADING");
+  const [savedRows, setSavedRows] = useState([]);
+  const [userId, setUserId] = useState(null);
+
+  const refresh = useCallback(async () => {
+    const user = getStoredUser();
+    const role = normalizeRole(user?.role);
+    if (!user?.userId || role !== "ADOPTER") {
+      setUserId(null);
+      setScenario("NOT_ADOPTER");
+      setSavedRows([]);
+      setLoading(false);
+      return;
     }
-  ]);
+    setUserId(user.userId);
+    setLoading(true);
+    try {
+      const state = await loadAdopterJourneyState(user.userId);
+      const merged = mergeSavedWithCompatibility(
+        state.savedAnimals,
+        state.strongMatches,
+        state.apiBaseUrl
+      );
+      const eligible = merged.filter(
+        (a) => a.compatibility >= STRONG_MATCH_THRESHOLD
+      );
+
+      if (state.noRequest) {
+        setScenario("NO_REQUEST");
+        setSavedRows([]);
+      } else if (state.draftOnly) {
+        setScenario("DRAFT_ONLY");
+        setSavedRows([]);
+      } else if (state.submitted && state.strongMatches.length === 0) {
+        setScenario("SUBMITTED_NO_MATCHES");
+        setSavedRows([]);
+      } else if (state.submitted && state.strongMatches.length > 0) {
+        setScenario("READY");
+        setSavedRows(eligible);
+      } else {
+        setScenario("NO_REQUEST");
+        setSavedRows([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setScenario("NO_REQUEST");
+      setSavedRows([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   const [typeFilter, setTypeFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Compatibility");
 
   const visibleAnimals = useMemo(() => {
-    if (!adoptionRequestExists) {
-      return [];
-    }
-
-    let result = [...savedAnimals];
-
+    let result = [...savedRows];
     if (typeFilter !== "All") {
       result = result.filter((animal) => animal.type === typeFilter);
     }
-
     if (sortBy === "Compatibility") {
       result.sort((a, b) => b.compatibility - a.compatibility);
     }
-
     if (sortBy === "Name") {
       result.sort((a, b) => a.name.localeCompare(b.name));
     }
-
     return result;
-  }, [adoptionRequestExists, savedAnimals, sortBy, typeFilter]);
+  }, [savedRows, sortBy, typeFilter]);
 
-  const handleRemove = (id) => {
-    setSavedAnimals((prev) => prev.filter((animal) => animal.id !== id));
-    showPopup({
-      type: "warning",
-      title: "Removed",
-      message: "Animal removed from saved list."
-    });
+  const handleRemove = async (id) => {
+    if (!userId) {
+      return;
+    }
+    try {
+      const api = getApiBaseUrl();
+      const res = await fetch(
+        `${api}/api/saved?userId=${userId}&animalId=${id}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Remove failed");
+      }
+      setSavedRows((prev) => prev.filter((animal) => animal.id !== id));
+      showPopup({
+        type: "warning",
+        title: "Removed",
+        message: "Animal removed from saved list."
+      });
+    } catch (err) {
+      console.error(err);
+      showPopup({
+        type: "error",
+        title: "Could not remove",
+        message: "Please try again."
+      });
+    }
   };
 
   const goToAnimalDetail = (id) => {
@@ -104,8 +128,58 @@ function SavedAnimalsPage() {
   };
 
   const goToCompatibleAnimals = () => {
-    navigate("/adopterhomepage");
+    navigate("/compatible-animals");
   };
+
+  if (loading) {
+    return (
+      <div className="saved-animals-page">
+        <Navbar />
+        <main className="saved-animals-main">
+          <p className="saved-animals-loading-msg">Loading…</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (scenario === "NOT_ADOPTER") {
+    return (
+      <div className="saved-animals-page">
+        <Navbar />
+        <main className="saved-animals-main">
+          <section className="saved-animals-empty-shell">
+            <div className="saved-animals-empty-card">
+              <span className="saved-animals-empty-badge">Adopters only</span>
+              <h2>Saved animals is for adopters</h2>
+              <p>Sign in as an adopter to use this page.</p>
+              <div className="saved-animals-empty-actions">
+                <button
+                  type="button"
+                  className="saved-animals-primary-btn"
+                  onClick={() => navigate("/login")}
+                >
+                  Sign in
+                </button>
+              </div>
+            </div>
+          </section>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const gateCard = (badge, title, body, actions) => (
+    <section className="saved-animals-empty-shell">
+      <div className="saved-animals-empty-card locked">
+        <span className="saved-animals-empty-badge">{badge}</span>
+        <h2>{title}</h2>
+        <p>{body}</p>
+        <div className="saved-animals-empty-actions">{actions}</div>
+      </div>
+    </section>
+  );
 
   return (
     <div className="saved-animals-page">
@@ -117,71 +191,94 @@ function SavedAnimalsPage() {
             <p className="saved-animals-tag">Saved Animals</p>
             <h1>Keep track of animals you want to revisit later.</h1>
             <p>
-              This page only becomes active after your adoption request is
-              completed and compatible animals start appearing in your matching
-              flow.
+              After you submit your adoption request, only animals with a
+              compatibility score of {STRONG_MATCH_THRESHOLD}% or higher
+              (inclusive) count as strong matches. Save those from your compatible
+              list and manage them here.
             </p>
           </div>
 
           <div className="saved-animals-hero-right">
             <div className="saved-animals-hero-card">
               <span className="saved-animals-hero-badge">Adopter Space</span>
-              <h3>Saved animals come after matching begins</h3>
+              <h3>Three steps to this page</h3>
               <p>
-                You can only save animals after your adoption request is created
-                and compatible matches are unlocked by the platform.
+                Submit your request, unlock animals with scores of at least{" "}
+                {STRONG_MATCH_THRESHOLD}% (inclusive), then save the ones you love
+                from the compatible list.
               </p>
             </div>
           </div>
         </section>
 
-        {!adoptionRequestExists && (
-          <section className="saved-animals-empty-shell">
-            <div className="saved-animals-empty-card locked">
-              <span className="saved-animals-empty-badge">Locked</span>
-              <h2>Complete your adoption request first</h2>
-              <p>
-                Saved animals are not available until you submit your adoption
-                request. Once the platform starts generating compatible matches,
-                you will be able to save animals from that list here.
-              </p>
-              <div className="saved-animals-empty-actions">
-                <button
-                  type="button"
-                  className="saved-animals-primary-btn"
-                  onClick={goToAdoptionRequest}
-                >
-                  Create Adoption Request
-                </button>
-              </div>
-            </div>
-          </section>
-        )}
+        {scenario === "NO_REQUEST" &&
+          gateCard(
+            "Get started",
+            "Create an adoption request first",
+            `You have not started an adoption request yet. Saved animals appear after you submit a request and the platform finds animals with a compatibility score of ${STRONG_MATCH_THRESHOLD}% or higher (inclusive).`,
+            <>
+              <button
+                type="button"
+                className="saved-animals-primary-btn"
+                onClick={goToAdoptionRequest}
+              >
+                Start adoption request
+              </button>
+            </>
+          )}
 
-        {adoptionRequestExists && visibleAnimals.length === 0 && (
-          <section className="saved-animals-empty-shell">
-            <div className="saved-animals-empty-card">
-              <span className="saved-animals-empty-badge">No Saved Animals Yet</span>
-              <h2>Your saved list is still empty</h2>
-              <p>
-                You already have an adoption request, but you have not saved any
-                compatible animals yet. Once you begin reviewing your matches,
-                you can add animals to this list and compare them later.
-              </p>
-              <div className="saved-animals-empty-actions">
+        {scenario === "DRAFT_ONLY" &&
+          gateCard(
+            "Draft in progress",
+            "Finish and submit your request",
+            "You have a draft adoption request. Submit it so we can calculate compatibility. Until then, saved animals stay locked.",
+            <>
+              <button
+                type="button"
+                className="saved-animals-primary-btn"
+                onClick={goToAdoptionRequest}
+              >
+                Continue adoption request
+              </button>
+            </>
+          )}
+
+        {scenario === "SUBMITTED_NO_MATCHES" &&
+          gateCard(
+            "No strong matches yet",
+            `No animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher`,
+            `Your request is in, but right now there are no animals with a compatibility score of ${STRONG_MATCH_THRESHOLD}% or higher (inclusive). Check again later or adjust your preferences on the adoption form if needed.`,
+            <>
+              <button
+                type="button"
+                className="saved-animals-primary-btn"
+                onClick={goToCompatibleAnimals}
+              >
+                View compatible animals
+              </button>
+            </>
+          )}
+
+        {scenario === "READY" && visibleAnimals.length === 0 && (
+          <>
+            {gateCard(
+              "No saved animals yet",
+              "You have matches — save some from the list",
+              `Animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher are ready for you. Open compatible animals and tap save on any profile; they will show up here with filters and sorting.`,
+              <>
                 <button
                   type="button"
                   className="saved-animals-primary-btn"
                   onClick={goToCompatibleAnimals}
                 >
-                  View Compatible Animals
+                  Browse compatible animals
                 </button>
-              </div>
-            </div>
-          </section>
+              </>
+            )}
+          </>
         )}
 
-        {adoptionRequestExists && visibleAnimals.length > 0 && (
+        {scenario === "READY" && visibleAnimals.length > 0 && (
           <>
             <section className="saved-animals-toolbar">
               <div className="saved-animals-toolbar-left">
@@ -211,7 +308,7 @@ function SavedAnimalsPage() {
               </div>
 
               <div className="saved-animals-toolbar-right">
-                <span>{visibleAnimals.length} saved animals</span>
+                <span>{visibleAnimals.length} saved (≥{STRONG_MATCH_THRESHOLD}%)</span>
               </div>
             </section>
 
@@ -219,13 +316,20 @@ function SavedAnimalsPage() {
               {visibleAnimals.map((animal) => (
                 <div key={animal.id} className="saved-animal-card">
                   <div className="saved-animal-image-wrap">
-                    <img
-                      src={animal.image}
-                      alt={animal.name}
-                      className="saved-animal-image"
-                    />
+                    {animal.image ? (
+                      <img
+                        src={animal.image}
+                        alt={animal.name}
+                        className="saved-animal-image"
+                      />
+                    ) : (
+                      <div
+                        className="saved-animal-image-placeholder"
+                        aria-hidden="true"
+                      />
+                    )}
                     <span className="saved-animal-badge">
-                      {animal.compatibility}% Match
+                      {animal.compatibility}% compatibility
                     </span>
                   </div>
 

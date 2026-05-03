@@ -1,11 +1,16 @@
 package com.adoptionplatform.backend.controller;
 
+import com.adoptionplatform.backend.dto.CompleteAdopterProfileRequest;
+import com.adoptionplatform.backend.dto.CompleteOwnerProfileRequest;
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
+import com.adoptionplatform.backend.dto.UpdateProfileRequest;
+import com.adoptionplatform.backend.dto.UserProfileDto;
 import com.adoptionplatform.backend.dto.ResendVerificationRequest;
 import com.adoptionplatform.backend.dto.ResetPasswordRequest;
 import com.adoptionplatform.backend.dto.Verify2FARequest;
 import com.adoptionplatform.backend.service.AuthService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -101,6 +106,40 @@ public class AuthController {
                 request.getNewPassword(),
                 request.getConfirmPassword()
         );
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/profile/{userId}")
+    public ResponseEntity<UserProfileDto> getProfile(@PathVariable Long userId) {
+        return authService.getProfileByUserId(userId)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<Map<String, String>> updateProfile(@RequestBody UpdateProfileRequest request) {
+        Map<String, String> response = authService.updateProfile(request);
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/complete-adopter-profile")
+    public ResponseEntity<Map<String, String>> completeAdopterProfile(@RequestBody CompleteAdopterProfileRequest request) {
+        Map<String, String> response = authService.completeAdopterProfile(request);
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/complete-owner-profile")
+    public ResponseEntity<Map<String, String>> completeOwnerProfile(@RequestBody CompleteOwnerProfileRequest request) {
+        Map<String, String> response = authService.completeOwnerProfile(request);
         if (response.containsKey("error")) {
             return ResponseEntity.badRequest().body(response);
         }

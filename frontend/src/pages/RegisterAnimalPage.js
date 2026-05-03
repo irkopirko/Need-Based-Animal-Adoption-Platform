@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./RegisterAnimalPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
 
 function RegisterAnimalPage() {
+  const navigate = useNavigate();
   const [images, setImages] = useState([]);
   const [toast, setToast] = useState(null);
 
@@ -21,6 +24,22 @@ function RegisterAnimalPage() {
     description: "",
     housingLocation: ""
   });
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (!stored?.userId || normalizeRole(stored.role) !== "OWNER") {
+      return;
+    }
+    const apiBaseUrl = getApiBaseUrl();
+    fetch(`${apiBaseUrl}/api/auth/profile/${stored.userId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (profile && profile.ownerProfileCompleted === false) {
+          navigate("/complete-owner-profile", { replace: true });
+        }
+      })
+      .catch(() => {});
+  }, [navigate]);
 
   const triggerToast = (message, type) => {
     setToast({ message, type });
@@ -40,12 +59,14 @@ function RegisterAnimalPage() {
     setImages(updatedImages);
   };
 
-const user = JSON.parse(localStorage.getItem("paviaUser"));
-
-
-
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    const user = getStoredUser();
+    if (!user?.userId || normalizeRole(user.role) !== "OWNER") {
+      triggerToast("Please log in as an owner to register an animal.", "error");
+      return;
+    }
 
     if (images.length < 3) {
       triggerToast("Please upload at least 3 images.", "error");
@@ -72,50 +93,45 @@ const user = JSON.parse(localStorage.getItem("paviaUser"));
       goodWithPets: formData.goodWithPets.toUpperCase(),
       description: formData.description,
       housingLocation: formData.housingLocation,
-      ownerId: user?.userId 
+      ownerId: user.userId
     };
-const formPayload = new FormData();
 
-formPayload.append(
-  "animal",
-  new Blob([JSON.stringify(payload)], {
-    type: "application/json",
-  })
-);
+    const formPayload = new FormData();
+    formPayload.append(
+      "animal",
+      new Blob([JSON.stringify(payload)], {
+        type: "application/json"
+      })
+    );
+    images.forEach((image) => {
+      formPayload.append("images", image);
+    });
 
-images.forEach((image) => {
-  formPayload.append("images", image);
-});
+    const apiBaseUrl = getApiBaseUrl();
+
     try {
-      const formPayload = new FormData();
+      const response = await fetch(`${apiBaseUrl}/api/animals/create-with-images`, {
+        method: "POST",
+        body: formPayload
+      });
 
-
-formPayload.append(
-  "animal",
-  new Blob([JSON.stringify(payload)], {
-    type: "application/json"
-  })
-);
-
-images.forEach((image) => {
-  formPayload.append("images", image);
-});
-
-const response = await fetch("http://localhost:8080/api/animals/create-with-images", {
-  method: "POST",
-  body: formPayload
-});
+      const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error("Animal could not be saved.");
+        const msg =
+          result.error ||
+          (response.status === 403
+            ? "Complete your owner profile before listing animals."
+            : "Animal could not be saved.");
+        triggerToast(msg, "error");
+        if (response.status === 403) {
+          navigate("/complete-owner-profile", { replace: true });
+        }
+        return;
       }
-
-      const result = await response.json();
-      console.log("Animal saved:", result);
 
       triggerToast("Animal registered successfully!", "success");
 
-      // RESET
       setFormData({
         name: "",
         animalType: "",
@@ -132,7 +148,6 @@ const response = await fetch("http://localhost:8080/api/animals/create-with-imag
       });
 
       setImages([]);
-
     } catch (error) {
       console.error(error);
       triggerToast("Backend connection failed.", "error");
@@ -154,7 +169,6 @@ const response = await fetch("http://localhost:8080/api/animals/create-with-imag
             <h2>Animal Information</h2>
 
             <div className="register-grid">
-
               <input name="name" placeholder="Name" onChange={handleChange} value={formData.name} />
 
               <select name="animalType" onChange={handleChange} value={formData.animalType}>
@@ -211,7 +225,6 @@ const response = await fetch("http://localhost:8080/api/animals/create-with-imag
                 <option value="No">No</option>
               </select>
 
-              {}
               <select name="housingLocation" onChange={handleChange} value={formData.housingLocation}>
                 <option value="">Where is the animal?</option>
                 <option value="Home">Home</option>
@@ -240,4 +253,5 @@ const response = await fetch("http://localhost:8080/api/animals/create-with-imag
     </div>
   );
 }
+
 export default RegisterAnimalPage;

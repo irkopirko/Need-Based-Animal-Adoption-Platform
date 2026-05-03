@@ -84,17 +84,51 @@
   border: 1px solid #e4ebe2;
   background: #fbfbf9;
   cursor: pointer;
+  text-align: left;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
 }
 
 .owner-conversation-card-active {
   background: #eef9f0;
 }
 
-.owner-conversation-image {
+.owner-conversation-avatar-placeholder {
   width: 70px;
   height: 90px;
-  object-fit: cover;
   border-radius: 12px;
+  background: linear-gradient(145deg, #e8f2ea 0%, #dcefe0 55%, #e2ebe4 100%);
+  border: 1px solid #e0ebe3;
+}
+
+.owner-conversation-content h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.owner-conversation-content p {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+.owner-conversation-preview {
+  display: block;
+  font-size: 12px;
+  color: #555;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.owner-conversation-time {
+  font-size: 12px;
+  color: #888;
+  align-self: start;
 }
 
 .owner-chat-panel {
@@ -121,11 +155,59 @@
   font-weight: 800;
 }
 
+.owner-messages-highlight-card h3 {
+  margin: 12px 0 8px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.owner-messages-highlight-card p {
+  margin: 0;
+  opacity: 0.95;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+.owner-chat-sub {
+  margin: 4px 0 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.owner-chat-get-contact-banner {
+  background: linear-gradient(180deg, #f7fcf8 0%, #eef9f0 100%);
+  border: 1px solid #dcefe0;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.owner-chat-get-contact-banner strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #1f8f46;
+  font-size: 15px;
+}
+
+.owner-chat-get-contact-banner p {
+  margin: 0;
+  font-size: 14px;
+  color: #525952;
+  line-height: 1.55;
+}
+
+.owner-chat-empty-select {
+  margin: 24px 0;
+  color: #666;
+  text-align: center;
+}
+
 .owner-chat-messages {
   flex: 1;
   display: grid;
   gap: 10px;
   padding: 10px 0;
+  min-height: 120px;
 }
 
 .owner-chat-bubble-row {
@@ -204,4 +286,29 @@
   font-weight: 800;
   cursor: pointer;
   margin-top: 16px;
+}
+
+.owner-secondary-outline-btn {
+  display: block;
+  margin: 12px auto 0;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid #d0d8d0;
+  background: #ffffff;
+  color: #3a443a;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.owner-messages-locked-card-wide {
+  max-width: 720px;
+  width: 100%;
+  margin: 0 20px;
+  box-sizing: border-box;
+}
+
+.owner-messages-loading-msg {
+  padding: 48px 20px;
+  text-align: center;
+  color: #5f665f;
 }

@@ -12,7 +12,17 @@ public class AnimalRequest {
     private String specialNeeds;
     private String description;
     private String housingLocation;     //home or shelter
+    private Long ownerId;
+
     public AnimalRequest() {
+    }
+
+    public Long getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(Long ownerId) {
+        this.ownerId = ownerId;
     }
     public String getName() {
         return name;

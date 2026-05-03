@@ -16,6 +16,9 @@ import RegisterAnimalPage from "./pages/RegisterAnimalPage";
 import CompatibleAnimalsPage from "./pages/CompatibleAnimalsPage";
 import MatchResultsPage from "./pages/MatchResultsPage";
 import Verify2FAPage from "./pages/Verify2FAPage";
+import AccountProfilePage from "./pages/AccountProfilePage";
+import CompleteAdopterProfilePage from "./pages/CompleteAdopterProfilePage";
+import CompleteOwnerProfilePage from "./pages/CompleteOwnerProfilePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { PopupProvider } from "./components/PopupProvider";
@@ -33,8 +36,11 @@ function App() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/new" element={<ResetPasswordPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/account" element={<AccountProfilePage />} />
           <Route path="/adopterhomepage" element={<AdopterHomePage />} />
           <Route path="/ownerhomepage" element={<OwnerHomePage />} />
+          <Route path="/complete-adopter-profile" element={<CompleteAdopterProfilePage />} />
+          <Route path="/complete-owner-profile" element={<CompleteOwnerProfilePage />} />
           <Route path="/adoption-request" element={<AdoptionRequestPage />} />
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/adopt" element={<GuestAdoptPage />} />

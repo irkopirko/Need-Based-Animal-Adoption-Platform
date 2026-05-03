@@ -18,6 +18,12 @@ import animalSlide12 from "../images/animalSlide12.jpg";
 import animalSlide13 from "../images/animalSlide13.jpg";
 import animalSlide14 from "../images/animalSlide14.jpg";
 import animalSlide15 from "../images/animalSlide15.jpg";
+import {
+  broadcastStoredUserRefresh,
+  getApiBaseUrl,
+  getStoredUser,
+  normalizeRole
+} from "../utils/auth";
 
 function AdopterHomePage() {
   const navigate = useNavigate();
@@ -48,6 +54,41 @@ function AdopterHomePage() {
 
     return () => clearInterval(interval);
   }, [slides.length]);
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (!user?.userId || normalizeRole(user.role) !== "ADOPTER") {
+      return undefined;
+    }
+
+    let cancelled = false;
+    const apiBaseUrl = getApiBaseUrl();
+
+    fetch(`${apiBaseUrl}/api/auth/profile/${user.userId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (cancelled || !profile) {
+          return;
+        }
+        const prev = getStoredUser() || {};
+        localStorage.setItem(
+          "paviaUser",
+          JSON.stringify({
+            ...prev,
+            adopterProfileCompleted: profile.adopterProfileCompleted
+          })
+        );
+        broadcastStoredUserRefresh();
+        if (!profile.adopterProfileCompleted) {
+          navigate("/complete-adopter-profile", { replace: true });
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
 
   const goToAdoptionRequest = () => {
     navigate("/adoption-request");

@@ -3,32 +3,38 @@ import { useParams, useNavigate } from "react-router-dom";
 import "./AnimalDetailPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { usePopup } from "../components/PopupProvider";
+import {
+  STRONG_MATCH_THRESHOLD,
+  resolveAnimalImageUrl
+} from "../utils/adopterJourney";
+import { recordOwnerInquiry } from "../utils/ownerJourney";
+import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
 
 function AnimalDetailPage() {
-  const user =JSON.parse(localStorage.getItem("paviaUser"));
+  const user = getStoredUser();
   const { id } = useParams();
   const navigate = useNavigate();
+  const { showPopup } = usePopup();
 
   const [animal, setAnimal] = useState(null);
   const [selectedImage, setSelectedImage] = useState("");
   const [saved, setSaved] = useState(false);
 
-const getStoredUser = () => {
-  return JSON.parse(localStorage.getItem("paviaUser"));
-};
-    const isOwner = user?.role === "OWNER";
-    const isAdopter = user?.role === "ADOPTER";
+  const role = normalizeRole(user?.role);
+  const isOwner = role === "OWNER";
+  const isAdopter = role === "ADOPTER";
 
   useEffect(() => {
     const fetchAnimal = async () => {
       try {
-        const response = await fetch(
-          `http://localhost:8080/api/animals/${id}`
-        );
+        const api = getApiBaseUrl();
+        const response = await fetch(`${api}/api/animals/${id}`);
         const data = await response.json();
         setAnimal(data);
-        if (data.images && data.images.length > 0) {
-          setSelectedImage(data.images[0]);
+        const first = data.images?.[0];
+        if (first) {
+          setSelectedImage(resolveAnimalImageUrl(data, api) || first);
         }
       } catch (error) {
         console.error("Error fetching animal:", error);
@@ -40,6 +46,52 @@ const getStoredUser = () => {
 
   const handleSave = () => {
     setSaved(!saved);
+  };
+
+  const handleGetInContact = () => {
+    if (!animal?.ownerId || !user?.userId) {
+      showPopup({
+        type: "error",
+        title: "Cannot send",
+        message: "Missing owner or account information."
+      });
+      return;
+    }
+    const adopterName =
+      user.firstName ||
+      user.fullName ||
+      user.name ||
+      user.email ||
+      "Adopter";
+    const res = recordOwnerInquiry({
+      ownerId: animal.ownerId,
+      adopterUserId: user.userId,
+      adopterName,
+      animalId: animal.id,
+      animalName: animal.name,
+      summary: `Interested in ${animal.name} — sent from animal profile.`
+    });
+    if (!res.ok) {
+      if (res.error === "duplicate") {
+        showPopup({
+          type: "warning",
+          title: "Already sent",
+          message: "You already sent an inquiry for this animal."
+        });
+        return;
+      }
+      showPopup({
+        type: "error",
+        title: "Could not send",
+        message: res.error || "Try again."
+      });
+      return;
+    }
+    showPopup({
+      type: "success",
+      title: "Inquiry sent",
+      message: "The owner can see this under Manage requests and Messages."
+    });
   };
 
   if (!animal) {
@@ -65,24 +117,29 @@ const getStoredUser = () => {
                 </span>
                 {isAdopter && (
                   <span className="animal-detail-score-badge">
-                    {animal.compatibilityScore || 0}% Match
+                    {Math.round(animal.compatibilityScore ?? 0)}% compatibility
                   </span>
                 )}
               </div>
             </div>
 
             <div className="animal-detail-gallery">
-              {animal.images.map((img, index) => (
-                <img
-                  key={index}
-                  src={img}
-                  alt={`Animal ${index}`}
-                  className={`animal-detail-gallery-item ${
-                    selectedImage === img ? "active" : ""
-                  }`}
-                  onClick={() => setSelectedImage(img)}
-                />
-              ))}
+              {(animal.images || []).map((img, index) => {
+                const api = getApiBaseUrl();
+                const resolved =
+                  resolveAnimalImageUrl({ images: [img] }, api) || img;
+                return (
+                  <img
+                    key={index}
+                    src={resolved}
+                    alt={`Animal ${index}`}
+                    className={`animal-detail-gallery-item ${
+                      selectedImage === resolved ? "active" : ""
+                    }`}
+                    onClick={() => setSelectedImage(resolved)}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -91,6 +148,18 @@ const getStoredUser = () => {
             <p className="animal-breed">
               {animal.breed} • {animal.animalType}
             </p>
+
+            {isAdopter && animal.compatibilityScore != null && (
+              <p className="animal-compatibility-threshold-note">
+                {(animal.compatibilityScore ?? 0) >= STRONG_MATCH_THRESHOLD
+                  ? `Strong match — ${Math.round(
+                      animal.compatibilityScore
+                    )}% compatibility (platform uses ≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`
+                  : `${Math.round(
+                      animal.compatibilityScore
+                    )}% compatibility — below the strong-match cutoff (≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`}
+              </p>
+            )}
 
             <div className="animal-info-grid">
               <div><strong>Age:</strong> {animal.ageGroup}</div>
@@ -112,6 +181,18 @@ const getStoredUser = () => {
                   >
                     Send Adoption Request
                   </button>
+                  {animal.ownerId != null &&
+                    animal.compatibilityScore != null &&
+                    Math.round(animal.compatibilityScore) >=
+                      STRONG_MATCH_THRESHOLD && (
+                      <button
+                        type="button"
+                        className="secondary-btn animal-detail-contact-btn"
+                        onClick={handleGetInContact}
+                      >
+                        Get in contact with owner
+                      </button>
+                    )}
                   <button className="secondary-btn" onClick={handleSave}>
                     {saved ? "Saved ✓" : "Save Animal"}
                   </button>

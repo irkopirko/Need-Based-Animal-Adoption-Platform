@@ -1,3 +1,10 @@
+.saved-animals-loading-msg {
+  padding: 48px 24px;
+  text-align: center;
+  color: #5f665f;
+  font-size: 16px;
+}
+
 .saved-animals-page {
   min-height: 100vh;
   background: linear-gradient(180deg, #f7f7f5 0%, #f2f6f2 100%);
@@ -232,6 +239,12 @@
   display: block;
 }
 
+.saved-animal-image-placeholder {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(145deg, #e8f2ea 0%, #dcefe0 55%, #e2ebe4 100%);
+}
+
 .saved-animal-badge {
   position: absolute;
   top: 14px;
@@ -288,6 +301,18 @@
   margin-top: 18px;
   display: flex;
   gap: 10px;
+}
+
+.saved-animal-primary-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  border: none;
+  background: linear-gradient(135deg, #28c95a, #0ea5a4);
+  color: #ffffff;
 }
 
 .saved-animal-secondary-btn {

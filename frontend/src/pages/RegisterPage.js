@@ -1,15 +1,20 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./RegisterPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import {
+  formatTurkishPhoneInput,
   getApiBaseUrl,
   getMissingPasswordRequirements,
   isPasswordValid,
-  isValidEmail
+  isValidEmail,
+  isValidTurkishMobileInput,
+  normalizeTurkishMobileToE164
 } from "../utils/auth";
 import { usePopup } from "../components/PopupProvider";
+import { TURKEY_PROVINCES } from "../data/turkeyProvinces";
+import { fetchDistrictsForProvince } from "../data/turkeyGeoApi";
 
 function RegisterPage() {
   const navigate = useNavigate();
@@ -18,100 +23,157 @@ function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
 
   const [formData, setFormData] = useState({
-    fullName: "",
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
-    location: "",
+    provinceId: "",
+    districtId: "",
+    districtManual: "",
     phone: "",
     agreeToTerms: false
   });
 
   const [errors, setErrors] = useState({
-    fullName: false,
+    firstName: false,
+    lastName: false,
     email: false,
     password: false,
-    location: false,
+    province: false,
+    district: false,
     phone: false,
     agreeToTerms: false
   });
 
+  const [districts, setDistricts] = useState([]);
+  const [districtLoading, setDistrictLoading] = useState(false);
+  const [districtLoadError, setDistrictLoadError] = useState(false);
+
   const missingPasswordRequirements = getMissingPasswordRequirements(formData.password);
 
-  const formatTurkishPhone = (value) => {
-  let digits = value.replace(/\D/g, "");
+  useEffect(() => {
+    const pid = formData.provinceId;
+    if (!pid) {
+      setDistricts([]);
+      setDistrictLoadError(false);
+      return;
+    }
 
-  if (digits.startsWith("90")) {
-    digits = digits.slice(2);
-  }
+    let cancelled = false;
+    setDistrictLoading(true);
+    setDistrictLoadError(false);
 
-  if (digits.startsWith("0")) {
-    digits = digits.slice(1);
-  }
+    fetchDistrictsForProvince(Number(pid))
+      .then((list) => {
+        if (!cancelled) {
+          setDistricts(list);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDistricts([]);
+          setDistrictLoadError(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDistrictLoading(false);
+        }
+      });
 
-  digits = digits.slice(0, 10);
-
-  let formatted = "+90";
-
-  if (digits.length > 0) formatted += " " + digits.slice(0, 3);
-  if (digits.length > 3) formatted += " " + digits.slice(3, 6);
-  if (digits.length > 6) formatted += " " + digits.slice(6, 8);
-  if (digits.length > 8) formatted += " " + digits.slice(8, 10);
-
-  return formatted;
-};
+    return () => {
+      cancelled = true;
+    };
+  }, [formData.provinceId]);
 
   const handleChange = (e) => {
-  const { name, value, type, checked } = e.target;
+    const { name, value, type, checked } = e.target;
 
-  if (name === "phone") {
+    if (name === "phone") {
+      setFormData({
+        ...formData,
+        phone: formatTurkishPhoneInput(value)
+      });
+
+      setErrors({
+        ...errors,
+        phone: false
+      });
+
+      return;
+    }
+
+    if (name === "provinceId") {
+      setFormData({
+        ...formData,
+        provinceId: value,
+        districtId: "",
+        districtManual: ""
+      });
+      setErrors({
+        ...errors,
+        province: false,
+        district: false
+      });
+      return;
+    }
+
+    if (name === "districtId" || name === "districtManual") {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+      setErrors({
+        ...errors,
+        district: false
+      });
+      return;
+    }
+
     setFormData({
       ...formData,
-      phone: formatTurkishPhone(value),
+      [name]: type === "checkbox" ? checked : value
     });
 
     setErrors({
       ...errors,
-      phone: false,
+      [name]: false
     });
-
-    return;
-  }
-
-  setFormData({
-    ...formData,
-    [name]: type === "checkbox" ? checked : value,
-  });
-
-  setErrors({
-    ...errors,
-    [name]: false,
-  });
-};
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const newErrors = {
-      fullName: false,
+      firstName: false,
+      lastName: false,
       email: false,
       password: false,
-      location: false,
+      province: false,
+      district: false,
       phone: false,
       agreeToTerms: false
     };
 
     let hasError = false;
 
-    if (formData.fullName.trim() === "") {
-      newErrors.fullName = true;
+    if (formData.firstName.trim() === "") {
+      newErrors.firstName = true;
+      hasError = true;
+    }
+
+    if (formData.lastName.trim() === "") {
+      newErrors.lastName = true;
       hasError = true;
     }
 
     if (!isValidEmail(formData.email)) {
       newErrors.email = true;
       hasError = true;
-      const invalidEmailMessage =
-        "Invalid email format. Please check your email address.";
-      showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
+      showPopup({
+        type: "warning",
+        title: "Invalid Email",
+        message: "Invalid email format. Please check your email address."
+      });
     }
 
     if (formData.password.trim() === "" || !isPasswordValid(formData.password)) {
@@ -119,8 +181,19 @@ function RegisterPage() {
       hasError = true;
     }
 
-    if (formData.location.trim() === "") {
-      newErrors.location = true;
+    if (!formData.provinceId) {
+      newErrors.province = true;
+      hasError = true;
+    }
+
+    let districtOk = false;
+    if (districtLoadError) {
+      districtOk = formData.districtManual.trim().length > 0;
+    } else {
+      districtOk = Boolean(formData.districtId);
+    }
+    if (!districtOk) {
+      newErrors.district = true;
       hasError = true;
     }
 
@@ -129,9 +202,7 @@ function RegisterPage() {
       hasError = true;
     }
 
-    const phoneDigits = formData.phone.replace(/\D/g, "");
-
-    if (!/^905\d{9}$/.test(phoneDigits)) {
+    if (!isValidTurkishMobileInput(formData.phone)) {
       newErrors.phone = true;
       hasError = true;
     }
@@ -152,13 +223,27 @@ function RegisterPage() {
       return;
     }
 
+    const provinceName =
+      TURKEY_PROVINCES.find((p) => String(p.id) === String(formData.provinceId))?.name ||
+      "";
+    let districtName = "";
+    if (districtLoadError) {
+      districtName = formData.districtManual.trim();
+    } else {
+      districtName =
+        districts.find((d) => String(d.id) === String(formData.districtId))?.name || "";
+    }
+
+    const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+    const location = `${provinceName} / ${districtName}`;
+
     const userData = {
       role,
-      fullName: formData.fullName,
+      fullName,
       email: formData.email,
       password: formData.password,
-      location: formData.location,
-      phone: "+" + formData.phone.replace(/\D/g, ""),
+      location,
+      phone: normalizeTurkishMobileToE164(formData.phone)
     };
 
     const apiBaseUrl = getApiBaseUrl();
@@ -175,16 +260,20 @@ function RegisterPage() {
       const result = await response.json();
 
       if (result.error === "Invalid email format" || result.error === "Invalid email domain") {
-        const invalidEmailMessage =
-          "Invalid email format. Please check your email address.";
-        showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
+        showPopup({
+          type: "warning",
+          title: "Invalid Email",
+          message: "Invalid email format. Please check your email address."
+        });
         return;
       }
 
       if (result.error === "Email is already registered") {
-        const duplicateEmailMessage =
-          "An account with this email already exists. Please log in.";
-        showPopup({ type: "info", title: "Account Exists", message: duplicateEmailMessage });
+        showPopup({
+          type: "info",
+          title: "Account Exists",
+          message: "An account with this email already exists. Please log in."
+        });
         navigate("/login", { replace: true });
         return;
       }
@@ -203,7 +292,6 @@ function RegisterPage() {
         return;
       }
 
-      // Account is NOT created here. Users must verify email first.
       navigate("/verify-email", {
         state: { email: formData.email.trim() },
         replace: true
@@ -275,15 +363,30 @@ function RegisterPage() {
           <form onSubmit={handleSubmit}>
             <div className="register-form-grid">
               <div className="register-input-group">
-                <label htmlFor="fullName">Full Name</label>
+                <label htmlFor="firstName">First name</label>
                 <input
-                  id="fullName"
+                  id="firstName"
                   type="text"
-                  name="fullName"
-                  placeholder="Your full name"
-                  value={formData.fullName}
+                  name="firstName"
+                  placeholder="Your first name"
+                  value={formData.firstName}
                   onChange={handleChange}
-                  className={errors.fullName ? "input-error" : ""}
+                  className={errors.firstName ? "input-error" : ""}
+                  autoComplete="given-name"
+                />
+              </div>
+
+              <div className="register-input-group">
+                <label htmlFor="lastName">Last name</label>
+                <input
+                  id="lastName"
+                  type="text"
+                  name="lastName"
+                  placeholder="Your last name"
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className={errors.lastName ? "input-error" : ""}
+                  autoComplete="family-name"
                 />
               </div>
 
@@ -297,66 +400,108 @@ function RegisterPage() {
                   value={formData.email}
                   onChange={handleChange}
                   className={errors.email ? "input-error" : ""}
+                  autoComplete="email"
                 />
               </div>
 
               <div className="register-input-group">
-                <label htmlFor="password">Password</label>
-                <div className="password-wrapper">
-                  <input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    name="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleChange}
-                    className={errors.password ? "input-error" : ""}
-                  />
-                  <button
-                    type="button"
-                    className="toggle-password-btn"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-                {missingPasswordRequirements.length > 0 && formData.password.length > 0 && (
-                  <div className="password-requirements-box">
-                    {missingPasswordRequirements.map((requirement) => (
-                      <p key={requirement} className="password-requirement-item">
-                        {requirement}
-                      </p>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="register-input-group">
-                <label htmlFor="location">Location</label>
+                <label htmlFor="phone">Phone Number</label>
                 <input
-                  id="location"
-                  type="text"
-                  name="location"
-                  placeholder="City / District"
-                  value={formData.location}
-                  onChange={handleChange}
-                  className={errors.location ? "input-error" : ""}
-                />
-              </div>
-            </div>
-
-            <div className="register-input-group register-full-width-group">
-              <label htmlFor="phone">Phone Number</label>
-              <input
                   id="phone"
                   type="text"
                   name="phone"
-                  placeholder="+90 5xx xxx xx xx"
+                  placeholder="0554 xxx xx xx"
                   value={formData.phone}
                   onChange={handleChange}
-                  maxLength={17}
+                  maxLength={15}
                   className={errors.phone ? "input-error" : ""}
-              />
+                  autoComplete="tel"
+                />
+              </div>
+
+              <div className="register-input-group">
+                <label htmlFor="provinceId">Province</label>
+                <select
+                  id="provinceId"
+                  name="provinceId"
+                  value={formData.provinceId}
+                  onChange={handleChange}
+                  className={`register-select ${errors.province ? "input-error" : ""}`}
+                >
+                  <option value="">Select a province</option>
+                  {TURKEY_PROVINCES.map((p) => (
+                    <option key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="register-input-group">
+                <label htmlFor="districtId">District</label>
+                {districtLoadError ? (
+                  <input
+                    id="districtManual"
+                    type="text"
+                    name="districtManual"
+                    placeholder="Type your district (list could not be loaded)"
+                    value={formData.districtManual}
+                    onChange={handleChange}
+                    className={errors.district ? "input-error" : ""}
+                    autoComplete="address-level3"
+                  />
+                ) : (
+                  <select
+                    id="districtId"
+                    name="districtId"
+                    value={formData.districtId}
+                    onChange={handleChange}
+                    disabled={!formData.provinceId || districtLoading}
+                    className={`register-select ${errors.district ? "input-error" : ""}`}
+                  >
+                    <option value="">
+                      {districtLoading ? "Loading…" : "Select a district"}
+                    </option>
+                    {districts.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="register-input-group register-full-width-group register-password-block">
+              <label htmlFor="password">Password</label>
+              <div className="password-wrapper">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  name="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className={errors.password ? "input-error" : ""}
+                  autoComplete="new-password"
+                />
+                <button
+                  type="button"
+                  className="toggle-password-btn"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              {missingPasswordRequirements.length > 0 && formData.password.length > 0 && (
+                <div className="password-requirements-box">
+                  {missingPasswordRequirements.map((requirement) => (
+                    <p key={requirement} className="password-requirement-item">
+                      {requirement}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
             <label className="register-checkbox-row">
@@ -387,7 +532,6 @@ function RegisterPage() {
       </main>
 
       <Footer />
-
     </div>
   );
 }

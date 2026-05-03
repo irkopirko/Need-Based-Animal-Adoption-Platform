@@ -174,7 +174,11 @@ public class AuthService {
 
         User user = userOptional.get();
 
-
+        /*if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            saveLoginLog(user.getId(), user.getEmail(), user.getRole().toString(), false, "Wrong password");
+            response.put("error", "Wrong password");
+            return response;
+        }*/
         boolean passwordMatches;
 
         if (user.getPassword().startsWith("$2a$") || user.getPassword().startsWith("$2b$")) {
@@ -804,17 +808,6 @@ public class AuthService {
             response.put("error", "User id is required");
             return response;
         }
-        String fn = request.getFirstName() == null ? "" : request.getFirstName().trim();
-        String ln = request.getLastName() == null ? "" : request.getLastName().trim();
-        if (fn.isEmpty()) {
-            response.put("error", "First name is required");
-            return response;
-        }
-        if (ln.isEmpty()) {
-            response.put("error", "Last name is required");
-            return response;
-        }
-        String combinedName = (fn + " " + ln).trim();
         String address = request.getAddressLine() == null ? "" : request.getAddressLine().trim();
         if (address.isEmpty()) {
             response.put("error", "Street address is required");
@@ -857,14 +850,12 @@ public class AuthService {
             return response;
         }
 
-        user.setFullName(combinedName);
         user.setAddressLine(address);
         user.setBirthYear(year);
         user.setGender(gender);
         user.setAdopterProfileCompleted(Boolean.TRUE);
         userRepository.save(user);
         response.put("message", "Profile completed");
-        response.put("fullName", combinedName);
         return response;
     }
 
@@ -877,8 +868,8 @@ public class AuthService {
         String listingType = request.getOwnerListingType() == null
                 ? ""
                 : request.getOwnerListingType().trim().toUpperCase(Locale.ROOT);
-        if (!listingType.equals("SHELTER") && !listingType.equals("OWNER")) {
-            response.put("error", "Select whether you list as a shelter or as an owner (private listings)");
+        if (!listingType.equals("SHELTER") && !listingType.equals("INDIVIDUAL")) {
+            response.put("error", "Select whether you list as a shelter or as an individual owner");
             return response;
         }
 
@@ -913,7 +904,9 @@ public class AuthService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
-
+    /**
+     * @return canonical +905xxxxxxxx or null if not a valid Turkish GSM (10 digits starting with 5).
+     */
     private String normalizeTurkishMobileToE164(String raw) {
         if (raw == null) {
             return null;

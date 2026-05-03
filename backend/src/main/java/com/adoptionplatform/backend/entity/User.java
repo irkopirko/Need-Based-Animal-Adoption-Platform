@@ -23,6 +23,23 @@ public class User {
     private String location;
     private String phone;
 
+    @Column(length = 2000)
+    private String addressLine;
+
+    private Integer birthYear;
+
+    @Column(length = 32)
+    private String gender;
+
+    @Column(name = "adopter_profile_completed")
+    private Boolean adopterProfileCompleted;
+
+    @Column(name = "owner_profile_completed")
+    private Boolean ownerProfileCompleted;
+
+    @Column(name = "owner_listing_type", length = 32)
+    private String ownerListingType;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
@@ -81,6 +98,54 @@ public class User {
         this.phone = phone;
     }
 
+    public String getAddressLine() {
+        return addressLine;
+    }
+
+    public void setAddressLine(String addressLine) {
+        this.addressLine = addressLine;
+    }
+
+    public Integer getBirthYear() {
+        return birthYear;
+    }
+
+    public void setBirthYear(Integer birthYear) {
+        this.birthYear = birthYear;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+    public Boolean getAdopterProfileCompleted() {
+        return adopterProfileCompleted;
+    }
+
+    public void setAdopterProfileCompleted(Boolean adopterProfileCompleted) {
+        this.adopterProfileCompleted = adopterProfileCompleted;
+    }
+
+    public Boolean getOwnerProfileCompleted() {
+        return ownerProfileCompleted;
+    }
+
+    public void setOwnerProfileCompleted(Boolean ownerProfileCompleted) {
+        this.ownerProfileCompleted = ownerProfileCompleted;
+    }
+
+    public String getOwnerListingType() {
+        return ownerListingType;
+    }
+
+    public void setOwnerListingType(String ownerListingType) {
+        this.ownerListingType = ownerListingType;
+    }
+
     public Role getRole() {
         return role;
     }
@@ -112,12 +177,12 @@ public class User {
     public void setEmailVerificationExpiresAt(Long emailVerificationExpiresAt) {
         this.emailVerificationExpiresAt = emailVerificationExpiresAt;
     }
-    
-public LocalDateTime getRegistrationTime() {
-    return registrationTime;
-}
 
-public void setRegistrationTime(LocalDateTime registrationTime) {
-    this.registrationTime = registrationTime;
-}
+    public LocalDateTime getRegistrationTime() {
+        return registrationTime;
+    }
+
+    public void setRegistrationTime(LocalDateTime registrationTime) {
+        this.registrationTime = registrationTime;
+    }
 }

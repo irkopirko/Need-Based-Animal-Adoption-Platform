@@ -4,6 +4,13 @@ import "./CompatibleAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
+import { getStoredUser, getApiBaseUrl } from "../utils/auth";
+import {
+  fetchUserAdoptionRequests,
+  summarizeAdoptionRequests,
+  STRONG_MATCH_THRESHOLD,
+  resolveAnimalImageUrl
+} from "../utils/adopterJourney";
 
 function CompatibleAnimalsPage() {
   const navigate = useNavigate();
@@ -14,23 +21,38 @@ function CompatibleAnimalsPage() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Highest Match");
   const [loading, setLoading] = useState(true);
-  const [hasAdoptionRequest, setHasAdoptionRequest] = useState(true);
+  const [hasAdoptionRequest, setHasAdoptionRequest] = useState(false);
 
   useEffect(() => {
-    const storedRequest = localStorage.getItem("adoptionRequestCompleted");
-    setHasAdoptionRequest(storedRequest === "true");
-  }, []);
+    let cancelled = false;
 
-  useEffect(() => {
-    if (!hasAdoptionRequest) {
-      setLoading(false);
-      return;
-    }
+    const run = async () => {
+      setLoading(true);
+      const user = getStoredUser();
+      let allowed =
+        typeof window !== "undefined" &&
+        localStorage.getItem("adoptionRequestCompleted") === "true";
 
-    const fetchCompatibleAnimals = async () => {
+      if (user?.userId) {
+        const requests = await fetchUserAdoptionRequests(user.userId);
+        const { hasSubmitted } = summarizeAdoptionRequests(requests);
+        allowed = hasSubmitted || allowed;
+      }
+
+      if (cancelled) {
+        return;
+      }
+      setHasAdoptionRequest(allowed);
+
+      if (!allowed) {
+        setAnimals([]);
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await fetch(
-          "http://localhost:8080/api/animals/compatible?threshold=75"
+          `${getApiBaseUrl()}/api/animals/compatible?threshold=${STRONG_MATCH_THRESHOLD}`
         );
 
         if (!response.ok) {
@@ -38,21 +60,40 @@ function CompatibleAnimalsPage() {
         }
 
         const data = await response.json();
-        setAnimals(data);
+        const apiBase = getApiBaseUrl();
+        const normalized = (Array.isArray(data) ? data : []).map((a) => {
+          if (!a.images?.length) {
+            return a;
+          }
+          const resolved = resolveAnimalImageUrl(a, apiBase);
+          return { ...a, images: [resolved || a.images[0]] };
+        });
+        if (!cancelled) {
+          setAnimals(normalized);
+        }
       } catch (error) {
         console.error("Error fetching compatible animals:", error);
-        showPopup({
-          type: "critical",
-          title: "Loading Failed",
-          message: "Compatible animals could not be loaded from backend."
-        });
+        if (!cancelled) {
+          showPopup({
+            type: "critical",
+            title: "Loading Failed",
+            message: "Compatible animals could not be loaded from backend."
+          });
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+        }
       }
     };
 
-    fetchCompatibleAnimals();
-  }, [hasAdoptionRequest]);
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // showPopup from context is stable; avoid re-fetch on identity change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   let filteredAnimals = [...animals];
 
@@ -96,7 +137,7 @@ function CompatibleAnimalsPage() {
   };
 
   const goToAnimalDetail = (animalId) => {
-    navigate(`/animals/${animalId}`);
+    navigate(`/animal/${animalId}`);
   };
 
   const goToRequestForm = () => {
@@ -133,7 +174,8 @@ function CompatibleAnimalsPage() {
             <p>
               This page becomes available after you submit your adoption request.
               Once your lifestyle and home information are saved, the system can
-              calculate compatibility scores and show suitable animals.
+              calculate compatibility scores. Animals at{" "}
+              {STRONG_MATCH_THRESHOLD}% or higher appear as strong matches.
             </p>
             <button
               type="button"
@@ -158,10 +200,13 @@ function CompatibleAnimalsPage() {
         <main className="compatible-main">
           <section className="compatible-empty-card">
             <span className="compatible-badge">No Matches Yet</span>
-            <h1>No animals passed the compatibility threshold</h1>
+            <h1>
+              No animals at {STRONG_MATCH_THRESHOLD}% compatibility or higher
+            </h1>
             <p>
-              There are currently no dogs or cats matching your profile strongly
-              enough. You can review your request later or wait for new listings.
+              Only animals with a compatibility score of {STRONG_MATCH_THRESHOLD}%
+              or higher (inclusive) are shown here. None meet that bar right now.
+              You can review your request later or wait for new listings.
             </p>
             <button
               type="button"
@@ -192,9 +237,10 @@ function CompatibleAnimalsPage() {
               your lifestyle best.
             </h1>
             <p className="compatible-hero-text">
-              These dogs and cats passed the compatibility threshold based on
-              your adoption request. Explore stronger matches first and focus on
-              animals more likely to suit your home and routine.
+              These listings all have a compatibility score of at least{" "}
+              {STRONG_MATCH_THRESHOLD}% (scores of {STRONG_MATCH_THRESHOLD}% and
+              higher count as strong matches). Explore them in order of fit for
+              your home and routine.
             </p>
 
             <div className="compatible-hero-buttons">
@@ -226,15 +272,15 @@ function CompatibleAnimalsPage() {
               <h3>Your results are filtered by compatibility</h3>
 
               <p>
-                Only animals scoring 75% or above appear here. This helps reduce
-                random browsing and makes the adoption flow more focused and
-                meaningful.
+                Only animals with a compatibility score of at least{" "}
+                {STRONG_MATCH_THRESHOLD}% (inclusive) appear here. This keeps
+                browsing focused on meaningful fits.
               </p>
 
               <div className="compatible-highlight-stats">
                 <div className="compatible-mini-stat">
                   <strong>{filteredAnimals.length}</strong>
-                  <span>Visible Matches</span>
+                  <span>Strong matches (≥{STRONG_MATCH_THRESHOLD}%)</span>
                 </div>
 
                 <div className="compatible-mini-stat">
@@ -295,7 +341,7 @@ function CompatibleAnimalsPage() {
                   className="compatible-card-image"
                 />
                 <span className="compatible-score-pill">
-                  {animal.compatibilityScore || 0}% Match
+                  {animal.compatibilityScore || 0}% compatibility
                 </span>
               </div>
 

@@ -1,100 +1,205 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "./OwnerMessagesPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import animalSlide3 from "../images/animalSlide3.jpg";
+import { getStoredUser, normalizeRole } from "../utils/auth";
+import {
+  loadOwnerEngagementState,
+  resolveOwnerScenario,
+  appendOwnerThreadMessage,
+  getInquiryPreview,
+  formatInquiryDate,
+  PAVIA_OWNER_ENGAGEMENT_UPDATED,
+  STRONG_MATCH_THRESHOLD
+} from "../utils/ownerJourney";
+
+function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onSecondary }) {
+  return (
+    <div className="owner-messages-page">
+      <Navbar />
+      <main className="owner-messages-locked-main">
+        <div className="owner-messages-locked-card owner-messages-locked-card-wide">
+          <span className="owner-messages-badge">{badge}</span>
+          <h1>{title}</h1>
+          <p>{body}</p>
+          <button type="button" className="owner-primary-btn" onClick={onPrimary}>
+            {primaryLabel}
+          </button>
+          {secondaryLabel && onSecondary && (
+            <button
+              type="button"
+              className="owner-secondary-outline-btn"
+              onClick={onSecondary}
+            >
+              {secondaryLabel}
+            </button>
+          )}
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+}
 
 function OwnerMessagesPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [scenario, setScenario] = useState("NO_LISTINGS");
+  const [engage, setEngage] = useState(null);
+  const [selectedChatId, setSelectedChatId] = useState(null);
+  const [draft, setDraft] = useState("");
 
-  const [hasListings] = useState(false);
-  const [hasMessageRequests] = useState(false);
-  const [selectedChatId, setSelectedChatId] = useState(1);
-
-  const conversations = [
-    {
-      id: 1,
-      adopterName: "Ceren Sarıgül",
-      animalName: "Luna",
-      preview: "Hello, I am interested in adopting Luna.",
-      time: "10:24",
-      unread: 1,
-      image: animalSlide3,
-      status: "New Inquiry"
+  const refresh = useCallback(async () => {
+    const user = getStoredUser();
+    if (!user?.userId || normalizeRole(user.role) !== "OWNER") {
+      setScenario("NOT_OWNER");
+      setEngage(null);
+      setLoading(false);
+      return;
     }
-  ];
+    setLoading(true);
+    const data = await loadOwnerEngagementState(user.userId);
+    const scen = resolveOwnerScenario({
+      hasListings: data.hasListings,
+      hasStrongMatchOnListings: data.hasStrongMatchOnListings,
+      hasInquiries: data.hasInquiries,
+      hasAnyMessages: data.hasAnyMessages
+    });
+    setEngage(data);
+    setScenario(scen);
 
-  const messagesByChat = {
-    1: [
-      {
-        id: 1,
-        sender: "adopter",
-        text: "Hello, I am interested in adopting Luna.",
-        time: "10:12"
-      },
-      {
-        id: 2,
-        sender: "owner",
-        text: "Thank you for your interest. Could you share more about your home environment?",
-        time: "10:18"
-      }
-    ]
+    if (scen === "INQUIRY_NO_MESSAGES" || scen === "FULL") {
+      const sorted = [...(data.inquiries || [])].sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      const fromUrl = searchParams.get("inquiry");
+      const pick = sorted.find((i) => i.id === fromUrl) || sorted[0] || null;
+      setSelectedChatId(pick?.id || null);
+    } else {
+      setSelectedChatId(null);
+    }
+    setLoading(false);
+  }, [searchParams]);
+
+  useEffect(() => {
+    refresh();
+    const fn = () => {
+      refresh();
+    };
+    window.addEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
+    return () => window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
+  }, [refresh]);
+
+  const selectedInquiry = useMemo(
+    () => engage?.inquiries?.find((i) => i.id === selectedChatId),
+    [engage, selectedChatId]
+  );
+
+  const selectedMessages = useMemo(() => {
+    if (!engage?.threads || !selectedChatId) {
+      return [];
+    }
+    return engage.threads[selectedChatId] || [];
+  }, [engage, selectedChatId]);
+
+  const handleSend = () => {
+    const user = getStoredUser();
+    const text = draft.trim();
+    if (!user?.userId || !selectedChatId || !text) {
+      return;
+    }
+    appendOwnerThreadMessage(user.userId, selectedChatId, {
+      sender: "owner",
+      text
+    });
+    setDraft("");
+    refresh();
   };
 
-  if (!hasListings) {
+  if (loading) {
     return (
       <div className="owner-messages-page">
         <Navbar />
         <main className="owner-messages-locked-main">
-          <div className="owner-messages-locked-card">
-            <span className="owner-messages-badge">No Listings</span>
-            <h1>You need to register an animal first</h1>
-            <p>
-              Messaging becomes available after you create an animal listing.
-              Once adopters express interest, their inquiries will appear here.
-            </p>
-            <button
-              className="owner-primary-btn"
-              onClick={() => navigate("/register-animal")}
-            >
-              Register Animal
-            </button>
-          </div>
+          <p className="owner-messages-loading-msg">Loading…</p>
         </main>
         <Footer />
       </div>
     );
   }
 
-  if (hasListings && !hasMessageRequests) {
+  if (scenario === "NOT_OWNER") {
     return (
-      <div className="owner-messages-page">
-        <Navbar />
-        <main className="owner-messages-locked-main">
-          <div className="owner-messages-locked-card">
-            <span className="owner-messages-badge">No Messages Yet</span>
-            <h1>No inquiries received yet</h1>
-            <p>
-              Once adopters submit requests for your listed animals, their
-              messages will appear here.
-            </p>
-            <button
-              className="owner-primary-btn"
-              onClick={() => navigate("/ownerhomepage")}
-            >
-              View My Listings
-            </button>
-          </div>
-        </main>
-        <Footer />
-      </div>
+      <Gate
+        badge="Owners only"
+        title="Owner messages"
+        body="Sign in with an owner account to use this inbox."
+        primaryLabel="Sign in"
+        onPrimary={() => navigate("/login")}
+      />
     );
   }
 
-  const selectedConversation =
-    conversations.find((c) => c.id === selectedChatId) || conversations[0];
-  const selectedMessages = messagesByChat[selectedChatId] || [];
+  if (scenario === "NO_LISTINGS") {
+    return (
+      <Gate
+        badge="No listings"
+        title="Register an animal first"
+        body="Messaging opens after you have at least one listing. When adopters reach out, threads show up here."
+        primaryLabel="Register animal"
+        onPrimary={() => navigate("/register-animal")}
+        secondaryLabel="Owner home"
+        onSecondary={() => navigate("/ownerhomepage")}
+      />
+    );
+  }
+
+  if (scenario === "LISTINGS_NO_STRONG_MATCH") {
+    return (
+      <Gate
+        badge="No strong matches on your listings"
+        title="None of your animals appear in adopters’ strong-match results yet"
+        body={`Adopters only see animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher (inclusive). None of your current listings are in that pool right now—check listing quality or wait for new adopters.`}
+        primaryLabel="View my listings"
+        onPrimary={() => navigate("/ownerhomepage")}
+        secondaryLabel="Manage requests"
+        onSecondary={() => navigate("/owner-requests")}
+      />
+    );
+  }
+
+  if (scenario === "STRONG_MATCH_NO_INQUIRY") {
+    return (
+      <Gate
+        badge="No inquiries yet"
+        title="Strong matches exist, but no inquiries"
+        body={`Your listing(s) can appear for adopters at ${STRONG_MATCH_THRESHOLD}% or higher. No one has sent an inquiry yet. You can remind adopters to use “Get in contact” on the animal page.`}
+        primaryLabel="Manage requests"
+        onPrimary={() => navigate("/owner-requests")}
+        secondaryLabel="Owner home"
+        onSecondary={() => navigate("/ownerhomepage")}
+      />
+    );
+  }
+
+  const conversations = (engage?.inquiries || [])
+    .slice()
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map((inq) => ({
+      id: inq.id,
+      adopterName: inq.adopterName,
+      animalName: inq.animalName,
+      preview: getInquiryPreview(engage?.threads, inq.id),
+      time: formatInquiryDate(inq.createdAt),
+      status: engage?.threads?.[inq.id]?.length ? "Active" : "New inquiry"
+    }));
+
+  const showInquiryCta =
+    scenario === "INQUIRY_NO_MESSAGES" &&
+    selectedInquiry &&
+    selectedMessages.length === 0;
 
   return (
     <div className="owner-messages-page">
@@ -104,20 +209,21 @@ function OwnerMessagesPage() {
         <section className="owner-messages-hero">
           <div className="owner-messages-hero-left">
             <p className="owner-messages-tag">Owner Messages</p>
-            <h1>Connect with potential adopters</h1>
+            <h1>Connect with adopters who reached out</h1>
             <p>
-              Review inquiries, communicate with adopters, and guide animals
-              toward their forever homes.
+              Inquiries arrive when an adopter uses Get in contact on a strong
+              match (≥ {STRONG_MATCH_THRESHOLD}%). Reply here to keep the adoption
+              process moving.
             </p>
           </div>
 
           <div className="owner-messages-hero-right">
             <div className="owner-messages-highlight-card">
-              <span className="owner-highlight-badge">Owner Inbox</span>
-              <h3>Every message brings a new opportunity</h3>
+              <span className="owner-highlight-badge">Inbox</span>
+              <h3>Threads follow real inquiries</h3>
               <p>
-                Respond to inquiries and ensure a smooth and responsible
-                adoption process.
+                No inquiry yet means no thread—once an inquiry exists, you can
+                send the first message or wait for the adopter.
               </p>
             </div>
           </div>
@@ -127,66 +233,93 @@ function OwnerMessagesPage() {
           <div className="owner-conversation-panel">
             <h2>Conversations</h2>
             <div className="owner-conversation-list">
-              {conversations.map((conversation) => (
+              {conversations.map((c) => (
                 <button
-                  key={conversation.id}
+                  key={c.id}
+                  type="button"
                   className={`owner-conversation-card ${
-                    selectedChatId === conversation.id
-                      ? "owner-conversation-card-active"
-                      : ""
+                    selectedChatId === c.id ? "owner-conversation-card-active" : ""
                   }`}
-                  onClick={() => setSelectedChatId(conversation.id)}
+                  onClick={() => setSelectedChatId(c.id)}
                 >
-                  <img
-                    src={conversation.image}
-                    alt={conversation.animalName}
-                    className="owner-conversation-image"
+                  <div
+                    className="owner-conversation-avatar-placeholder"
+                    aria-hidden="true"
                   />
                   <div className="owner-conversation-content">
-                    <h3>{conversation.adopterName}</h3>
-                    <p>Regarding {conversation.animalName}</p>
-                    <span>{conversation.preview}</span>
+                    <h3>{c.adopterName}</h3>
+                    <p>Regarding {c.animalName}</p>
+                    <span className="owner-conversation-preview">{c.preview}</span>
                   </div>
-                  <span className="owner-conversation-time">
-                    {conversation.time}
-                  </span>
+                  <span className="owner-conversation-time">{c.time}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div className="owner-chat-panel">
-            <div className="owner-chat-header">
-              <h2>{selectedConversation.adopterName}</h2>
-              <span className="owner-chat-badge">Active</span>
-            </div>
-
-            <div className="owner-chat-messages">
-              {selectedMessages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`owner-chat-bubble-row ${
-                    message.sender === "owner"
-                      ? "owner-chat-user"
-                      : "owner-chat-adopter"
-                  }`}
-                >
-                  <div className="owner-chat-bubble">
-                    <p>{message.text}</p>
-                    <span>{message.time}</span>
+            {selectedInquiry ? (
+              <>
+                <div className="owner-chat-header">
+                  <div>
+                    <h2>{selectedInquiry.adopterName}</h2>
+                    <p className="owner-chat-sub">Regarding {selectedInquiry.animalName}</p>
                   </div>
+                  <span className="owner-chat-badge">
+                    {selectedMessages.length ? "Active" : "New inquiry"}
+                  </span>
                 </div>
-              ))}
-            </div>
 
-            <div className="owner-chat-input-area">
-              <input
-                type="text"
-                placeholder="Write your message..."
-                className="owner-chat-input"
-              />
-              <button className="owner-chat-send-btn">Send</button>
-            </div>
+                {showInquiryCta && (
+                  <div className="owner-chat-get-contact-banner">
+                    <strong>Get in contact</strong>
+                    <p>
+                      There are no messages in this thread yet. Send a short reply
+                      to introduce yourself and next steps—the adopter will see it
+                      here when they return.
+                    </p>
+                  </div>
+                )}
+
+                <div className="owner-chat-messages">
+                  {selectedMessages.map((message) => (
+                    <div
+                      key={message.id}
+                      className={`owner-chat-bubble-row ${
+                        message.sender === "owner"
+                          ? "owner-chat-user"
+                          : "owner-chat-adopter"
+                      }`}
+                    >
+                      <div className="owner-chat-bubble">
+                        <p>{message.text}</p>
+                        <span>{message.time}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="owner-chat-input-area">
+                  <input
+                    type="text"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value)}
+                    placeholder="Write your message…"
+                    className="owner-chat-input"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleSend();
+                      }
+                    }}
+                  />
+                  <button type="button" className="owner-chat-send-btn" onClick={handleSend}>
+                    Send
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="owner-chat-empty-select">Select a conversation.</p>
+            )}
           </div>
         </section>
       </main>

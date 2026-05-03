@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Navbar.css";
-import { getHomePathByRole, getStoredUser, normalizeRole } from "../utils/auth";
+import {
+  getHomePathByRole,
+  getStoredUser,
+  getUserInitials,
+  normalizeRole,
+  PAVIA_USER_UPDATED_EVENT
+} from "../utils/auth";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -10,7 +16,10 @@ function Navbar() {
   const menuRef = useRef(null);
 
   useEffect(() => {
-    setUser(getStoredUser());
+    const syncUser = () => setUser(getStoredUser());
+    syncUser();
+    window.addEventListener(PAVIA_USER_UPDATED_EVENT, syncUser);
+    return () => window.removeEventListener(PAVIA_USER_UPDATED_EVENT, syncUser);
   }, []);
 
   const isLoggedIn = !!user;
@@ -46,22 +55,31 @@ function Navbar() {
     if (!user) return [];
 
     if (normalizedRole === "OWNER") {
-      return [
-        { label: "Owner Homepage", path: "/ownerhomepage" },
-        { label: "Register Animal", path: "/register-animal" },
-        { label: "Manage Requests", path: "/owner-requests" },
-        { label: "Messages", path: "/owner-messages" },
-        { label: "My Animal Listings", path: "/ownerhomepage" }
-      ];
+      const items = [];
+      if (user.ownerProfileCompleted === false) {
+        items.push({ label: "Complete profile", path: "/complete-owner-profile" });
+      }
+      items.push(
+        { label: "Dashboard", path: "/ownerhomepage" },
+        { label: "Register an animal", path: "/register-animal" },
+        { label: "Adoption requests", path: "/owner-requests" },
+        { label: "Messages", path: "/owner-messages" }
+      );
+      return items;
     }
 
-    return [
-      { label: "Adopter Homepage", path: "/adopterhomepage" },
-      { label: "Create Adoption Request", path: "/adoption-request" },
-      { label: "Compatible Animals", path: "/matches" },
-      { label: "Saved Animals", path: "/saved-animals" },
+    const adopterItems = [];
+    if (user.adopterProfileCompleted === false) {
+      adopterItems.push({ label: "Complete profile", path: "/complete-adopter-profile" });
+    }
+    adopterItems.push(
+      { label: "Home", path: "/adopterhomepage" },
+      { label: "Adoption request", path: "/adoption-request" },
+      { label: "Matching animals", path: "/matches" },
+      { label: "Saved animals", path: "/saved-animals" },
       { label: "Messages", path: "/adopter-messages" }
-    ];
+    );
+    return adopterItems;
   };
 
   useEffect(() => {
@@ -152,20 +170,37 @@ function Navbar() {
               type="button"
               className={`nav-profile-btn ${showMenu ? "nav-profile-btn-open" : ""}`}
               onClick={() => setShowMenu(!showMenu)}
+              aria-haspopup="true"
+              aria-expanded={showMenu}
+              aria-label="Account menu"
             >
-              <span className="nav-profile-avatar">
-                <span className="nav-avatar-head"></span>
-                <span className="nav-avatar-body"></span>
+              <span className="nav-profile-avatar nav-profile-avatar-initials" aria-hidden>
+                {getUserInitials(user)}
               </span>
             </button>
 
             {showMenu && (
               <div className="nav-profile-menu">
                 <div className="nav-profile-menu-head">
-                  <p className="nav-profile-name">My Account</p>
-                  <p className="nav-profile-role">
-                    {normalizedRole === "OWNER" ? "Owner" : "Adopter"}
-                  </p>
+                  <div className="nav-profile-menu-identity">
+                    <span className="nav-profile-menu-avatar" aria-hidden>
+                      {getUserInitials(user)}
+                    </span>
+                    <div>
+                      <p className="nav-profile-name">
+                        {(user?.fullName && String(user.fullName).trim()) ||
+                          user?.email ||
+                          "Signed in"}
+                      </p>
+                      <p className="nav-profile-role">
+                        {normalizedRole === "OWNER"
+                          ? user?.ownerListingType === "SHELTER"
+                            ? "Shelter"
+                            : "Owner"
+                          : "Adopter"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {menuItems.map((item) => (
@@ -175,10 +210,21 @@ function Navbar() {
                     className="nav-profile-item"
                     onClick={() => closeMenuAndNavigate(item.path)}
                   >
-                    <span className="nav-profile-item-icon"></span>
+                    <span className="nav-profile-item-icon" aria-hidden />
                     <span>{item.label}</span>
                   </button>
                 ))}
+
+                <div className="nav-profile-divider" role="presentation" />
+
+                <button
+                  type="button"
+                  className="nav-profile-item"
+                  onClick={() => closeMenuAndNavigate("/account")}
+                >
+                  <span className="nav-profile-item-icon nav-profile-item-icon-account" aria-hidden />
+                  <span>Edit profile</span>
+                </button>
 
                 <button
                   type="button"
