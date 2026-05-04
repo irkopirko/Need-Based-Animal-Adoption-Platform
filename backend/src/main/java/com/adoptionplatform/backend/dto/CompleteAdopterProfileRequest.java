@@ -6,6 +6,8 @@ public class CompleteAdopterProfileRequest {
     private String addressLine;
     private Integer birthYear;
     private String gender;
+    private String firstName;
+    private String lastName;
 
     public Long getUserId() {
         return userId;
@@ -37,5 +39,21 @@ public class CompleteAdopterProfileRequest {
 
     public void setGender(String gender) {
         this.gender = gender;
+    }
+
+    public String getFirstName() {
+    return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
 }
