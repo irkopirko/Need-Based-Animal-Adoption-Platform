@@ -4,13 +4,11 @@ import "./RegisterPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import {
-  formatTurkishPhoneInput,
   getApiBaseUrl,
   getMissingPasswordRequirements,
   isPasswordValid,
   isValidEmail,
-  isValidTurkishMobileInput,
-  normalizeTurkishMobileToE164
+  isValidTurkishMobileInput
 } from "../utils/auth";
 import { usePopup } from "../components/PopupProvider";
 import { TURKEY_PROVINCES } from "../data/turkeyProvinces";
@@ -53,6 +51,7 @@ function RegisterPage() {
 
   useEffect(() => {
     const pid = formData.provinceId;
+
     if (!pid) {
       setDistricts([]);
       setDistrictLoadError(false);
@@ -86,13 +85,32 @@ function RegisterPage() {
     };
   }, [formData.provinceId]);
 
+  const formatPhoneBody = (value) => {
+    let digits = value.replace(/\D/g, "");
+
+    if (digits.startsWith("90")) digits = digits.slice(2);
+    if (digits.startsWith("0")) digits = digits.slice(1);
+
+    digits = digits.slice(0, 10);
+
+    let formatted = "";
+    if (digits.length > 0) formatted += digits.slice(0, 3);
+    if (digits.length > 3) formatted += " " + digits.slice(3, 6);
+    if (digits.length > 6) formatted += " " + digits.slice(6, 8);
+    if (digits.length > 8) formatted += " " + digits.slice(8, 10);
+
+    return formatted;
+  };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
     if (name === "phone") {
+      const formatted = formatPhoneBody(value);
+
       setFormData({
         ...formData,
-        phone: formatTurkishPhoneInput(value)
+        phone: formatted
       });
 
       setErrors({
@@ -110,11 +128,13 @@ function RegisterPage() {
         districtId: "",
         districtManual: ""
       });
+
       setErrors({
         ...errors,
         province: false,
         district: false
       });
+
       return;
     }
 
@@ -123,10 +143,12 @@ function RegisterPage() {
         ...formData,
         [name]: value
       });
+
       setErrors({
         ...errors,
         district: false
       });
+
       return;
     }
 
@@ -143,6 +165,7 @@ function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     const newErrors = {
       firstName: false,
       lastName: false,
@@ -187,22 +210,21 @@ function RegisterPage() {
     }
 
     let districtOk = false;
+
     if (districtLoadError) {
       districtOk = formData.districtManual.trim().length > 0;
     } else {
       districtOk = Boolean(formData.districtId);
     }
+
     if (!districtOk) {
       newErrors.district = true;
       hasError = true;
     }
 
-    if (formData.phone.trim() === "") {
-      newErrors.phone = true;
-      hasError = true;
-    }
+    const phoneDigits = formData.phone.replace(/\D/g, "");
 
-    if (!isValidTurkishMobileInput(formData.phone)) {
+    if (!/^5\d{9}$/.test(phoneDigits) || !isValidTurkishMobileInput(formData.phone)) {
       newErrors.phone = true;
       hasError = true;
     }
@@ -226,7 +248,9 @@ function RegisterPage() {
     const provinceName =
       TURKEY_PROVINCES.find((p) => String(p.id) === String(formData.provinceId))?.name ||
       "";
+
     let districtName = "";
+
     if (districtLoadError) {
       districtName = formData.districtManual.trim();
     } else {
@@ -240,10 +264,10 @@ function RegisterPage() {
     const userData = {
       role,
       fullName,
-      email: formData.email,
+      email: formData.email.trim(),
       password: formData.password,
       location,
-      phone: normalizeTurkishMobileToE164(formData.phone)
+      phone: "+90" + phoneDigits
     };
 
     const apiBaseUrl = getApiBaseUrl();
@@ -279,7 +303,11 @@ function RegisterPage() {
       }
 
       if (result.error === "Could not send verification email. Please try again.") {
-        showPopup({ type: "error", title: "Email Error", message: result.error });
+        showPopup({
+          type: "error",
+          title: "Email Error",
+          message: result.error
+        });
         return;
       }
 
@@ -298,6 +326,7 @@ function RegisterPage() {
       });
     } catch (error) {
       console.error("Error while sending register request:", error);
+
       showPopup({
         type: "error",
         title: "Connection Error",
@@ -406,17 +435,21 @@ function RegisterPage() {
 
               <div className="register-input-group">
                 <label htmlFor="phone">Phone Number</label>
-                <input
-                  id="phone"
-                  type="text"
-                  name="phone"
-                  placeholder="0554 xxx xx xx"
-                  value={formData.phone}
-                  onChange={handleChange}
-                  maxLength={15}
-                  className={errors.phone ? "input-error" : ""}
-                  autoComplete="tel"
-                />
+
+                <div className={`phone-input ${errors.phone ? "input-error" : ""}`}>
+                  <span className="phone-prefix">+90</span>
+
+                  <input
+                    id="phone"
+                    type="text"
+                    name="phone"
+                    placeholder="555 555 55 55"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    maxLength={13}
+                    autoComplete="tel"
+                  />
+                </div>
               </div>
 
               <div className="register-input-group">
@@ -439,12 +472,13 @@ function RegisterPage() {
 
               <div className="register-input-group">
                 <label htmlFor="districtId">District</label>
+
                 {districtLoadError ? (
                   <input
                     id="districtManual"
                     type="text"
                     name="districtManual"
-                    placeholder="Type your district (list could not be loaded)"
+                    placeholder="Type your district"
                     value={formData.districtManual}
                     onChange={handleChange}
                     className={errors.district ? "input-error" : ""}
@@ -462,6 +496,7 @@ function RegisterPage() {
                     <option value="">
                       {districtLoading ? "Loading…" : "Select a district"}
                     </option>
+
                     {districts.map((d) => (
                       <option key={d.id} value={String(d.id)}>
                         {d.name}
@@ -474,6 +509,7 @@ function RegisterPage() {
 
             <div className="register-input-group register-full-width-group register-password-block">
               <label htmlFor="password">Password</label>
+
               <div className="password-wrapper">
                 <input
                   id="password"
@@ -485,6 +521,7 @@ function RegisterPage() {
                   className={errors.password ? "input-error" : ""}
                   autoComplete="new-password"
                 />
+
                 <button
                   type="button"
                   className="toggle-password-btn"
@@ -493,6 +530,7 @@ function RegisterPage() {
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
+
               {missingPasswordRequirements.length > 0 && formData.password.length > 0 && (
                 <div className="password-requirements-box">
                   {missingPasswordRequirements.map((requirement) => (
@@ -511,6 +549,7 @@ function RegisterPage() {
                 checked={formData.agreeToTerms}
                 onChange={handleChange}
               />
+
               <span className={errors.agreeToTerms ? "checkbox-text-error" : ""}>
                 I agree to the <a href="/">Terms of Service</a> and{" "}
                 <a href="/">Privacy Policy</a>
