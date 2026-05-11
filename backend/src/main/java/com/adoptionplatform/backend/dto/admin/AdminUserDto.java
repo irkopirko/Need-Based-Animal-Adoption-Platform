@@ -1,63 +1,33 @@
-package com.adoptionplatform.backend.entity;
+package com.adoptionplatform.backend.dto.admin;
 
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "users")
-public class User {
+public class AdminUserDto {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
-    @Column(nullable = false)
     private String fullName;
-
-    @Column(nullable = false, unique = true)
     private String email;
-
-    @Column(nullable = false)
-    private String password;
-
     private String location;
     private String phone;
-
-    @Column(length = 2000)
     private String addressLine;
-
     private Integer birthYear;
-
-    @Column(length = 32)
     private String gender;
-
-    @Column(name = "adopter_profile_completed")
+    private String role;
     private Boolean adopterProfileCompleted;
-
-    @Column(name = "owner_profile_completed")
     private Boolean ownerProfileCompleted;
-
-    @Column(name = "owner_listing_type", length = 32)
     private String ownerListingType;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
-
-    @Column(name = "emailVerified")
-    private boolean emailVerified = false;
-
+    private boolean emailVerified;
     private boolean active = true;
-
-    private String emailVerificationCode;
-    private Long emailVerificationExpiresAt;
-
     private LocalDateTime registrationTime;
-
-    public User() {}
 
     public Long getId() {
         return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
     }
 
     public String getFullName() {
@@ -74,14 +44,6 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     public String getLocation() {
@@ -124,6 +86,14 @@ public class User {
         this.gender = gender;
     }
 
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
     public Boolean getAdopterProfileCompleted() {
         return adopterProfileCompleted;
     }
@@ -148,14 +118,6 @@ public class User {
         this.ownerListingType = ownerListingType;
     }
 
-    public Role getRole() {
-        return role;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
-    }
-
     public boolean isEmailVerified() {
         return emailVerified;
     }
@@ -164,20 +126,14 @@ public class User {
         this.emailVerified = emailVerified;
     }
 
-    public String getEmailVerificationCode() {
-        return emailVerificationCode;
+    @JsonProperty("isActive")
+    public boolean isActive() {
+        return active;
     }
 
-    public void setEmailVerificationCode(String emailVerificationCode) {
-        this.emailVerificationCode = emailVerificationCode;
-    }
-
-    public Long getEmailVerificationExpiresAt() {
-        return emailVerificationExpiresAt;
-    }
-
-    public void setEmailVerificationExpiresAt(Long emailVerificationExpiresAt) {
-        this.emailVerificationExpiresAt = emailVerificationExpiresAt;
+    @JsonProperty("isActive")
+    public void setActive(boolean active) {
+        this.active = active;
     }
 
     public LocalDateTime getRegistrationTime() {
@@ -186,13 +142,5 @@ public class User {
 
     public void setRegistrationTime(LocalDateTime registrationTime) {
         this.registrationTime = registrationTime;
-    }
-
-    public boolean isActive() {
-        return active;
-    }
-
-    public void setActive(boolean active) {
-        this.active = active;
     }
 }
