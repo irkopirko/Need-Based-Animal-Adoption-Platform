@@ -15,6 +15,8 @@ public class MatchResultDto {
     private double matchPercentage;
     private List<String> matchReasons;
     private String coverImageUrl;
+    /** Image URLs from the persisted listing (same order as {@code animals} / images API). */
+    private List<String> listingImageUrls;
     private List<String> highlightTags;
     private String ageDisplay;
     private boolean isSaved;
@@ -77,35 +79,43 @@ public class MatchResultDto {
     public List<String> getMatchReasons() { return matchReasons; }
     public void setMatchReasons(List<String> matchReasons) { this.matchReasons = matchReasons; }
 
-public String getCoverImageUrl() {
-    return coverImageUrl;
-}
+    public String getCoverImageUrl() {
+        return coverImageUrl;
+    }
 
-public void setCoverImageUrl(String coverImageUrl) {
-    this.coverImageUrl = coverImageUrl;
-}
+    public void setCoverImageUrl(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
+    }
 
-public List<String> getHighlightTags() {
-    return highlightTags;
-}
+    public List<String> getListingImageUrls() {
+        return listingImageUrls;
+    }
 
-public void setHighlightTags(List<String> highlightTags) {
-    this.highlightTags = highlightTags;
+    public void setListingImageUrls(List<String> listingImageUrls) {
+        this.listingImageUrls = listingImageUrls;
+    }
 
-}
-public String getAgeDisplay() {
-    return ageDisplay;
-}
+    public List<String> getHighlightTags() {
+        return highlightTags;
+    }
 
-public void setAgeDisplay(String ageDisplay) {
-    this.ageDisplay = ageDisplay;
-}
+    public void setHighlightTags(List<String> highlightTags) {
+        this.highlightTags = highlightTags;
 
-public boolean isSaved() {
-    return isSaved;
-}
+    }
+    public String getAgeDisplay() {
+        return ageDisplay;
+    }
 
-public void setSaved(boolean saved) {
-    isSaved = saved;
-}
+    public void setAgeDisplay(String ageDisplay) {
+        this.ageDisplay = ageDisplay;
+    }
+
+    public boolean isSaved() {
+        return isSaved;
+    }
+
+    public void setSaved(boolean saved) {
+        isSaved = saved;
+    }
 }

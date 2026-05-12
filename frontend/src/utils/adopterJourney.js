@@ -47,12 +47,22 @@ export function mapMatchResultToCompatibleAnimal(row, apiBaseUrl) {
     return row;
   }
   const rawUrl = row.coverImageUrl;
-  const resolved = resolveMediaUrl(rawUrl, apiBaseUrl) || rawUrl || null;
+  const resolvedCover = resolveMediaUrl(rawUrl, apiBaseUrl) || rawUrl || null;
   const reasons = Array.isArray(row.matchReasons) ? row.matchReasons : [];
   const pct = Math.round(Number(row.matchPercentage) || 0);
   const desc =
     (typeof row.description === "string" && row.description.trim()) ||
     (reasons.length ? reasons.slice(0, 3).join(" · ") : "");
+
+  let images = [];
+  if (Array.isArray(row.listingImageUrls) && row.listingImageUrls.length > 0) {
+    images = row.listingImageUrls
+      .map((u) => resolveMediaUrl(u, apiBaseUrl) || u)
+      .filter(Boolean);
+  }
+  if (images.length === 0 && resolvedCover) {
+    images = [resolvedCover];
+  }
 
   return {
     id: row.animalId,
@@ -65,15 +75,16 @@ export function mapMatchResultToCompatibleAnimal(row, apiBaseUrl) {
     housingLocation: row.housingLocation,
     description: desc,
     compatibilityScore: pct,
-    images: resolved ? [resolved] : [],
+    images,
     matchReasons: reasons,
     isSaved: row.saved === true || row.isSaved === true
   };
 }
 
 /**
- * Strong matches for adopters: computed from the saved adoption request via {@code /api/match}.
- * When {@code userId} is omitted, falls back to DB {@code /api/animals/compatible} (owner dashboard / legacy).
+ * Strong matches for adopters: overlap-based score from {@code /api/match} (listing fields vs the
+ * submitted adoption request; ≥ {@code STRONG_MATCH_THRESHOLD}% inclusive). When {@code userId} is
+ * omitted, falls back to DB {@code /api/animals/compatible} (legacy / non-adopter callers).
  *
  * @param {number|string|null|undefined} userId
  * @param {number|string|null|undefined} [requestId] optional adoption_requests.id to score against
@@ -98,21 +109,35 @@ export async function fetchStrongMatchAnimals(userId, requestId = null) {
 
   try {
     const rid = requestId != null ? Number(requestId) : NaN;
-    const q =
-      Number.isFinite(rid) && rid > 0
-        ? `?requestId=${encodeURIComponent(String(rid))}`
-        : "";
-    const res = await fetch(`${api}/api/match/${uid}${q}`);
+    const params = new URLSearchParams();
+    params.set("minOverlap", String(STRONG_MATCH_THRESHOLD));
+    if (Number.isFinite(rid) && rid > 0) {
+      params.set("requestId", String(rid));
+    }
+    const res = await fetch(`${api}/api/match/${uid}?${params.toString()}`);
     if (!res.ok) {
-      return [];
+      const text = await res.text();
+      let msg = `Could not load compatibility matches (HTTP ${res.status}).`;
+      try {
+        const body = JSON.parse(text);
+        if (body && typeof body.error === "string" && body.error.trim()) {
+          msg = body.error.trim();
+        }
+      } catch {
+        if (text && text.trim()) {
+          msg = text.trim().slice(0, 200);
+        }
+      }
+      throw new Error(msg);
     }
     const data = await res.json();
     const list = Array.isArray(data) ? data : [];
-    return list
-      .filter((row) => (Number(row.matchPercentage) || 0) >= STRONG_MATCH_THRESHOLD)
-      .map((row) => mapMatchResultToCompatibleAnimal(row, api));
-  } catch {
-    return [];
+    return list.map((row) => mapMatchResultToCompatibleAnimal(row, api));
+  } catch (e) {
+    if (e instanceof Error) {
+      throw e;
+    }
+    throw new Error("Could not load compatibility matches.");
   }
 }
 

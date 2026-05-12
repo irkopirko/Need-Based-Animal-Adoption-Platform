@@ -26,8 +26,9 @@ public class MatchController {
     @GetMapping("/{userId}")
     public ResponseEntity<List<MatchResultDto>> getMatches(
             @PathVariable Long userId,
-            @RequestParam(required = false) Long requestId
+            @RequestParam(required = false) Long requestId,
+            @RequestParam(required = false) Double minOverlap
     ) {
-        return ResponseEntity.ok(matchService.getMatches(userId, requestId));
+        return ResponseEntity.ok(matchService.getMatches(userId, requestId, minOverlap));
     }
 }

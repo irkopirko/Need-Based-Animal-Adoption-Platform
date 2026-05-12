@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getStoredUser, normalizeRole } from "../utils/auth";
+import { getStoredUser, normalizeRole, getResolvedUserId } from "../utils/auth";
 import { fetchUserAdoptionRequests } from "../utils/adopterJourney";
 import "./AdopterMyRequestsPage.css";
 
@@ -21,12 +21,13 @@ function AdopterMyRequestsPage() {
 
   const load = useCallback(async () => {
     const user = getStoredUser();
-    if (!user?.userId || normalizeRole(user.role) !== "ADOPTER") {
+    const uid = getResolvedUserId(user);
+    if (uid == null || normalizeRole(user.role) !== "ADOPTER") {
       navigate("/login", { replace: true });
       return;
     }
     setLoading(true);
-    const list = await fetchUserAdoptionRequests(user.userId);
+    const list = await fetchUserAdoptionRequests(uid);
     const sorted = [...list].sort((a, b) => {
       const ta = a.requestTime ? new Date(a.requestTime).getTime() : 0;
       const tb = b.requestTime ? new Date(b.requestTime).getTime() : 0;

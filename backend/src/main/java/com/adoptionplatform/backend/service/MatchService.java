@@ -5,14 +5,15 @@ import com.adoptionplatform.backend.entity.AdoptionRequest;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
 import com.adoptionplatform.backend.repository.AnimalRepository;
-import org.springframework.stereotype.Service;
 import com.adoptionplatform.backend.repository.SavedAnimalRepository;
+import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class MatchService {
@@ -32,14 +33,18 @@ public class MatchService {
     }
 
     public List<MatchResultDto> getMatches(Long userId) {
-        return getMatches(userId, null);
+        return getMatches(userId, null, null);
     }
 
     /**
-     * Scores every animal against the adopter's adoption request. When {@code requestId} is null,
-     * uses the latest {@code SUBMITTED} request if any, otherwise the latest request by time.
+     * same as the {@link #getMatches(Long, Long, Double)} with no post-filter (all scored listings, highest first).
      */
     public List<MatchResultDto> getMatches(Long userId, Long requestId) {
+        return getMatches(userId, requestId, null);
+    }
+
+
+    public List<MatchResultDto> getMatches(Long userId, Long requestId, Double minOverlapPercent) {
         List<AdoptionRequest> requests = adoptionRequestRepository.findByUserId(userId);
 
         if (requests == null || requests.isEmpty()) {
@@ -55,7 +60,10 @@ public class MatchService {
         List<MatchResultDto> results = new ArrayList<>();
 
         for (Animal animal : animals) {
-            ScoreResult scoreResult = calculateAdvancedScore(latestRequest, animal);
+            if (!isListedForPublicMatching(animal)) {
+                continue;
+            }
+            DetailedScore detailed = calculateDetailedScore(latestRequest, animal);
 
             MatchResultDto dto = new MatchResultDto(
                     animal.getId(),
@@ -66,28 +74,39 @@ public class MatchService {
                     animal.getAgeGroup(),
                     animal.getEnergyLevel(),
                     animal.getHousingLocation(),
-                    scoreResult.percentage,
-                    scoreResult.reasons
+                    detailed.percentage,
+                    detailed.reasons
             );
 
             dto.setCoverImageUrl(getCoverImageUrl(animal));
+            List<String> imgs = animal.getImages();
+            if (imgs != null && !imgs.isEmpty()) {
+                dto.setListingImageUrls(new ArrayList<>(imgs));
+            }
             dto.setHighlightTags(getHighlightTags(animal));
-//dto.setAgeDisplay(getAgeDisplay(animal));
             dto.setSaved(savedRepo.existsByUserIdAndAnimalId(userId, animal.getId()));
 
             results.add(dto);
         }
 
         results.sort(Comparator.comparingDouble(MatchResultDto::getMatchPercentage).reversed());
+        if (minOverlapPercent != null && minOverlapPercent > 0) {
+            return results.stream()
+                    .filter(d -> d.getMatchPercentage() >= minOverlapPercent)
+                    .collect(Collectors.toCollection(ArrayList::new));
+        }
         return results;
     }
 
     private AdoptionRequest selectRequestForMatching(List<AdoptionRequest> requests, Long userId, Long requestId) {
         if (requestId != null) {
-            return requests.stream()
+            Optional<AdoptionRequest> exact = requests.stream()
                     .filter(r -> Objects.equals(requestId, r.getId()) && Objects.equals(userId, r.getUserId()))
-                    .findFirst()
-                    .orElse(null);
+                    .findFirst();
+            if (exact.isPresent()) {
+                return exact.get();
+            }
+            // Stale or wrong ?requestId= — fall back to latest submitted instead of returning no listings.
         }
         Optional<AdoptionRequest> submitted = requests.stream()
                 .filter(r -> "SUBMITTED".equalsIgnoreCase(String.valueOf(r.getRequestPhase())))
@@ -106,82 +125,166 @@ public class MatchService {
                 .orElse(null);
     }
 
-    private ScoreResult calculateAdvancedScore(AdoptionRequest request, Animal animal) {
-        double score = 0;
+    private boolean isListedForPublicMatching(Animal animal) {
+        String s = animal.getListingStatus();
+        if (s == null || s.isBlank()) {
+            return true;
+        }
+        String t = s.trim();
+        if ("ARCHIVED".equalsIgnoreCase(t)) {
+            return false;
+        }
+        return true;
+    }
+
+    private DetailedScore calculateDetailedScore(AdoptionRequest request, Animal animal) {
         List<String> reasons = new ArrayList<>();
 
-        score += animalTypeScore(request, animal, reasons);          // 18
-        score += ageScore(request, animal, reasons);                 // 10
-        score += sizeScore(request, animal, reasons);                // 10
-        score += energyLifestyleScore(request, animal, reasons);     // 15
-        score += homeEnvironmentScore(request, animal, reasons);     // 15
-        score += childrenScore(request, animal, reasons);            // 10
-        score += otherPetsScore(request, animal, reasons);           // 8
-        score += groomingScore(request, animal, reasons);            // 5
-        score += specialNeedsScore(request, animal, reasons);        // 6
-        score += experienceScore(request, animal, reasons);          // 3
+        double earned = 0;
+        double applicable = 0;
 
-        double percentage = Math.max(0, Math.min(100, Math.round(score)));
+        CategoryOutcome type = animalTypeCategory(request, animal, reasons);
+        earned += type.earned;
+        applicable += type.maxWeight;
+
+        CategoryOutcome age = ageCategory(request, animal, reasons);
+        earned += age.earned;
+        applicable += age.maxWeight;
+
+        CategoryOutcome size = sizeCategory(request, animal, reasons);
+        earned += size.earned;
+        applicable += size.maxWeight;
+
+        CategoryOutcome energy = energyCategory(request, animal, reasons);
+        earned += energy.earned;
+        applicable += energy.maxWeight;
+
+        CategoryOutcome home = homeCategory(request, animal, reasons);
+        earned += home.earned;
+        applicable += home.maxWeight;
+
+        CategoryOutcome children = childrenCategory(request, animal, reasons);
+        earned += children.earned;
+        applicable += children.maxWeight;
+
+        CategoryOutcome pets = otherPetsCategory(request, animal, reasons);
+        earned += pets.earned;
+        applicable += pets.maxWeight;
+
+        CategoryOutcome grooming = groomingCategory(request, animal, reasons);
+        earned += grooming.earned;
+        applicable += grooming.maxWeight;
+
+        CategoryOutcome special = specialNeedsCategory(request, animal, reasons);
+        earned += special.earned;
+        applicable += special.maxWeight;
+
+        CategoryOutcome experience = experienceCategory(request, animal, reasons);
+        earned += experience.earned;
+        applicable += experience.maxWeight;
+
+        double percentage = applicable > 0
+                ? Math.max(0, Math.min(100, Math.round(100.0 * earned / applicable)))
+                : 0;
 
         if (reasons.isEmpty()) {
-            reasons.add("This animal has limited compatibility based on the current request.");
+            reasons.add("This animal has limited compatibility based on the overlapping fields in the current request.");
         }
 
-        return new ScoreResult(percentage, reasons);
+        return new DetailedScore(percentage, reasons);
     }
 
-    private double animalTypeScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome animalTypeCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        if (!hasText(animal.getAnimalType()) || !hasText(request.getPreferredAnimalTypes())) {
+            return CategoryOutcome.skip();
+        }
+        double max = 18;
         if (contains(request.getPreferredAnimalTypes(), animal.getAnimalType())) {
             reasons.add("Animal type matches the adopter's preference.");
-            return 18;
+            return new CategoryOutcome(max, max);
         }
-
-        return 0;
+        return new CategoryOutcome(0, max);
     }
 
-    private double ageScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome ageCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
         String animalType = safe(animal.getAnimalType());
         String age = safe(animal.getAgeGroup());
-
-        if (animalType.isEmpty() || age.isEmpty()) {
-            return 0;
+        if (animalType.isEmpty() || age.isEmpty() || !hasText(request.getPreferredAgeRanges())) {
+            return CategoryOutcome.skip();
         }
-
+        double max = 10;
         String expected = animalTypeTitle(animalType) + " - " + normalizeAgeForRequest(age);
 
         if (contains(request.getPreferredAgeRanges(), expected)) {
             reasons.add("Age range matches the adopter's preference.");
-            return 10;
+            return new CategoryOutcome(max, max);
         }
-
         if (contains(request.getPreferredAgeRanges(), animalTypeTitle(animalType))) {
-            return 5;
+            return new CategoryOutcome(5, max);
         }
-
-        return 0;
+        return new CategoryOutcome(0, max);
     }
 
-    private double sizeScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome sizeCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
         if (!isDog(animal)) {
+            double max = 8;
             reasons.add("Size preference is less restrictive for cats.");
-            return 8;
+            return new CategoryOutcome(max, max);
         }
-
+        if (!hasText(animal.getSize()) || !hasText(request.getPreferredSizes())) {
+            return CategoryOutcome.skip();
+        }
+        double max = 10;
         String expected = "Dog - " + title(safe(animal.getSize()));
 
         if (contains(request.getPreferredSizes(), expected) || contains(request.getPreferredSizes(), animal.getSize())) {
             reasons.add("Size matches the adopter's preference.");
-            return 10;
+            return new CategoryOutcome(max, max);
         }
-
         if (isMedium(animal.getSize())) {
-            return 5;
+            return new CategoryOutcome(5, max);
         }
-
-        return 0;
+        return new CategoryOutcome(0, max);
     }
 
-    private double energyLifestyleScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome energyCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        String animalEnergy = safe(animal.getEnergyLevel());
+        if (animalEnergy.isEmpty()) {
+            return CategoryOutcome.skip();
+        }
+        boolean requestSide =
+                hasText(request.getPreferredEnergyLevels())
+                        || hasText(request.getActivityLevel())
+                        || hasText(request.getTimeAtHome())
+                        || hasText(request.getWorkSchedule());
+        if (!requestSide) {
+            return CategoryOutcome.skip();
+        }
+        double max = 15;
+        double points = energyLifestyleRawPoints(request, animal);
+        if (points >= 10) {
+            reasons.add("Energy level fits the adopter's lifestyle and time availability.");
+        }
+        return new CategoryOutcome(points, max);
+    }
+
+    private double energyLifestyleRawPoints(AdoptionRequest request, Animal animal) {
         String preferredEnergy = safe(request.getPreferredEnergyLevels());
         String activity = safe(request.getActivityLevel());
         String timeAtHome = safe(request.getTimeAtHome());
@@ -216,16 +319,32 @@ public class MatchService {
             points += 2;
         }
 
-        points = clamp(points, 0, 15);
-
-        if (points >= 10) {
-            reasons.add("Energy level fits the adopter's lifestyle and time availability.");
-        }
-
-        return points;
+        return clamp(points, 0, 15);
     }
 
-    private double homeEnvironmentScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome homeCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        boolean animalSide = hasText(animal.getSize()) || hasText(animal.getEnergyLevel());
+        boolean requestSide =
+                hasText(request.getIndoorSpace())
+                        || hasText(request.getLivingSpace())
+                        || hasText(request.getHasGarden())
+                        || hasText(request.getOutdoorAccess());
+        if (!animalSide || !requestSide) {
+            return CategoryOutcome.skip();
+        }
+        double max = 15;
+        double points = homeEnvironmentRawPoints(request, animal);
+        if (points >= 10) {
+            reasons.add("Home environment is suitable for this animal.");
+        }
+        return new CategoryOutcome(points, max);
+    }
+
+    private double homeEnvironmentRawPoints(AdoptionRequest request, Animal animal) {
         String indoorSpace = safe(request.getIndoorSpace());
         String livingSpace = safe(request.getLivingSpace());
         String hasGarden = safe(request.getHasGarden());
@@ -269,98 +388,125 @@ public class MatchService {
             points -= 3;
         }
 
-        points = clamp(points, 0, 15);
-
-        if (points >= 10) {
-            reasons.add("Home environment is suitable for this animal.");
-        }
-
-        return points;
+        return clamp(points, 0, 15);
     }
 
-    private double childrenScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome childrenCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        if (!hasText(animal.getGoodWithChildren()) || !hasText(request.getHasChildren())) {
+            return CategoryOutcome.skip();
+        }
+        double max = 10;
         String hasChildren = safe(request.getHasChildren());
         String goodWithChildren = safe(animal.getGoodWithChildren());
 
         if (hasChildren.contains("NO")) {
-            return 10;
+            return new CategoryOutcome(max, max);
         }
 
         if (hasChildren.contains("YES") && goodWithChildren.equals("YES")) {
             reasons.add("Animal is suitable for a household with children.");
-            return 10;
+            return new CategoryOutcome(max, max);
         }
 
         if (hasChildren.contains("YES") && goodWithChildren.equals("NO")) {
-            return 0;
+            return new CategoryOutcome(0, max);
         }
 
-        return 5;
+        return new CategoryOutcome(5, max);
     }
 
-    private double otherPetsScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome otherPetsCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        if (!hasText(animal.getGoodWithPets()) || !hasText(request.getHasOtherPets())) {
+            return CategoryOutcome.skip();
+        }
+        double max = 8;
         String hasOtherPets = safe(request.getHasOtherPets());
         String goodWithPets = safe(animal.getGoodWithPets());
 
         if (hasOtherPets.contains("NO")) {
-            return 8;
+            return new CategoryOutcome(max, max);
         }
 
         if (hasOtherPets.contains("YES") && goodWithPets.equals("YES")) {
             reasons.add("Animal is compatible with homes that already have pets.");
-            return 8;
+            return new CategoryOutcome(max, max);
         }
 
         if (hasOtherPets.contains("YES") && goodWithPets.equals("NO")) {
-            return 0;
+            return new CategoryOutcome(0, max);
         }
 
-        return 4;
+        return new CategoryOutcome(4, max);
     }
 
-    private double groomingScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome groomingCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
         String animalType = animalTypeTitle(safe(animal.getAnimalType()));
         String groomingNeed = title(safe(animal.getGroomingNeed()));
 
-        if (animalType.isEmpty() || groomingNeed.isEmpty()) {
-            return 0;
+        if (animalType.isEmpty() || groomingNeed.isEmpty() || !hasText(request.getGroomingTolerance())) {
+            return CategoryOutcome.skip();
         }
-
+        double max = 5;
         String expected = animalType + " - " + groomingNeed + " Grooming";
 
         if (contains(request.getGroomingTolerance(), expected)) {
             reasons.add("Grooming needs match the adopter's tolerance.");
-            return 5;
+            return new CategoryOutcome(max, max);
         }
 
         if (safe(animal.getGroomingNeed()).equals("LOW")) {
-            return 3;
+            return new CategoryOutcome(3, max);
         }
 
-        return 0;
+        return new CategoryOutcome(0, max);
     }
 
-    private double specialNeedsScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome specialNeedsCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        if (!hasText(animal.getSpecialNeeds()) || !hasText(request.getSpecialNeedsAcceptance())) {
+            return CategoryOutcome.skip();
+        }
+        double max = 6;
         String acceptance = safe(request.getSpecialNeedsAcceptance());
         String specialNeeds = safe(animal.getSpecialNeeds());
 
         if (specialNeeds.equals("NO")) {
-            return 6;
+            return new CategoryOutcome(max, max);
         }
 
         if (specialNeeds.equals("YES") && acceptance.contains("YES")) {
             reasons.add("Adopter accepts animals with special needs.");
-            return 6;
+            return new CategoryOutcome(max, max);
         }
 
         if (specialNeeds.equals("YES") && acceptance.contains("DEPENDS")) {
-            return 3;
+            return new CategoryOutcome(3, max);
         }
 
-        return 0;
+        return new CategoryOutcome(0, max);
     }
 
-    private double experienceScore(AdoptionRequest request, Animal animal, List<String> reasons) {
+    private CategoryOutcome experienceCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        double max = 3;
         String hasExperience = safe(request.getHasPreviousExperience());
         String previousTypes = safe(request.getPreviousPetTypes());
         String animalType = safe(animal.getAnimalType());
@@ -369,28 +515,38 @@ public class MatchService {
         String energy = safe(animal.getEnergyLevel());
 
         boolean highCareAnimal =
-                specialNeeds.equals("YES") ||
-                        grooming.equals("HIGH") ||
-                        energy.equals("ACTIVE");
+                specialNeeds.equals("YES")
+                        || grooming.equals("HIGH")
+                        || energy.equals("ACTIVE");
 
         if (!highCareAnimal) {
-            return 3;
+            return new CategoryOutcome(max, max);
+        }
+
+        if (!hasText(request.getHasPreviousExperience())) {
+            return CategoryOutcome.skip();
         }
 
         if (hasExperience.contains("YES") && previousTypes.contains(animalType)) {
             reasons.add("Previous pet experience supports this match.");
-            return 3;
+            return new CategoryOutcome(max, max);
         }
 
         if (hasExperience.contains("YES")) {
-            return 2;
+            return new CategoryOutcome(2, max);
         }
 
-        return 0;
+        return new CategoryOutcome(0, max);
+    }
+
+    private boolean hasText(String s) {
+        return s != null && !s.trim().isEmpty();
     }
 
     private boolean contains(String source, String value) {
-        if (source == null || value == null) return false;
+        if (source == null || value == null) {
+            return false;
+        }
         return source.toUpperCase().contains(value.toUpperCase());
     }
 
@@ -408,13 +564,19 @@ public class MatchService {
 
     private String title(String value) {
         String clean = safe(value).toLowerCase();
-        if (clean.isEmpty()) return "";
+        if (clean.isEmpty()) {
+            return "";
+        }
         return clean.substring(0, 1).toUpperCase() + clean.substring(1);
     }
 
     private String animalTypeTitle(String animalType) {
-        if (animalType.equals("DOG")) return "Dog";
-        if (animalType.equals("CAT")) return "Cat";
+        if (animalType.equals("DOG")) {
+            return "Dog";
+        }
+        if (animalType.equals("CAT")) {
+            return "Cat";
+        }
         return title(animalType);
     }
 
@@ -440,15 +602,30 @@ public class MatchService {
         return Math.max(min, Math.min(max, value));
     }
 
-    private static class ScoreResult {
+    private static final class CategoryOutcome {
+        private final double earned;
+        private final double maxWeight;
+
+        private CategoryOutcome(double earned, double maxWeight) {
+            this.earned = earned;
+            this.maxWeight = maxWeight;
+        }
+
+        private static CategoryOutcome skip() {
+            return new CategoryOutcome(0, 0);
+        }
+    }
+
+    private static final class DetailedScore {
         private final double percentage;
         private final List<String> reasons;
 
-        private ScoreResult(double percentage, List<String> reasons) {
+        private DetailedScore(double percentage, List<String> reasons) {
             this.percentage = percentage;
             this.reasons = reasons;
         }
     }
+
     private String getCoverImageUrl(Animal animal) {
         if (animal.getImages() != null && !animal.getImages().isEmpty()) {
             return animal.getImages().get(0);
@@ -465,6 +642,7 @@ public class MatchService {
         String clean = value.toLowerCase().replace("_", " ").trim();
         return clean.substring(0, 1).toUpperCase() + clean.substring(1);
     }
+
     private List<String> getHighlightTags(Animal animal) {
         List<String> tags = new ArrayList<>();
 
@@ -498,27 +676,4 @@ public class MatchService {
 
         return tags.size() > 2 ? tags.subList(0, 2) : tags;
     }
-/*private String getAgeDisplay(Animal animal) {
-    if (animal.getAge() != null) {
-        return animal.getAge() + " years";
-    }
-
-    // fallback (ageGroup varsa)
-    if (animal.getAgeGroup() != null) {
-        String age = animal.getAgeGroup().toLowerCase();
-
-        switch (age) {
-            case "young":
-            case "puppy":
-            case "kitten":
-                return "Under 1 year";
-            case "adult":
-                return "2-5 years";
-            case "senior":
-                return "6+ years";
-        }
-    }
-
-    return "";
-}*/
 }

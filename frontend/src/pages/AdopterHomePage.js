@@ -21,6 +21,7 @@ import animalSlide15 from "../images/animalSlide15.jpg";
 import {
   broadcastStoredUserRefresh,
   getApiBaseUrl,
+  getResolvedUserId,
   getStoredUser,
   normalizeRole
 } from "../utils/auth";
@@ -57,14 +58,15 @@ function AdopterHomePage() {
 
   useEffect(() => {
     const user = getStoredUser();
-    if (!user?.userId || normalizeRole(user.role) !== "ADOPTER") {
+    const uid = getResolvedUserId(user);
+    if (uid == null || normalizeRole(user.role) !== "ADOPTER") {
       return undefined;
     }
 
     let cancelled = false;
     const apiBaseUrl = getApiBaseUrl();
 
-    fetch(`${apiBaseUrl}/api/auth/profile/${user.userId}`)
+    fetch(`${apiBaseUrl}/api/auth/profile/${uid}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((profile) => {
         if (cancelled || !profile) {

@@ -4,7 +4,7 @@ import "./CompatibleAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
-import { getStoredUser, getApiBaseUrl } from "../utils/auth";
+import { getStoredUser, getApiBaseUrl, getResolvedUserId } from "../utils/auth";
 import {
   fetchUserAdoptionRequests,
   summarizeAdoptionRequests,
@@ -36,8 +36,9 @@ function CompatibleAnimalsPage() {
         typeof window !== "undefined" &&
         localStorage.getItem("adoptionRequestCompleted") === "true";
 
-      if (user?.userId) {
-        const requests = await fetchUserAdoptionRequests(user.userId);
+      const resolvedUid = getResolvedUserId(user);
+      if (resolvedUid != null) {
+        const requests = await fetchUserAdoptionRequests(resolvedUid);
         const { hasSubmitted } = summarizeAdoptionRequests(requests);
         allowed = hasSubmitted || allowed;
       }
@@ -54,7 +55,7 @@ function CompatibleAnimalsPage() {
       }
 
       const apiBase = getApiBaseUrl();
-      const uid = user?.userId;
+      const uid = getResolvedUserId(user);
       const ridNum =
         requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
           ? Number(requestIdFromUrl)
@@ -78,7 +79,7 @@ function CompatibleAnimalsPage() {
           showPopup({
             type: "critical",
             title: "Loading Failed",
-            message: "Compatible animals could not be loaded from backend."
+            message: error?.message || "Compatible animals could not be loaded from backend."
           });
         }
       } finally {
@@ -256,10 +257,10 @@ function CompatibleAnimalsPage() {
               your lifestyle best.
             </h1>
             <p className="compatible-hero-text">
-              These listings all have a compatibility score of at least{" "}
-              {STRONG_MATCH_THRESHOLD}% (scores of {STRONG_MATCH_THRESHOLD}% and
-              higher count as strong matches). Explore them in order of fit for
-              your home and routine.
+              These listings scored at least{" "}
+              <strong>{STRONG_MATCH_THRESHOLD}%</strong> overlap between your submitted adoption
+              request and each active listing (only fields where both sides supply comparable context
+              count toward the percentage). Explore them in order of fit for your home and routine.
             </p>
 
             <div className="compatible-hero-buttons">

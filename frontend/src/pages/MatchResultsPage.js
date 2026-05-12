@@ -4,16 +4,17 @@ import Footer from "../components/Footer";
 import "./MatchResultsPage.css";
 import { useNavigate } from "react-router-dom";
 import { STRONG_MATCH_THRESHOLD } from "../utils/adopterJourney";
+import { getApiBaseUrl, getResolvedUserId, getStoredUser } from "../utils/auth";
 
 function MatchResultsPage() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [requestData, setRequestData] = useState(null);
-  const navigate= useNavigate();
+  const navigate = useNavigate();
 
-  const user = JSON.parse(localStorage.getItem("paviaUser"));
-  const userId = user?.userId || 1;
+  const user = getStoredUser();
+  const userId = getResolvedUserId(user);
 
   const handleEditPreferences = () => {
   const storedRequests = JSON.parse(localStorage.getItem("adoptionRequests")) || [];
@@ -28,10 +29,18 @@ function MatchResultsPage() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (userId == null) {
+        setMessage("Could not load compatibility results. Please sign in again.");
+        setLoading(false);
+        return;
+      }
       try {
+        const api = getApiBaseUrl();
+        const params = new URLSearchParams();
+        params.set("minOverlap", String(STRONG_MATCH_THRESHOLD));
         const [matchResponse, profileResponse] = await Promise.all([
-          fetch(`http://localhost:8080/api/match/${userId}`),
-          fetch(`http://localhost:8080/api/profile/${userId}`)
+          fetch(`${api}/api/match/${userId}?${params.toString()}`),
+          fetch(`${api}/api/profile/${userId}`)
         ]);
 
         if (!matchResponse.ok) {
@@ -173,7 +182,6 @@ function MatchResultsPage() {
       <Footer />
     </div>
   );
-  return <div>Match Page</div>;
 }
 
 export default MatchResultsPage;

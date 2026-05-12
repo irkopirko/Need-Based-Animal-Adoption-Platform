@@ -9,7 +9,12 @@ import {
   resolveMediaUrl
 } from "../utils/adopterJourney";
 import { recordOwnerInquiry } from "../utils/ownerJourney";
-import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
+import {
+  getApiBaseUrl,
+  getResolvedUserId,
+  getStoredUser,
+  normalizeRole
+} from "../utils/auth";
 
 function AnimalDetailPage() {
   const user = getStoredUser();
@@ -47,7 +52,8 @@ function AnimalDetailPage() {
   };
 
   const handleGetInContact = () => {
-    if (!animal?.ownerId || !user?.userId) {
+    const adopterUid = getResolvedUserId(user);
+    if (!animal?.ownerId || adopterUid == null) {
       showPopup({
         type: "error",
         title: "Cannot send",
@@ -63,7 +69,7 @@ function AnimalDetailPage() {
       "Adopter";
     const res = recordOwnerInquiry({
       ownerId: animal.ownerId,
-      adopterUserId: user.userId,
+      adopterUserId: adopterUid,
       adopterName,
       animalId: animal.id,
       animalName: animal.name,

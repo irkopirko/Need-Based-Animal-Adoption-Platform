@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "./AdopterMessagesPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getStoredUser, normalizeRole } from "../utils/auth";
+import { getStoredUser, normalizeRole, getResolvedUserId } from "../utils/auth";
 import {
   loadAdopterJourneyState,
   STRONG_MATCH_THRESHOLD
@@ -33,14 +33,15 @@ function AdopterMessagesPage() {
   const refresh = useCallback(async () => {
     const user = getStoredUser();
     const role = normalizeRole(user?.role);
-    if (!user?.userId || role !== "ADOPTER") {
+    const uid = getResolvedUserId(user);
+    if (uid == null || role !== "ADOPTER") {
       setScenario("NOT_ADOPTER");
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const state = await loadAdopterJourneyState(user.userId);
+      const state = await loadAdopterJourneyState(uid);
       if (state.noRequest) {
         setScenario("NO_REQUEST");
       } else if (state.draftOnly) {

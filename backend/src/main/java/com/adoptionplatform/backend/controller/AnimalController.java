@@ -33,7 +33,9 @@ public class AnimalController {
         this.animalService = animalService;
     }
 
-
+    /**
+     * owner dashboard: animals where {@code animals.owner_id} = {@code ownerId}.
+     */
     @GetMapping("/owner/{ownerId}")
     public ResponseEntity<?> listByOwner(
             @PathVariable Long ownerId,
@@ -53,7 +55,8 @@ public class AnimalController {
     }
 
     /**
-     * Animals whose {@code compatibilityScore} is greater than or equal to {@code threshold}(default 75).
+     * animals whose {@code compatibilityScore} is greater than or equal to {@code threshold}
+     * (default 75) a score of exactly 75% counts as a match.
      */
     @GetMapping("/compatible")
     public List<Animal> getCompatibleAnimals(
@@ -83,7 +86,7 @@ public class AnimalController {
     }
 
     /**
-     * same contract as {@code POST /api/animals/create}: persists a row in {@code animals} with
+     * same contract as the {@code POST /api/animals/create}: persists a row in {@code animals} with
      * {@code owner_id} pointing at {@code users.id} (animal PK remains {@code animals.id})
      */
     @PostMapping
@@ -134,7 +137,7 @@ public class AnimalController {
     }
 
     /**
-     * Owner-only: uploads JPEGs and returns public image URLs (for edit listing without replacing all photos).
+     * Ooner-only: uploads JPEGs and returns public image URLs (for edit listing without replacing all photos).
      */
     @PostMapping(value = "/owner-upload-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadOwnerListingImages(

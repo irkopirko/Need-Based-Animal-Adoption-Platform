@@ -4,7 +4,7 @@ import "./SavedAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
-import { getStoredUser, normalizeRole, getApiBaseUrl } from "../utils/auth";
+import { getStoredUser, normalizeRole, getApiBaseUrl, getResolvedUserId } from "../utils/auth";
 import {
   loadAdopterJourneyState,
   mergeSavedWithCompatibility,
@@ -23,17 +23,18 @@ function SavedAnimalsPage() {
   const refresh = useCallback(async () => {
     const user = getStoredUser();
     const role = normalizeRole(user?.role);
-    if (!user?.userId || role !== "ADOPTER") {
+    const uid = getResolvedUserId(user);
+    if (uid == null || role !== "ADOPTER") {
       setUserId(null);
       setScenario("NOT_ADOPTER");
       setSavedRows([]);
       setLoading(false);
       return;
     }
-    setUserId(user.userId);
+    setUserId(uid);
     setLoading(true);
     try {
-      const state = await loadAdopterJourneyState(user.userId);
+      const state = await loadAdopterJourneyState(uid);
       const merged = mergeSavedWithCompatibility(
         state.savedAnimals,
         state.strongMatches,

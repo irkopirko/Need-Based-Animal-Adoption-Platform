@@ -516,8 +516,13 @@ function AdoptionRequestPage() {
           });
           return;
         }
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("adoptionRequestCompleted", "true");
+        }
+        navigate(`/compatible-animals?requestId=${encodeURIComponent(String(requestId))}`);
+      } else {
+        navigate("/compatible-animals");
       }
-      navigate("/compatible-animals");
     } catch (err) {
       console.error(err);
       showPopup({
