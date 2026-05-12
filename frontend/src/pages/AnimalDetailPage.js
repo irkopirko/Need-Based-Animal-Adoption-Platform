@@ -6,7 +6,7 @@ import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
 import {
   STRONG_MATCH_THRESHOLD,
-  resolveAnimalImageUrl
+  resolveMediaUrl
 } from "../utils/adopterJourney";
 import { recordOwnerInquiry } from "../utils/ownerJourney";
 import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
@@ -32,10 +32,8 @@ function AnimalDetailPage() {
         const response = await fetch(`${api}/api/animals/${id}`);
         const data = await response.json();
         setAnimal(data);
-        const first = data.images?.[0];
-        if (first) {
-          setSelectedImage(resolveAnimalImageUrl(data, api) || first);
-        }
+        const imgs = Array.isArray(data.images) ? data.images.filter(Boolean) : [];
+        setSelectedImage(imgs.length > 0 ? resolveMediaUrl(imgs[0], api) || "" : "");
       } catch (error) {
         console.error("Error fetching animal:", error);
       }
@@ -98,6 +96,8 @@ function AnimalDetailPage() {
     return <div className="loading">Loading...</div>;
   }
 
+  const apiBase = getApiBaseUrl();
+
   return (
     <div className="animal-detail-page">
       <Navbar />
@@ -106,11 +106,21 @@ function AnimalDetailPage() {
         <section className="animal-detail-hero">
           <div className="animal-detail-hero-left">
             <div className="animal-detail-main-image-wrap">
-              <img
-                src={selectedImage}
-                alt={animal.name}
-                className="animal-detail-main-image"
-              />
+              {selectedImage ? (
+                <img
+                  src={selectedImage}
+                  alt={animal.name}
+                  className="animal-detail-main-image"
+                />
+              ) : (
+                <div
+                  className="animal-detail-main-image-placeholder"
+                  role="img"
+                  aria-label="No photo available"
+                >
+                  No photo
+                </div>
+              )}
               <div className="animal-detail-image-topbar">
                 <span className="animal-detail-status-badge">
                   {animal.listingStatus || "Active"}
@@ -125,9 +135,10 @@ function AnimalDetailPage() {
 
             <div className="animal-detail-gallery">
               {(animal.images || []).map((img, index) => {
-                const api = getApiBaseUrl();
-                const resolved =
-                  resolveAnimalImageUrl({ images: [img] }, api) || img;
+                const resolved = resolveMediaUrl(img, apiBase) || "";
+                if (!resolved) {
+                  return null;
+                }
                 return (
                   <img
                     key={index}
@@ -203,13 +214,13 @@ function AnimalDetailPage() {
                 <>
                   <button
                     className="primary-btn"
-                    onClick={() => navigate(`/listing/${animal.id}`)}
+                    onClick={() => navigate(`/register-animal?edit=${animal.id}`)}
                   >
                     Edit Listing
                   </button>
                   <button
                     className="secondary-btn"
-                    onClick={() => navigate("/owner-requests")}
+                    onClick={() => navigate(`/animal/${animal.id}/requests`)}
                   >
                     Manage Requests
                   </button>

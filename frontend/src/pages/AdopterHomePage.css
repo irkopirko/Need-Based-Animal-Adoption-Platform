@@ -401,6 +401,27 @@
   cursor: pointer;
 }
 
+.adopter-action-card .adopter-action-sub-link {
+  display: block;
+  margin-top: 12px;
+  height: auto;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: #0ea5a4;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-align: left;
+}
+
+.adopter-action-card .adopter-action-sub-link:hover {
+  color: #087a79;
+}
+
 @media (max-width: 980px) {
   .adopter-hero,
   .adopter-summary-grid,

@@ -36,6 +36,7 @@ function Navbar() {
   const goToAbout = () => navigate("/about");
   const goGuestAdopt = () => navigate("/adopt");
   const goAdopterAdoptHub = () => navigate("/adoption-request");
+  const goAdopterMyRequests = () => navigate("/my-adoption-requests");
   const goOwnerManageRequests = () => navigate("/owner-requests");
 
   const handleLogout = () => {
@@ -61,6 +62,7 @@ function Navbar() {
       }
       items.push(
         { label: "Dashboard", path: "/ownerhomepage" },
+        { label: "Listed animals", path: "/owner-listings" },
         { label: "Register an animal", path: "/register-animal" },
         { label: "Adoption requests", path: "/owner-requests" },
         { label: "Messages", path: "/owner-messages" }
@@ -75,6 +77,7 @@ function Navbar() {
     adopterItems.push(
       { label: "Home", path: "/adopterhomepage" },
       { label: "Adoption request", path: "/adoption-request" },
+      { label: "My adoption requests", path: "/my-adoption-requests" },
       { label: "Matching animals", path: "/matches" },
       { label: "Saved animals", path: "/saved-animals" },
       { label: "Messages", path: "/adopter-messages" }
@@ -125,13 +128,22 @@ function Navbar() {
         )}
 
         {isLoggedIn && normalizedRole === "ADOPTER" && (
-          <button
-            type="button"
-            className="navbar-link-btn"
-            onClick={goAdopterAdoptHub}
-          >
-            Adopt
-          </button>
+          <div className="navbar-adopter-adopt-group">
+            <button
+              type="button"
+              className="navbar-link-btn"
+              onClick={goAdopterAdoptHub}
+            >
+              Adopt
+            </button>
+            <button
+              type="button"
+              className="navbar-adopter-requests-link"
+              onClick={goAdopterMyRequests}
+            >
+              View my requests
+            </button>
+          </div>
         )}
 
         {isLoggedIn && normalizedRole === "OWNER" && (

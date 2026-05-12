@@ -119,8 +119,44 @@ export const getStoredUser = () => {
   }
 
 };
-export const getApiBaseUrl = () =>
-  process.env.REACT_APP_API_URL?.trim() || "http://localhost:8080";
+
+/** Numeric account id from stored session (supports several JSON shapes from the API). */
+export const getResolvedUserId = (user) => {
+  if (!user) {
+    return null;
+  }
+  const raw =
+    user.userId ??
+    user.user_id ??
+    user.id ??
+    user.userID ??
+    user?.user?.id ??
+    user?.user?.userId;
+  if (raw == null || raw === "") {
+    return null;
+  }
+  const s = typeof raw === "string" ? raw.trim() : raw;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * When unset, use same-origin URLs on loopback during `npm start` so CRA `setupProxy.js` can forward
+ * `/api` and `/uploads` to Spring Boot. Set `REACT_APP_API_URL` explicitly for production or remote APIs.
+ */
+export const getApiBaseUrl = () => {
+  const fromEnv = process.env.REACT_APP_API_URL?.trim();
+  if (fromEnv) {
+    return fromEnv;
+  }
+  if (typeof window !== "undefined") {
+    const h = window.location.hostname;
+    if (h === "localhost" || h === "127.0.0.1" || h === "[::1]") {
+      return "";
+    }
+  }
+  return "http://localhost:8080";
+};
 
 export const PAVIA_USER_UPDATED_EVENT = "paviaUserUpdated";
 

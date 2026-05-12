@@ -9,7 +9,12 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/match")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
+@CrossOrigin(origins = {
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+})
 public class MatchController {
 
     private final MatchService matchService;
@@ -19,7 +24,10 @@ public class MatchController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<List<MatchResultDto>> getMatches(@PathVariable Long userId) {
-        return ResponseEntity.ok(matchService.getMatches(userId));
+    public ResponseEntity<List<MatchResultDto>> getMatches(
+            @PathVariable Long userId,
+            @RequestParam(required = false) Long requestId
+    ) {
+        return ResponseEntity.ok(matchService.getMatches(userId, requestId));
     }
 }

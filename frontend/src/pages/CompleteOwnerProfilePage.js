@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { usePopup } from "../components/PopupProvider";
 import {
   broadcastStoredUserRefresh,
@@ -28,6 +29,8 @@ function CompleteOwnerProfilePage() {
   const [saving, setSaving] = useState(false);
   const [ownerListingType, setOwnerListingType] = useState("");
   const [userId, setUserId] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -142,8 +145,61 @@ function CompleteOwnerProfilePage() {
     }
   };
 
+  const handleConfirmDeleteAccount = async () => {
+    if (!userId) return;
+    setDeleteBusy(true);
+    const apiBaseUrl = getApiBaseUrl();
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/auth/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showPopup({
+          type: "error",
+          title: "Could not delete account",
+          message: data.error || "Account could not be deleted."
+        });
+        return;
+      }
+      localStorage.removeItem("paviaUser");
+      broadcastStoredUserRefresh();
+      setDeleteDialogOpen(false);
+      showPopup({
+        type: "success",
+        title: "Account deleted",
+        message: "Your account and related data have been permanently removed."
+      });
+      navigate("/login", { replace: true });
+    } catch (err) {
+      console.error(err);
+      showPopup({
+        type: "error",
+        title: "Connection error",
+        message: "Could not reach the server."
+      });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="complete-profile-page complete-owner-profile">
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete your account?"
+        description="Are you sure? This will permanently delete your account, animal listings, saved references, and activity logs. This cannot be undone."
+        confirmLabel="Yes, delete everything"
+        cancelLabel="Cancel"
+        confirmDanger
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setDeleteDialogOpen(false);
+        }}
+        onConfirm={handleConfirmDeleteAccount}
+      />
       <Navbar />
       <main className="complete-profile-main">
         <div className="complete-profile-card">
@@ -202,6 +258,21 @@ function CompleteOwnerProfilePage() {
             indicates required fields
           </p>
         </div>
+
+        <section className="complete-profile-delete-panel" aria-label="Delete account">
+          <h2 className="complete-profile-delete-panel-title">Delete your account</h2>
+          <p className="complete-profile-delete-panel-lead">
+            Permanently remove your account and all related data.
+          </p>
+          <button
+            type="button"
+            className="complete-profile-delete-btn"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={loading || saving}
+          >
+            Delete account
+          </button>
+        </section>
       </main>
       <Footer />
     </div>

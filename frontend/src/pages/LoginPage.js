@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import "./LoginPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -8,6 +8,7 @@ import { usePopup } from "../components/PopupProvider";
 
 function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +18,13 @@ function LoginPage() {
   const goSignup = () => {
     navigate("/register");
   };
+
+  useEffect(() => {
+    const prefill = location.state?.email;
+    if (prefill && typeof prefill === "string") {
+      setEmail(prefill.trim());
+    }
+  }, [location.state]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

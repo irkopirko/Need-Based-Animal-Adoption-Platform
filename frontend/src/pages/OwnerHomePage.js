@@ -1,21 +1,67 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./OwnerHomePage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import ownerHomeHeroImage from "../images/ownerHomeHeroImage.jpg";
-import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
+import { getApiBaseUrl, getStoredUser, getResolvedUserId, normalizeRole } from "../utils/auth";
+import {
+  fetchOwnerListings,
+  ownerListingImageUrls,
+  resolveOwnerListingImageUrl
+} from "../utils/ownerJourney";
+
+function listingStatusPillClass(status) {
+  const s = String(status || "").toLowerCase();
+  if (s.includes("draft")) {
+    return "owner-status-pill owner-status-draft";
+  }
+  if (s.includes("closed") || s.includes("adopted") || s.includes("removed")) {
+    return "owner-status-pill owner-status-muted";
+  }
+  return "owner-status-pill owner-status-active";
+}
+
+function ownerAnimalIconClass(index) {
+  const cycle = ["owner-animal-icon-green", "owner-animal-icon-mint", "owner-animal-icon-cream"];
+  return cycle[index % cycle.length];
+}
 
 function OwnerHomePage() {
   const navigate = useNavigate();
+  const [listings, setListings] = useState([]);
+  const [listingsLoaded, setListingsLoaded] = useState(false);
+  const apiBaseUrl = getApiBaseUrl();
+
+  const refreshListings = useCallback(async () => {
+    const stored = getStoredUser();
+    const uid = getResolvedUserId(stored);
+    if (!uid || normalizeRole(stored?.role) !== "OWNER") {
+      setListings([]);
+      setListingsLoaded(true);
+      return;
+    }
+    setListingsLoaded(false);
+    try {
+      const list = await fetchOwnerListings(uid);
+      setListings(Array.isArray(list) ? list : []);
+    } catch (err) {
+      console.error(err);
+      setListings([]);
+    } finally {
+      setListingsLoaded(true);
+    }
+  }, []);
 
   useEffect(() => {
     const stored = getStoredUser();
-    if (!stored?.userId || normalizeRole(stored.role) !== "OWNER") {
+    const uid = getResolvedUserId(stored);
+    if (!uid || normalizeRole(stored?.role) !== "OWNER") {
       return;
     }
-    const apiBaseUrl = getApiBaseUrl();
-    fetch(`${apiBaseUrl}/api/auth/profile/${stored.userId}`)
+    const base = getApiBaseUrl().replace(/\/$/, "");
+    const profileUrl = base ? `${base}/api/auth/profile/${uid}` : `/api/auth/profile/${uid}`;
+    fetch(profileUrl)
       .then((res) => (res.ok ? res.json() : null))
       .then((profile) => {
         if (profile && profile.ownerProfileCompleted === false) {
@@ -24,6 +70,20 @@ function OwnerHomePage() {
       })
       .catch(() => {});
   }, [navigate]);
+
+  useEffect(() => {
+    refreshListings();
+  }, [refreshListings]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (normalizeRole(getStoredUser()?.role) === "OWNER") {
+        refreshListings();
+      }
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [refreshListings]);
 
   const goToRegisterAnimal = () => {
     navigate("/register-animal");
@@ -36,6 +96,9 @@ function OwnerHomePage() {
   const goToListings = () => {
     navigate("/owner-listings");
   };
+
+  const listingCount = listings.length;
+  const previewRows = listings.slice(0, 5);
 
   return (
     <div className="owner-page">
@@ -84,14 +147,22 @@ function OwnerHomePage() {
         </section>
 
         <section className="owner-summary-grid">
-          <div className="owner-summary-card">
+          <button
+            type="button"
+            className="owner-summary-card owner-summary-card--clickable"
+            onClick={goToListings}
+          >
             <div className="owner-summary-head">
-              <span className="owner-summary-label">Active Listings</span>
+              <span className="owner-summary-label">Listed animals</span>
               <span className="owner-summary-mini-dot"></span>
             </div>
-            <p className="owner-summary-value">3</p>
-            <span className="owner-summary-note">Animals currently visible</span>
-          </div>
+            <p className="owner-summary-value">
+              {!listingsLoaded ? "…" : listingCount}
+            </p>
+            <span className="owner-summary-note">
+              Listed animals · {listingsLoaded ? listingCount : "…"} — open full list
+            </span>
+          </button>
 
           <div className="owner-summary-card">
             <div className="owner-summary-head">
@@ -138,44 +209,53 @@ function OwnerHomePage() {
                 <span>Status</span>
               </div>
 
-              <div className="owner-list-row">
-                <div className="owner-animal-meta">
-                  <div className="owner-animal-icon owner-animal-icon-green"></div>
-                  <div>
-                    <strong>Luna</strong>
-                    <p>Golden Retriever</p>
-                  </div>
+              {!listingsLoaded ? (
+                <div className="owner-list-row">
+                  <span style={{ color: "#777", fontSize: 14 }}>Loading listings…</span>
                 </div>
-                <span className="owner-status-pill owner-status-active">
-                  Active
-                </span>
-              </div>
-
-              <div className="owner-list-row">
-                <div className="owner-animal-meta">
-                  <div className="owner-animal-icon owner-animal-icon-mint"></div>
-                  <div>
-                    <strong>Milo</strong>
-                    <p>British Shorthair</p>
-                  </div>
+              ) : previewRows.length === 0 ? (
+                <div className="owner-list-row">
+                  <span style={{ color: "#777", fontSize: 14 }}>No animals yet. Register one to see it here.</span>
                 </div>
-                <span className="owner-status-pill owner-status-active">
-                  Active
-                </span>
-              </div>
-
-              <div className="owner-list-row">
-                <div className="owner-animal-meta">
-                  <div className="owner-animal-icon owner-animal-icon-cream"></div>
-                  <div>
-                    <strong>Daisy</strong>
-                    <p>Mixed Breed</p>
-                  </div>
-                </div>
-                <span className="owner-status-pill owner-status-draft">
-                  Draft
-                </span>
-              </div>
+              ) : (
+                previewRows.map((animal, index) => {
+                  const thumbs = ownerListingImageUrls(animal);
+                  const thumbUrl =
+                    thumbs.length > 0
+                      ? resolveOwnerListingImageUrl(thumbs[0], apiBaseUrl)
+                      : null;
+                  return (
+                  <button
+                    key={animal.id}
+                    type="button"
+                    className="owner-list-row owner-list-row--link"
+                    onClick={() => navigate(`/animal/${animal.id}`)}
+                  >
+                    <div className="owner-animal-meta">
+                      {thumbUrl ? (
+                        <img
+                          src={thumbUrl}
+                          alt=""
+                          className="owner-animal-thumb"
+                        />
+                      ) : (
+                        <div
+                          className={`owner-animal-icon ${ownerAnimalIconClass(index)}`}
+                          aria-hidden
+                        />
+                      )}
+                      <div>
+                        <strong>{animal.name || "Unnamed"}</strong>
+                        <p>{animal.breed || "—"}</p>
+                      </div>
+                    </div>
+                    <span className={listingStatusPillClass(animal.listingStatus)}>
+                      {animal.listingStatus || "Listed"}
+                    </span>
+                  </button>
+                  );
+                })
+              )}
             </div>
           </div>
 

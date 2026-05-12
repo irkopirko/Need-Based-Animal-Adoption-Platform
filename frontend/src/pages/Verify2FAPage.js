@@ -136,6 +136,19 @@ function Verify2FAPage() {
         return;
       }
 
+      if (mode === "register") {
+        showPopup({
+          type: "success",
+          title: "Account Created",
+          message: "Your account has been created successfully. Please sign in with your email and password."
+        });
+        navigate("/login", {
+          replace: true,
+          state: { email: email.trim(), justRegistered: true }
+        });
+        return;
+      }
+
       const adopterProfileCompleted =
         resolvedRole !== "ADOPTER" || data.adopterProfileCompleted === "true";
       const ownerProfileCompleted =
@@ -157,11 +170,8 @@ function Verify2FAPage() {
 
       showPopup({
         type: "success",
-        title: mode === "register" ? "Account Created" : "Login Successful",
-        message:
-          mode === "register"
-            ? "Your account has been created successfully."
-            : "You have logged in successfully."
+        title: "Login Successful",
+        message: "You have logged in successfully."
       });
 
       if (resolvedRole === "ADOPTER" && !adopterProfileCompleted) {

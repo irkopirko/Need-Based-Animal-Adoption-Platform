@@ -1,5 +1,6 @@
 package com.adoptionplatform.backend.controller;
 
+import com.adoptionplatform.backend.dto.DeleteAccountRequest;
 import com.adoptionplatform.backend.dto.CompleteAdopterProfileRequest;
 import com.adoptionplatform.backend.dto.CompleteOwnerProfileRequest;
 import com.adoptionplatform.backend.dto.LoginRequest;
@@ -140,6 +141,15 @@ public class AuthController {
     @PostMapping("/complete-owner-profile")
     public ResponseEntity<Map<String, String>> completeOwnerProfile(@RequestBody CompleteOwnerProfileRequest request) {
         Map<String, String> response = authService.completeOwnerProfile(request);
+        if (response.containsKey("error")) {
+            return ResponseEntity.badRequest().body(response);
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/delete-account")
+    public ResponseEntity<Map<String, String>> deleteAccount(@RequestBody DeleteAccountRequest request) {
+        Map<String, String> response = authService.deleteAccount(request);
         if (response.containsKey("error")) {
             return ResponseEntity.badRequest().body(response);
         }

@@ -39,6 +39,34 @@
   font-weight: 800;
 }
 
+.compatible-request-scope-note {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f0faf8;
+  border: 1px solid #c5e8e4;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #2d4a47;
+}
+
+.compatible-request-scope-link {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0a6b69;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.compatible-request-scope-link:hover {
+  color: #05403f;
+}
+
 .compatible-hero-title {
   margin: 0;
   font-size: 56px;

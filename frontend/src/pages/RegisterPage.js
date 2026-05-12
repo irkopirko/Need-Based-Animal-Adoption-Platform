@@ -14,6 +14,39 @@ import { usePopup } from "../components/PopupProvider";
 import { TURKEY_PROVINCES } from "../data/turkeyProvinces";
 import { fetchDistrictsForProvince } from "../data/turkeyGeoApi";
 
+function AdopterRoleIcon() {
+  return (
+    <svg
+      className="register-role-svg"
+      viewBox="0 0 24 24"
+      width="28"
+      height="28"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="currentColor"
+        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+      />
+    </svg>
+  );
+}
+
+function OwnerRoleIcon() {
+  return (
+    <svg
+      className="register-role-svg"
+      viewBox="0 0 24 24"
+      width="28"
+      height="28"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8h5z" />
+    </svg>
+  );
+}
+
 function RegisterPage() {
   const navigate = useNavigate();
   const { showPopup } = usePopup();
@@ -356,7 +389,9 @@ function RegisterPage() {
             }`}
             onClick={() => setRole("ADOPTER")}
           >
-            <div className="register-role-icon register-role-icon-green"></div>
+            <div className="register-role-icon register-role-icon-green" aria-hidden="true">
+              <AdopterRoleIcon />
+            </div>
             <h3>I Want to Adopt</h3>
             <p>
               Browse animals, fill out your profile, and find pets that match
@@ -371,7 +406,9 @@ function RegisterPage() {
             }`}
             onClick={() => setRole("OWNER")}
           >
-            <div className="register-role-icon register-role-icon-gray"></div>
+            <div className="register-role-icon register-role-icon-gray" aria-hidden="true">
+              <OwnerRoleIcon />
+            </div>
             <h3>I am a Shelter / Owner</h3>
             <p>
               Register animals, manage adoption requests, and help them find

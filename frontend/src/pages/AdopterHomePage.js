@@ -275,6 +275,13 @@ function AdopterHomePage() {
             <button type="button" onClick={goToAdoptionRequest}>
               Create Adoption Request
             </button>
+            <button
+              type="button"
+              className="adopter-action-sub-link"
+              onClick={() => navigate("/my-adoption-requests")}
+            >
+              View my requests
+            </button>
           </div>
 
           <div className="adopter-action-card">

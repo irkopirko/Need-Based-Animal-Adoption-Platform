@@ -245,56 +245,114 @@
 }
 
 .home-info-left {
-  background: white;
-  border: 1px solid #e8e8e2;
-  border-radius: 12px;
-  padding: 28px 24px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafcf9 100%);
+  border: 1px solid #e4ebe4;
+  border-radius: 16px;
+  padding: 32px 28px;
+  box-shadow: 0 16px 40px rgba(24, 31, 28, 0.06);
+  position: relative;
+  overflow: hidden;
+}
+
+.home-info-left::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 16px 0 0 16px;
+  background: linear-gradient(180deg, #28c95a, #0ea5a4);
 }
 
 .home-info-left h2 {
   margin: 0;
   font-size: 36px;
   font-weight: 800;
+  letter-spacing: -0.5px;
 }
 
 .home-info-left p {
   margin: 14px 0 0;
-  color: #666;
+  color: #555;
   line-height: 1.9;
   font-size: 15px;
 }
 
 .home-info-right {
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .home-info-box {
-  background: #fbfbf9;
-  border: 1px solid #ecece6;
-  border-radius: 12px;
-  padding: 20px 18px;
+  background: #ffffff;
+  border: 1px solid #e8e8e2;
+  border-radius: 14px;
+  padding: 20px 20px 20px 22px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.04);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+  position: relative;
+}
+
+.home-info-box::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 3px;
+  border-radius: 3px;
+  background: #d7f0e0;
+  opacity: 0.9;
+}
+
+.home-info-box:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(24, 31, 28, 0.08);
+  border-color: #cfe8d8;
 }
 
 .home-info-number {
-  display: inline-block;
-  color: #28c95a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: #e9f9ef;
+  color: #148a3a;
   font-weight: 800;
-  margin-bottom: 8px;
-  font-size: 14px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 .home-info-box h4 {
   margin: 0;
   font-size: 18px;
   font-weight: 800;
+  color: #1a1a1a;
 }
 
 .home-info-box p {
   margin: 8px 0 0;
-  color: #666;
-  line-height: 1.8;
+  color: #5f5f5f;
+  line-height: 1.75;
   font-size: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-info-box {
+    transition: none;
+  }
+
+  .home-info-box:hover {
+    transform: none;
+  }
 }
 
 .home-footer {

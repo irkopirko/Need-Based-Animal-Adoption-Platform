@@ -39,17 +39,78 @@ export function summarizeAdoptionRequests(requests) {
   };
 }
 
-export async function fetchStrongMatchAnimals() {
+/**
+ * Maps {@code /api/match/{userId}} rows into the same animal-like shape used by compatible / saved UIs.
+ */
+export function mapMatchResultToCompatibleAnimal(row, apiBaseUrl) {
+  if (!row || typeof row !== "object") {
+    return row;
+  }
+  const rawUrl = row.coverImageUrl;
+  const resolved = resolveMediaUrl(rawUrl, apiBaseUrl) || rawUrl || null;
+  const reasons = Array.isArray(row.matchReasons) ? row.matchReasons : [];
+  const pct = Math.round(Number(row.matchPercentage) || 0);
+  const desc =
+    (typeof row.description === "string" && row.description.trim()) ||
+    (reasons.length ? reasons.slice(0, 3).join(" · ") : "");
+
+  return {
+    id: row.animalId,
+    name: row.name,
+    animalType: row.animalType,
+    breed: row.breed,
+    ageGroup: row.ageGroup,
+    size: row.size,
+    energyLevel: row.energyLevel,
+    housingLocation: row.housingLocation,
+    description: desc,
+    compatibilityScore: pct,
+    images: resolved ? [resolved] : [],
+    matchReasons: reasons,
+    isSaved: row.saved === true || row.isSaved === true
+  };
+}
+
+/**
+ * Strong matches for adopters: computed from the saved adoption request via {@code /api/match}.
+ * When {@code userId} is omitted, falls back to DB {@code /api/animals/compatible} (owner dashboard / legacy).
+ *
+ * @param {number|string|null|undefined} userId
+ * @param {number|string|null|undefined} [requestId] optional adoption_requests.id to score against
+ */
+export async function fetchStrongMatchAnimals(userId, requestId = null) {
   const api = getApiBaseUrl();
+  const uid = userId != null ? Number(userId) : NaN;
+  if (!Number.isFinite(uid) || uid <= 0) {
+    try {
+      const res = await fetch(
+        `${api}/api/animals/compatible?threshold=${STRONG_MATCH_THRESHOLD}`
+      );
+      if (!res.ok) {
+        return [];
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
   try {
-    const res = await fetch(
-      `${api}/api/animals/compatible?threshold=${STRONG_MATCH_THRESHOLD}`
-    );
+    const rid = requestId != null ? Number(requestId) : NaN;
+    const q =
+      Number.isFinite(rid) && rid > 0
+        ? `?requestId=${encodeURIComponent(String(rid))}`
+        : "";
+    const res = await fetch(`${api}/api/match/${uid}${q}`);
     if (!res.ok) {
       return [];
     }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    const list = Array.isArray(data) ? data : [];
+    return list
+      .filter((row) => (Number(row.matchPercentage) || 0) >= STRONG_MATCH_THRESHOLD)
+      .map((row) => mapMatchResultToCompatibleAnimal(row, api));
   } catch {
     return [];
   }
@@ -72,17 +133,93 @@ export async function fetchSavedAnimalsForUser(userId) {
   }
 }
 
-export function resolveAnimalImageUrl(animal, apiBaseUrl) {
-  const path = animal?.images?.[0];
-  if (!path) {
+/**
+ * Default Spring Boot API port when the SPA runs on localhost (CRA/Vite) but uploads are served by the backend.
+ */
+const DEFAULT_LOCAL_API = "http://localhost:8080";
+
+/** Loopback browser host: use relative `/uploads/...` so CRA dev proxy can reach Spring Boot. */
+function isLoopbackPage() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const h = window.location.hostname;
+  return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
+}
+
+function loopbackUploadsPathname(urlString) {
+  try {
+    const u = new URL(urlString);
+    if (!u.pathname.startsWith("/uploads/")) {
+      return null;
+    }
+    const h = u.hostname;
+    if (h !== "localhost" && h !== "127.0.0.1" && h !== "[::1]") {
+      return null;
+    }
+    return `${u.pathname}${u.search}${u.hash}`;
+  } catch {
     return null;
   }
-  if (path.startsWith("http")) {
-    return path;
-  }
+}
+
+function uploadBaseForBrowser(apiBaseUrl, relativePath) {
   const base = (apiBaseUrl || "").replace(/\/$/, "");
-  const p = path.startsWith("/") ? path : `/${path}`;
+  if (!relativePath.startsWith("/uploads/")) {
+    return base;
+  }
+  if (typeof window === "undefined") {
+    return base || DEFAULT_LOCAL_API;
+  }
+  let pageOrigin = "";
+  try {
+    pageOrigin = window.location.origin.replace(/\/$/, "");
+  } catch {
+    return base || DEFAULT_LOCAL_API;
+  }
+  let host = "";
+  try {
+    host = new URL(pageOrigin).hostname;
+  } catch {
+    return base || DEFAULT_LOCAL_API;
+  }
+  const isLocalPage = host === "localhost" || host === "127.0.0.1";
+  if (isLocalPage && (!base || base === pageOrigin)) {
+    return DEFAULT_LOCAL_API;
+  }
+  return base || pageOrigin || DEFAULT_LOCAL_API;
+}
+
+export function resolveMediaUrl(path, apiBaseUrl) {
+  if (path == null || path === "") {
+    return null;
+  }
+  const s = typeof path === "string" ? path.trim() : String(path).trim();
+  if (!s) {
+    return null;
+  }
+  if (/^https?:\/\//i.test(s)) {
+    if (isLoopbackPage()) {
+      const rel = loopbackUploadsPathname(s);
+      if (rel) {
+        return rel;
+      }
+    }
+    return s;
+  }
+  const p = s.startsWith("/") ? s : `/${s}`;
+  if (isLoopbackPage() && p.startsWith("/uploads/")) {
+    return p;
+  }
+  let base = uploadBaseForBrowser(apiBaseUrl, p).replace(/\/$/, "");
+  if (!base) {
+    return p;
+  }
   return `${base}${p}`;
+}
+
+export function resolveAnimalImageUrl(animal, apiBaseUrl) {
+  return resolveMediaUrl(animal?.images?.[0], apiBaseUrl);
 }
 
 /**
@@ -104,7 +241,7 @@ export async function loadAdopterJourneyState(userId) {
 
   let strongMatches = [];
   if (submitted) {
-    strongMatches = await fetchStrongMatchAnimals();
+    strongMatches = await fetchStrongMatchAnimals(userId);
   }
 
   let savedAnimals = [];

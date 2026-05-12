@@ -12,8 +12,11 @@ import AdopterMessagesPage from "./pages/AdopterMessagesPage";
 import OwnerMessagesPage from "./pages/OwnerMessagesPage";
 import OwnerManageRequestsPage from "./pages/OwnerManageRequestsPage";
 import AnimalDetailPage from "./pages/AnimalDetailPage";
+import AnimalOwnerRequestsPage from "./pages/AnimalOwnerRequestsPage";
 import RegisterAnimalPage from "./pages/RegisterAnimalPage";
+import OwnerListingsPage from "./pages/OwnerListingsPage";
 import CompatibleAnimalsPage from "./pages/CompatibleAnimalsPage";
+import AdopterMyRequestsPage from "./pages/AdopterMyRequestsPage";
 import MatchResultsPage from "./pages/MatchResultsPage";
 import Verify2FAPage from "./pages/Verify2FAPage";
 import AccountProfilePage from "./pages/AccountProfilePage";
@@ -48,9 +51,12 @@ function App() {
           <Route path="/adopter-messages" element={<AdopterMessagesPage />} />
           <Route path="/owner-messages" element={<OwnerMessagesPage />} />
           <Route path="/owner-requests" element={<OwnerManageRequestsPage />} />
+          <Route path="/animal/:animalId/requests" element={<AnimalOwnerRequestsPage />} />
           <Route path="/animal/:id" element={<AnimalDetailPage />} />
           <Route path="/register-animal" element={<RegisterAnimalPage />} />
+          <Route path="/owner-listings" element={<OwnerListingsPage />} />
           <Route path="/compatible-animals" element={<CompatibleAnimalsPage />} />
+          <Route path="/my-adoption-requests" element={<AdopterMyRequestsPage />} />
         </Routes>
       </Router>
     </PopupProvider>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { usePopup } from "../components/PopupProvider";
 import {
   broadcastStoredUserRefresh,
@@ -11,22 +12,27 @@ import {
 } from "../utils/auth";
 import "./CompleteAdopterProfilePage.css";
 
-const LISTING_OPTIONS = [
-  { value: "", label: "Select one" },
-  { value: "SHELTER", label: "Shelter — I list animals on behalf of a shelter or rescue" },
-  {
-    value: "INDIVIDUAL",
-    label: "Individual owner — I list my own pets as a private person"
-  }
+const MIN_STREET = 10;
+
+const GENDER_OPTIONS = [
+  { value: "", label: "Select gender" },
+  { value: "MALE", label: "Male" },
+  { value: "FEMALE", label: "Female" }
 ];
 
-function CompleteOwnerProfilePage() {
+function CompleteAdopterProfilePage() {
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [ownerListingType, setOwnerListingType] = useState("");
   const [userId, setUserId] = useState(null);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [addressLine, setAddressLine] = useState("");
+  const [birthYear, setBirthYear] = useState("");
+  const [gender, setGender] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -39,11 +45,11 @@ function CompleteOwnerProfilePage() {
       navigate("/login", { replace: true });
       return;
     }
-    if (normalizeRole(stored.role) !== "OWNER") {
+    if (normalizeRole(stored.role) !== "ADOPTER") {
       showPopup({
         type: "info",
         title: "Wrong account type",
-        message: "This page is only for pet owners."
+        message: "This page is only for adopters."
       });
       navigate("/", { replace: true });
       return;
@@ -59,14 +65,23 @@ function CompleteOwnerProfilePage() {
             "paviaUser",
             JSON.stringify({
               ...prev,
-              ownerProfileCompleted: profile.ownerProfileCompleted,
-              ownerListingType: profile.ownerListingType || ""
+              adopterProfileCompleted: profile.adopterProfileCompleted,
+              fullName: profile.fullName || prev.fullName || ""
             })
           );
           broadcastStoredUserRefresh();
-          if (profile.ownerProfileCompleted) {
-            navigate("/ownerhomepage", { replace: true });
+          if (profile.adopterProfileCompleted) {
+            navigate("/adopterhomepage", { replace: true });
             return;
+          }
+          const full = String(profile.fullName || "").trim();
+          const parts = full.split(/\s+/).filter(Boolean);
+          if (parts.length >= 2) {
+            setFirstName(parts[0]);
+            setLastName(parts.slice(1).join(" "));
+          } else if (parts.length === 1) {
+            setFirstName(parts[0]);
+            setLastName("");
           }
         }
         setUserId(stored.userId);
@@ -82,11 +97,48 @@ function CompleteOwnerProfilePage() {
     e.preventDefault();
     if (!userId) return;
 
-    if (!ownerListingType) {
+    const fn = firstName.trim();
+    const ln = lastName.trim();
+    if (!fn) {
       showPopup({
         type: "warning",
-        title: "Selection required",
-        message: "Please choose whether you list as a shelter or as an individual owner."
+        title: "First name required",
+        message: "Please enter your first name."
+      });
+      return;
+    }
+    if (!ln) {
+      showPopup({
+        type: "warning",
+        title: "Last name required",
+        message: "Please enter your last name."
+      });
+      return;
+    }
+    const addr = addressLine.trim();
+    if (!addr || addr.length < MIN_STREET) {
+      showPopup({
+        type: "warning",
+        title: "Street address required",
+        message: `Please enter your full street address (at least ${MIN_STREET} characters).`
+      });
+      return;
+    }
+    const yearNum = parseInt(String(birthYear).trim(), 10);
+    const currentYear = new Date().getFullYear();
+    if (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > currentYear - 13) {
+      showPopup({
+        type: "warning",
+        title: "Birth year required",
+        message: "Enter a valid birth year. You must be at least 13."
+      });
+      return;
+    }
+    if (!gender || (gender !== "MALE" && gender !== "FEMALE")) {
+      showPopup({
+        type: "warning",
+        title: "Gender required",
+        message: "Please select male or female."
       });
       return;
     }
@@ -94,12 +146,16 @@ function CompleteOwnerProfilePage() {
     setSaving(true);
     const apiBaseUrl = getApiBaseUrl();
     try {
-      const response = await fetch(`${apiBaseUrl}/api/auth/complete-owner-profile`, {
+      const response = await fetch(`${apiBaseUrl}/api/auth/complete-adopter-profile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId,
-          ownerListingType
+          firstName: fn,
+          lastName: ln,
+          addressLine: addr,
+          birthYear: yearNum,
+          gender
         })
       });
       const data = await response.json();
@@ -113,12 +169,13 @@ function CompleteOwnerProfilePage() {
       }
 
       const prev = getStoredUser() || {};
+      const combined = `${fn} ${ln}`.trim();
       localStorage.setItem(
         "paviaUser",
         JSON.stringify({
           ...prev,
-          ownerProfileCompleted: true,
-          ownerListingType: data.ownerListingType || ownerListingType
+          adopterProfileCompleted: true,
+          fullName: data.fullName || combined
         })
       );
       broadcastStoredUserRefresh();
@@ -126,9 +183,9 @@ function CompleteOwnerProfilePage() {
       showPopup({
         type: "success",
         title: "Profile complete",
-        message: "You can now register animals for adoption."
+        message: "You can now browse animals and start an adoption request."
       });
-      navigate("/ownerhomepage", { replace: true });
+      navigate("/adopterhomepage", { replace: true });
     } catch (err) {
       console.error(err);
       showPopup({
@@ -141,32 +198,141 @@ function CompleteOwnerProfilePage() {
     }
   };
 
+  const handleConfirmDeleteAccount = async () => {
+    if (!userId) return;
+    setDeleteBusy(true);
+    const apiBaseUrl = getApiBaseUrl();
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/auth/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showPopup({
+          type: "error",
+          title: "Could not delete account",
+          message: data.error || "Account could not be deleted."
+        });
+        return;
+      }
+      localStorage.removeItem("paviaUser");
+      broadcastStoredUserRefresh();
+      setDeleteDialogOpen(false);
+      showPopup({
+        type: "success",
+        title: "Account deleted",
+        message: "Your account and related data have been permanently removed."
+      });
+      navigate("/login", { replace: true });
+    } catch (err) {
+      console.error(err);
+      showPopup({
+        type: "error",
+        title: "Connection error",
+        message: "Could not reach the server."
+      });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
-    <div className="complete-profile-page">
+    <div className="complete-profile-page complete-adopter-profile">
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete your account?"
+        description="Are you sure? This will permanently delete your account, profile, adoption requests, saved animals, and activity logs. This cannot be undone."
+        confirmLabel="Yes, delete everything"
+        cancelLabel="Cancel"
+        confirmDanger
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) setDeleteDialogOpen(false);
+        }}
+        onConfirm={handleConfirmDeleteAccount}
+      />
       <Navbar />
       <main className="complete-profile-main">
         <div className="complete-profile-card">
-          <p className="complete-profile-kicker">Before you list</p>
-          <h1 className="complete-profile-title">Complete your owner profile</h1>
+          <p className="complete-profile-kicker">Welcome</p>
+          <h1 className="complete-profile-title">Complete your adopter profile</h1>
           <p className="complete-profile-lead">
-            Tell us how you list animals on Pavia. You need to complete this once before you
-            can register any animal. Contact details stay in Edit profile.
+            We need a few details once before you can browse matches and submit adoption requests.
+            You can update address and contact later in Account.
           </p>
 
           {loading ? (
             <p className="complete-profile-loading">Loading…</p>
           ) : (
             <form className="complete-profile-form" noValidate onSubmit={handleSubmit}>
+              <div className="complete-profile-name-row">
+                <label className="complete-profile-label">
+                  <span className="complete-profile-label-heading">
+                    First name <span className="complete-profile-req" aria-hidden="true">*</span>
+                  </span>
+                  <input
+                    className="complete-profile-input"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    autoComplete="given-name"
+                    placeholder="First name"
+                  />
+                </label>
+                <label className="complete-profile-label">
+                  <span className="complete-profile-label-heading">
+                    Last name <span className="complete-profile-req" aria-hidden="true">*</span>
+                  </span>
+                  <input
+                    className="complete-profile-input"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    autoComplete="family-name"
+                    placeholder="Last name"
+                  />
+                </label>
+              </div>
+
               <label className="complete-profile-label">
                 <span className="complete-profile-label-heading">
-                  How do you list? <span className="complete-profile-req" aria-hidden="true">*</span>
+                  Street address <span className="complete-profile-req" aria-hidden="true">*</span>
+                </span>
+                <textarea
+                  className="complete-profile-textarea"
+                  value={addressLine}
+                  onChange={(e) => setAddressLine(e.target.value)}
+                  rows={3}
+                  autoComplete="street-address"
+                  placeholder={`Building, street, apartment… (min. ${MIN_STREET} characters)`}
+                />
+              </label>
+
+              <label className="complete-profile-label">
+                <span className="complete-profile-label-heading">
+                  Birth year <span className="complete-profile-req" aria-hidden="true">*</span>
+                </span>
+                <input
+                  className="complete-profile-input"
+                  type="number"
+                  value={birthYear}
+                  onChange={(e) => setBirthYear(e.target.value)}
+                  placeholder="e.g. 1998"
+                  min={1900}
+                  max={new Date().getFullYear()}
+                />
+              </label>
+
+              <label className="complete-profile-label">
+                <span className="complete-profile-label-heading">
+                  Gender <span className="complete-profile-req" aria-hidden="true">*</span>
                 </span>
                 <select
                   className="complete-profile-select"
-                  value={ownerListingType}
-                  onChange={(e) => setOwnerListingType(e.target.value)}
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
                 >
-                  {LISTING_OPTIONS.map((opt) => (
+                  {GENDER_OPTIONS.map((opt) => (
                     <option key={opt.value || "empty"} value={opt.value}>
                       {opt.label}
                     </option>
@@ -178,7 +344,7 @@ function CompleteOwnerProfilePage() {
                 <button
                   type="button"
                   className="complete-profile-btn complete-profile-btn-ghost"
-                  onClick={() => navigate("/ownerhomepage")}
+                  onClick={() => navigate("/adopterhomepage")}
                   disabled={saving}
                 >
                   Cancel
@@ -201,10 +367,25 @@ function CompleteOwnerProfilePage() {
             indicates required fields
           </p>
         </div>
+
+        <section className="complete-profile-delete-panel" aria-label="Delete account">
+          <h2 className="complete-profile-delete-panel-title">Delete your account</h2>
+          <p className="complete-profile-delete-panel-lead">
+            Permanently remove your account and all related data.
+          </p>
+          <button
+            type="button"
+            className="complete-profile-delete-btn"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={loading || saving}
+          >
+            Delete account
+          </button>
+        </section>
       </main>
       <Footer />
     </div>
   );
 }
 
-export default CompleteOwnerProfilePage;
+export default CompleteAdopterProfilePage;

@@ -1,10 +1,77 @@
 import { getApiBaseUrl } from "./auth";
-import { fetchStrongMatchAnimals, STRONG_MATCH_THRESHOLD } from "./adopterJourney";
+import {
+  fetchStrongMatchAnimals,
+  resolveMediaUrl,
+  STRONG_MATCH_THRESHOLD
+} from "./adopterJourney";
 
 const INQUIRIES_KEY = "paviaOwnerInquiries";
 const THREADS_KEY = "paviaOwnerMessageThreads";
 
 export const PAVIA_OWNER_ENGAGEMENT_UPDATED = "paviaOwnerEngagementUpdated";
+
+/** Same-origin safe when {@code getApiBaseUrl()} is {@code ""} (CRA {@code setupProxy}). */
+function apiUrl(apiBase, path) {
+  const p = path.startsWith("/") ? path : `/${path}`;
+  const b = (apiBase || "").replace(/\/$/, "");
+  return b ? `${b}${p}` : p;
+}
+
+/**
+ * Owner listings and dashboards expect {@code animal.images} as string URLs.
+ * Normalizes alternate JSON shapes (nested rows, snake_case) from APIs.
+ */
+export function normalizeAnimalFromApi(animal) {
+  if (!animal || typeof animal !== "object") {
+    return animal;
+  }
+  let images = animal.images;
+  if (Array.isArray(images) && images.some(Boolean)) {
+    return {
+      ...animal,
+      images: images.map((x) => String(x).trim()).filter(Boolean)
+    };
+  }
+  if (Array.isArray(animal.imageUrls) && animal.imageUrls.some(Boolean)) {
+    return {
+      ...animal,
+      images: animal.imageUrls.map((x) => String(x).trim()).filter(Boolean)
+    };
+  }
+  if (Array.isArray(animal.image_urls) && animal.image_urls.some(Boolean)) {
+    return {
+      ...animal,
+      images: animal.image_urls.map((x) => String(x).trim()).filter(Boolean)
+    };
+  }
+  if (Array.isArray(animal.animalImages) && animal.animalImages.length > 0) {
+    const urls = animal.animalImages
+      .map((row) => row?.imageUrl ?? row?.image_url ?? row?.url)
+      .filter((x) => x != null && String(x).trim() !== "");
+    if (urls.length > 0) {
+      return { ...animal, images: urls.map((x) => String(x).trim()) };
+    }
+  }
+  return {
+    ...animal,
+    images: Array.isArray(images) ? images.filter(Boolean) : []
+  };
+}
+
+/** Ordered image URL strings for an owner listing card or dashboard row. */
+export function ownerListingImageUrls(animal) {
+  const n = normalizeAnimalFromApi(animal);
+  if (!n || typeof n !== "object") {
+    return [];
+  }
+  const arr = n.images;
+  return Array.isArray(arr) ? arr.map((x) => String(x).trim()).filter(Boolean) : [];
+}
+
+/** Resolve one stored path/URL for an img src (same rules as adopter flow + CRA proxy). */
+export function resolveOwnerListingImageUrl(path, apiBaseUrl) {
+  return resolveMediaUrl(path, apiBaseUrl);
+}
 
 export function notifyOwnerEngagementUpdated() {
   if (typeof window !== "undefined") {
@@ -15,15 +82,49 @@ export function notifyOwnerEngagementUpdated() {
 export async function fetchAllAnimals() {
   const api = getApiBaseUrl();
   try {
-    const res = await fetch(`${api}/api/animals`);
+    const res = await fetch(apiUrl(api, "/api/animals"));
     if (!res.ok) {
       return [];
     }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    const raw = Array.isArray(data) ? data : [];
+    return raw.map(normalizeAnimalFromApi);
   } catch {
     return [];
   }
+}
+
+/**
+ * Animals listed by this owner (DB {@code animals.owner_id}). Requires {@code viewerId === ownerId}.
+ * @throws {Error} when the HTTP response is not OK (so callers can show the server message).
+ */
+export async function fetchOwnerListings(ownerId) {
+  const oid = Number(ownerId);
+  if (!Number.isFinite(oid)) {
+    throw new Error("Missing or invalid owner id.");
+  }
+  const api = getApiBaseUrl();
+  const res = await fetch(
+    apiUrl(api, `/api/animals/owner/${oid}?viewerId=${oid}`)
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = `Listings request failed (${res.status}).`;
+    try {
+      const body = JSON.parse(text);
+      if (body && typeof body.error === "string") {
+        msg = body.error;
+      }
+    } catch {
+      if (text && text.trim()) {
+        msg = text.trim().slice(0, 200);
+      }
+    }
+    throw new Error(msg);
+  }
+  const data = await res.json();
+  const raw = Array.isArray(data) ? data : [];
+  return raw.map(normalizeAnimalFromApi);
 }
 
 export function filterListingsForOwner(animals, ownerId) {
@@ -48,6 +149,15 @@ export function readOwnerInquiries(ownerId) {
   } catch {
     return [];
   }
+}
+
+/** Inquiries stored for this owner that reference a specific listing ({@code animalId}). */
+export function readInquiriesForAnimal(ownerId, animalId) {
+  const aid = Number(animalId);
+  if (!Number.isFinite(aid)) {
+    return [];
+  }
+  return readOwnerInquiries(ownerId).filter((x) => Number(x.animalId) === aid);
 }
 
 export function readOwnerThreads(ownerId) {

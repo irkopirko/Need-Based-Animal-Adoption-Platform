@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "./CompatibleAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -9,11 +9,14 @@ import {
   fetchUserAdoptionRequests,
   summarizeAdoptionRequests,
   STRONG_MATCH_THRESHOLD,
-  resolveAnimalImageUrl
+  resolveAnimalImageUrl,
+  fetchStrongMatchAnimals
 } from "../utils/adopterJourney";
 
 function CompatibleAnimalsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestIdFromUrl = searchParams.get("requestId");
   const { showPopup } = usePopup();
 
   const [animals, setAnimals] = useState([]);
@@ -50,18 +53,16 @@ function CompatibleAnimalsPage() {
         return;
       }
 
+      const apiBase = getApiBaseUrl();
+      const uid = user?.userId;
+      const ridNum =
+        requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
+          ? Number(requestIdFromUrl)
+          : null;
+
       try {
-        const response = await fetch(
-          `${getApiBaseUrl()}/api/animals/compatible?threshold=${STRONG_MATCH_THRESHOLD}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch compatible animals");
-        }
-
-        const data = await response.json();
-        const apiBase = getApiBaseUrl();
-        const normalized = (Array.isArray(data) ? data : []).map((a) => {
+        const fromMatch = await fetchStrongMatchAnimals(uid, ridNum);
+        const normalized = (Array.isArray(fromMatch) ? fromMatch : []).map((a) => {
           if (!a.images?.length) {
             return a;
           }
@@ -93,12 +94,21 @@ function CompatibleAnimalsPage() {
     };
     // showPopup from context is stable; avoid re-fetch on identity change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [requestIdFromUrl]);
 
   let filteredAnimals = [...animals];
 
+  const animalTypeLabel = (t) => {
+    const u = String(t || "").toUpperCase();
+    if (u === "DOG") return "Dog";
+    if (u === "CAT") return "Cat";
+    return t || "";
+  };
+
   if (typeFilter !== "All") {
-    filteredAnimals = filteredAnimals.filter((animal) => animal.animalType === typeFilter);
+    filteredAnimals = filteredAnimals.filter(
+      (animal) => animalTypeLabel(animal.animalType) === typeFilter
+    );
   }
 
   if (sortBy === "Highest Match") {
@@ -231,6 +241,15 @@ function CompatibleAnimalsPage() {
         <section className="compatible-hero">
           <div className="compatible-hero-left">
             <p className="compatible-hero-tag">Compatible Animals</p>
+            {requestIdFromUrl && /^\d+$/.test(String(requestIdFromUrl).trim()) && (
+              <p className="compatible-request-scope-note">
+                Showing strong matches (≥ {STRONG_MATCH_THRESHOLD}%) for{" "}
+                <strong>request #{String(requestIdFromUrl).trim()}</strong>.{" "}
+                <button type="button" className="compatible-request-scope-link" onClick={() => navigate("/compatible-animals")}>
+                  Use latest submitted request instead
+                </button>
+              </p>
+            )}
             <h1 className="compatible-hero-title">
               Animals that fit
               <br />

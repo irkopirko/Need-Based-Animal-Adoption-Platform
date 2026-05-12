@@ -33,6 +33,19 @@
   border-radius: 20px;
 }
 
+.animal-detail-main-image-placeholder {
+  width: 100%;
+  height: 420px;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #f4fff7, #eef6f2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7a6e;
+  font-weight: 700;
+  font-size: 15px;
+}
+
 .animal-detail-image-topbar {
   position: absolute;
   top: 12px;

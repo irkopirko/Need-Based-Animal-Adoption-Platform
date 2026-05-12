@@ -1,0 +1,117 @@
+.adopter-requests-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #f7f7f4;
+}
+
+.adopter-requests-main {
+  flex: 1;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 40px 20px 56px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.adopter-requests-hero {
+  margin-bottom: 28px;
+}
+
+.adopter-requests-tag {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0ea5a4;
+}
+
+.adopter-requests-hero h1 {
+  margin: 0 0 10px;
+  font-size: 26px;
+  font-weight: 800;
+  color: #141414;
+}
+
+.adopter-requests-hero p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #555;
+}
+
+.adopter-requests-loading,
+.adopter-requests-empty {
+  font-size: 15px;
+  color: #666;
+}
+
+.adopter-requests-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.adopter-requests-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #e8e8e2;
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05);
+}
+
+.adopter-requests-row strong {
+  display: block;
+  font-size: 16px;
+  color: #141414;
+  margin-bottom: 6px;
+}
+
+.adopter-requests-phase {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-right: 8px;
+}
+
+.adopter-requests-phase-submitted {
+  background: #e6f7f6;
+  color: #0a6b69;
+}
+
+.adopter-requests-phase-draft {
+  background: #fff4e5;
+  color: #8a5a00;
+}
+
+.adopter-requests-meta {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #777;
+}
+
+.adopter-requests-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  background: #0ea5a4;
+  color: #fff;
+}
+
+.adopter-requests-btn:hover {
+  filter: brightness(1.05);
+}

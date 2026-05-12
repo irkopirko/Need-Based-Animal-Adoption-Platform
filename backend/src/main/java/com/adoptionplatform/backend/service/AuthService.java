@@ -1,18 +1,24 @@
 package com.adoptionplatform.backend.service;
 
+import com.adoptionplatform.backend.dto.DeleteAccountRequest;
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
 import com.adoptionplatform.backend.dto.CompleteAdopterProfileRequest;
 import com.adoptionplatform.backend.dto.CompleteOwnerProfileRequest;
 import com.adoptionplatform.backend.dto.UpdateProfileRequest;
 import com.adoptionplatform.backend.dto.UserProfileDto;
+import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.entity.LoginLog;
 import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
+import com.adoptionplatform.backend.repository.AdopterProfileRepository;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
+import com.adoptionplatform.backend.repository.AnimalRepository;
 import com.adoptionplatform.backend.repository.LoginLogRepository;
+import com.adoptionplatform.backend.repository.SavedAnimalRepository;
 import com.adoptionplatform.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -25,8 +31,12 @@ import java.net.InetAddress;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -36,6 +46,8 @@ import java.util.regex.Pattern;
 
 @Service
 public class AuthService {
+
+    private static final String SQL_ANIMAL_IDS_BY_OWNER = "SELECT id FROM animals WHERE owner_id = ?";
 
     @Autowired
     private LoginLogRepository loginLogRepository;
@@ -51,6 +63,18 @@ public class AuthService {
 
     @Autowired
     private AdoptionRequestRepository adoptionRequestRepository;
+
+    @Autowired
+    private SavedAnimalRepository savedAnimalRepository;
+
+    @Autowired
+    private AnimalRepository animalRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private AdopterProfileRepository adopterProfileRepository;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long EMAIL_VERIFICATION_EXPIRY_MS = 10 * 60 * 1000;
@@ -754,8 +778,7 @@ public class AuthService {
             }
             String genderValue = request.getGender() == null ? "" : request.getGender().trim().toUpperCase(Locale.ROOT);
             if (!genderValue.equals("MALE")
-                    && !genderValue.equals("FEMALE")
-                    && !genderValue.equals("PREFER_NOT_TO_SAY")) {
+                    && !genderValue.equals("FEMALE")) {
                 response.put("error", "Gender is required");
                 return response;
             }
@@ -836,8 +859,7 @@ public class AuthService {
         }
         String gender = request.getGender() == null ? "" : request.getGender().trim().toUpperCase(Locale.ROOT);
         if (!gender.equals("MALE")
-                && !gender.equals("FEMALE")
-                && !gender.equals("PREFER_NOT_TO_SAY")) {
+                && !gender.equals("FEMALE")) {
             response.put("error", "Gender selection is required");
             return response;
         }
@@ -902,6 +924,41 @@ public class AuthService {
         userRepository.save(user);
         response.put("message", "Profile completed");
         response.put("ownerListingType", listingType);
+        return response;
+    }
+
+    @Transactional
+    public Map<String, String> deleteAccount(DeleteAccountRequest request) {
+        Map<String, String> response = new HashMap<>();
+        if (request == null || request.getUserId() == null) {
+            response.put("error", "User id is required");
+            return response;
+        }
+        Long userId = request.getUserId();
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isEmpty()) {
+            response.put("error", "User not found");
+            return response;
+        }
+
+        savedAnimalRepository.deleteByUserId(userId);
+
+        List<Long> animalIds = jdbcTemplate.query(
+                SQL_ANIMAL_IDS_BY_OWNER,
+                (rs, rowNum) -> rs.getLong("id"),
+                userId);
+        if (!animalIds.isEmpty()) {
+            List<Animal> ownedAnimals = new ArrayList<>(animalRepository.findAllById(animalIds));
+            savedAnimalRepository.deleteByAnimalIdIn(animalIds);
+            animalRepository.deleteAll(ownedAnimals);
+        }
+
+        adoptionRequestRepository.deleteByUserId(userId);
+        adopterProfileRepository.deleteByUserId(userId);
+        loginLogRepository.deleteByUserId(userId);
+        userRepository.deleteById(userId);
+
+        response.put("message", "Account deleted");
         return response;
     }
 

@@ -1,10 +1,41 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import "./GuestAdoptPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import guestAdoptHeroImage from "../images/guestAdoptHeroImage.jpg";
 
 function GuestAdoptPage() {
+  const flowSectionRef = useRef(null);
+
+  useEffect(() => {
+    const root = flowSectionRef.current;
+    if (!root) {
+      return undefined;
+    }
+    const steps = Array.from(root.querySelectorAll(".guest-flow-step"));
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion || typeof IntersectionObserver === "undefined") {
+      steps.forEach((el) => el.classList.add("guest-flow-step--visible"));
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("guest-flow-step--visible");
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" }
+    );
+    steps.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className="guest-adopt-page">
       <Navbar />
@@ -35,7 +66,7 @@ function GuestAdoptPage() {
         </section>
 
 
-       <section className="guest-flow-section">
+       <section ref={flowSectionRef} className="guest-flow-section">
          <div className="guest-flow-card">
            <div className="guest-flow-head">
              <p className="guest-adopt-tag">Adopt</p>

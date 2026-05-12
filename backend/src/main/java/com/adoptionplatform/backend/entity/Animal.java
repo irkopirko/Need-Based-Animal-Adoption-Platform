@@ -1,22 +1,50 @@
 package com.adoptionplatform.backend.entity;
-import jakarta.persistence.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence.CollectionTable;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.Column;
 
+/**
+ * row in {@code animals} primary key is {@link #id}
+ * {@link #owner} references the listing owner ({@code users.id}) via {@code owner_id}; that value is not the animal PK
+ */
 @Entity
 @Table(name = "animals")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Animal {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @JsonIgnore
+    @ManyToOne(optional = false, fetch = jakarta.persistence.FetchType.LAZY)
+    @JoinColumn(
+            name = "owner_id",
+            nullable = false,
+            referencedColumnName = "id",
+            foreignKey = @ForeignKey(name = "fk_animals_owner_user")
+    )
+    private User owner;
 
     private String name;
     private String animalType;
@@ -31,13 +59,12 @@ public class Animal {
     private String description;
     private String listingStatus;
     private Double compatibilityScore;
-    private String housingLocation; //home or shelter??
-    private Long ownerId; //which shelter owner uploaded the animal
+    private String housingLocation;
 
-    @ElementCollection
-    @CollectionTable(name = "animal_images", joinColumns = @JoinColumn(name = "animal_id"))
-    @Column(name = "image_url")
-    private List<String> images=new ArrayList<>();
+    @JsonIgnore
+    @Fetch(FetchMode.SUBSELECT)
+    @OneToMany(mappedBy = "animal", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<AnimalImage> animalImages = new ArrayList<>();
 
     public Animal() {
     }
@@ -98,17 +125,55 @@ public class Animal {
         return compatibilityScore;
     }
 
+    /**
+     * ordered image URLs persisted in {@code animal_images} (FK {@code animal_id} → {@link #id})
+     */
+    @JsonProperty("images")
     public List<String> getImages() {
-        return images;
+        List<String> out = new ArrayList<>();
+        if (animalImages == null || animalImages.isEmpty()) {
+            return out;
+        }
+        List<AnimalImage> rows = new ArrayList<>(animalImages);
+        rows.sort(Comparator.comparing(AnimalImage::getSortOrder, Comparator.nullsLast(Comparator.naturalOrder())));
+        for (AnimalImage row : rows) {
+            if (row.getImageUrl() != null && !row.getImageUrl().isBlank()) {
+                out.add(row.getImageUrl());
+            }
+        }
+        return out;
+    }
+
+    @JsonProperty("images")
+    public void setImages(List<String> urls) {
+        if (animalImages == null) {
+            animalImages = new ArrayList<>();
+        }
+        animalImages.clear();
+        if (urls == null) {
+            return;
+        }
+        int order = 0;
+        for (String raw : urls) {
+            if (raw == null || raw.isBlank()) {
+                continue;
+            }
+            AnimalImage row = new AnimalImage();
+            row.setAnimal(this);
+            row.setSortOrder(order);
+            row.setImageUrl(raw.trim());
+            animalImages.add(row);
+            order++;
+        }
     }
 
     public String getHousingLocation() {
-    return housingLocation;
-}
+        return housingLocation;
+    }
 
-public void setHousingLocation(String housingLocation) {
-    this.housingLocation = housingLocation;
-}
+    public void setHousingLocation(String housingLocation) {
+        this.housingLocation = housingLocation;
+    }
 
     public void setId(Long id) {
         this.id = id;
@@ -166,24 +231,27 @@ public void setHousingLocation(String housingLocation) {
         this.compatibilityScore = compatibilityScore;
     }
 
-    public void setImages(List<String> images) {
-        this.images = images;
-    }
     private LocalDateTime registerTime;
-public LocalDateTime getRegisterTime() {
-    return registerTime;
-}
 
-public void setRegisterTime(LocalDateTime registerTime) {
-    this.registerTime = registerTime;
-}
+    public LocalDateTime getRegisterTime() {
+        return registerTime;
+    }
 
-public Long getOwnerId() {
-    return ownerId;
-}
+    public void setRegisterTime(LocalDateTime registerTime) {
+        this.registerTime = registerTime;
+    }
 
-public void setOwnerId(Long ownerId) {
-    this.ownerId = ownerId;
-}
+    @JsonIgnore
+    public User getOwner() {
+        return owner;
+    }
 
+    public void setOwner(User owner) {
+        this.owner = owner;
+    }
+
+    @JsonProperty("ownerId")
+    public Long getOwnerId() {
+        return owner == null ? null : owner.getId();
+    }
 }

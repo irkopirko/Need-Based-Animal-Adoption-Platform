@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { usePopup } from "../components/PopupProvider";
 import {
   broadcastStoredUserRefresh,
@@ -49,8 +50,7 @@ function splitDisplayName(fullNameRaw) {
 const GENDER_OPTIONS = [
   { value: "", label: "Select gender" },
   { value: "MALE", label: "Male" },
-  { value: "FEMALE", label: "Female" },
-  { value: "PREFER_NOT_TO_SAY", label: "Prefer not to say" }
+  { value: "FEMALE", label: "Female" }
 ];
 
 function AccountProfilePage() {
@@ -64,10 +64,10 @@ function AccountProfilePage() {
   const [phone, setPhone] = useState("");
   const [provinceId, setProvinceId] = useState("");
   const [districtId, setDistrictId] = useState("");
-  const [districtManual, setDistrictManual] = useState("");
   const [districts, setDistricts] = useState([]);
   const [districtLoading, setDistrictLoading] = useState(false);
-  const [districtLoadError, setDistrictLoadError] = useState(false);
+  const [districtListFailed, setDistrictListFailed] = useState(false);
+  const [districtRetryNonce, setDistrictRetryNonce] = useState(0);
   const pendingDistrictNameRef = useRef(null);
   const [addressLine, setAddressLine] = useState("");
   const [birthYear, setBirthYear] = useState("");
@@ -75,6 +75,8 @@ function AccountProfilePage() {
   const [userId, setUserId] = useState(null);
   const [role, setRole] = useState(null);
   const [hasDraftAdoptionRequest, setHasDraftAdoptionRequest] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const isAdopter = normalizeRole(role) === "ADOPTER";
   const contactLocked = isAdopter && hasDraftAdoptionRequest;
@@ -83,29 +85,27 @@ function AccountProfilePage() {
     if (!provinceId) {
       setDistricts([]);
       setDistrictLoading(false);
-      setDistrictLoadError(false);
+      setDistrictListFailed(false);
       return;
     }
 
     let cancelled = false;
     setDistrictLoading(true);
-    setDistrictLoadError(false);
+    setDistrictListFailed(false);
 
     fetchDistrictsForProvince(Number(provinceId))
       .then((list) => {
         if (cancelled) {
           return;
         }
-        setDistricts(list);
+        setDistricts(Array.isArray(list) ? list : []);
         const pending = pendingDistrictNameRef.current;
         if (pending != null && pending !== "") {
-          const d = list.find((x) => x.name === pending);
+          const d = (Array.isArray(list) ? list : []).find((x) => x.name === pending);
           if (d) {
             setDistrictId(String(d.id));
-            setDistrictManual("");
           } else {
             setDistrictId("");
-            setDistrictManual(pending);
           }
           pendingDistrictNameRef.current = null;
         }
@@ -115,10 +115,9 @@ function AccountProfilePage() {
           return;
         }
         setDistricts([]);
-        setDistrictLoadError(true);
+        setDistrictListFailed(true);
         const pending = pendingDistrictNameRef.current;
         if (pending != null && pending !== "") {
-          setDistrictManual(pending);
           setDistrictId("");
           pendingDistrictNameRef.current = null;
         }
@@ -132,7 +131,7 @@ function AccountProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, [provinceId]);
+  }, [provinceId, districtRetryNonce]);
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -164,7 +163,6 @@ function AccountProfilePage() {
           pendingDistrictNameRef.current = null;
           setProvinceId("");
           setDistrictId("");
-          setDistrictManual("");
           setAddressLine("");
           setBirthYear("");
           setGender("");
@@ -181,7 +179,6 @@ function AccountProfilePage() {
         const province = TURKEY_PROVINCES.find((p) => p.name === provinceName);
         pendingDistrictNameRef.current = null;
         setDistrictId("");
-        setDistrictManual("");
         if (province && districtName) {
           pendingDistrictNameRef.current = districtName;
           setProvinceId(String(province.id));
@@ -189,11 +186,6 @@ function AccountProfilePage() {
           setProvinceId(String(province.id));
         } else if (!province && (districtName || provinceName)) {
           setProvinceId("");
-          setDistrictManual(
-            profile.location && String(profile.location).trim()
-              ? String(profile.location).trim()
-              : districtName || provinceName
-          );
         } else {
           setProvinceId("");
         }
@@ -203,7 +195,10 @@ function AccountProfilePage() {
             ? String(profile.birthYear)
             : ""
         );
-        setGender(profile.gender || "");
+        {
+          const g = (profile.gender || "").toUpperCase();
+          setGender(g === "PREFER_NOT_TO_SAY" ? "" : profile.gender || "");
+        }
         setHasDraftAdoptionRequest(Boolean(profile.hasDraftAdoptionRequest));
 
         const prevStored = getStoredUser() || {};
@@ -284,20 +279,30 @@ function AccountProfilePage() {
     }
     const provinceNameResolved =
       TURKEY_PROVINCES.find((p) => String(p.id) === String(provinceId))?.name || "";
-    let districtNameResolved = "";
-    if (districtLoadError) {
-      districtNameResolved = districtManual.trim();
-    } else {
-      districtNameResolved =
-        districts.find((d) => String(d.id) === String(districtId))?.name || "";
+    if (districtListFailed) {
+      showPopup({
+        type: "warning",
+        title: "District list unavailable",
+        message:
+          "We could not load districts for your province. Use “Retry loading districts” below the province field, then choose your district."
+      });
+      return;
     }
+    if (districtLoading) {
+      showPopup({
+        type: "info",
+        title: "Please wait",
+        message: "Districts are still loading. Try again in a moment."
+      });
+      return;
+    }
+    const districtNameResolved =
+      districts.find((d) => String(d.id) === String(districtId))?.name || "";
     if (!districtNameResolved) {
       showPopup({
         type: "warning",
         title: "District required",
-        message: districtLoadError
-          ? "Enter your district (the list could not be loaded)."
-          : "Please select your district."
+        message: "Please select your district from the list."
       });
       return;
     }
@@ -406,8 +411,65 @@ function AccountProfilePage() {
     }
   };
 
+  const handleConfirmDeleteAccount = async () => {
+    if (!userId) {
+      return;
+    }
+    setDeleteBusy(true);
+    const apiBaseUrl = getApiBaseUrl();
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/auth/delete-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showPopup({
+          type: "error",
+          title: "Could not delete account",
+          message: data.error || "Account could not be deleted."
+        });
+        return;
+      }
+      localStorage.removeItem("paviaUser");
+      broadcastStoredUserRefresh();
+      setDeleteDialogOpen(false);
+      showPopup({
+        type: "success",
+        title: "Account deleted",
+        message: "Your account and related data have been permanently removed."
+      });
+      navigate("/login", { replace: true });
+    } catch (err) {
+      console.error(err);
+      showPopup({
+        type: "error",
+        title: "Connection error",
+        message: "Could not reach the server."
+      });
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
   return (
     <div className="account-page">
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        title="Delete your account?"
+        description="Are you sure? This will permanently delete your account, profile, listings, adoption requests, saved animals, and activity logs. This cannot be undone."
+        confirmLabel="Yes, delete everything"
+        cancelLabel="Cancel"
+        confirmDanger
+        busy={deleteBusy}
+        onCancel={() => {
+          if (!deleteBusy) {
+            setDeleteDialogOpen(false);
+          }
+        }}
+        onConfirm={handleConfirmDeleteAccount}
+      />
       <Navbar />
       <main className="account-main">
         <div className="account-card">
@@ -496,7 +558,8 @@ function AccountProfilePage() {
                       pendingDistrictNameRef.current = null;
                       setProvinceId(e.target.value);
                       setDistrictId("");
-                      setDistrictManual("");
+                      setDistrictListFailed(false);
+                      setDistrictRetryNonce(0);
                     }}
                     disabled={contactLocked}
                     autoComplete="address-level1"
@@ -511,36 +574,54 @@ function AccountProfilePage() {
                 </label>
                 <label className="account-label account-label-nested">
                   <span className="account-sublabel">District</span>
-                  {districtLoadError ? (
-                    <input
-                      className={`account-input ${contactLocked ? "account-input-readonly" : ""}`}
-                      value={districtManual}
-                      onChange={(e) => setDistrictManual(e.target.value)}
-                      readOnly={contactLocked}
-                      placeholder="Type your district (list could not be loaded)"
-                      autoComplete="address-level3"
-                    />
-                  ) : (
-                    <select
-                      className={`account-select ${contactLocked ? "account-input-readonly" : ""}`}
-                      value={districtId}
-                      onChange={(e) => setDistrictId(e.target.value)}
-                      disabled={contactLocked || !provinceId || districtLoading}
-                      autoComplete="address-level2"
-                    >
-                      <option value="">
-                        {!provinceId
-                          ? "Select a province first"
-                          : districtLoading
-                            ? "Loading…"
+                  <select
+                    className={`account-select ${contactLocked ? "account-input-readonly" : ""}`}
+                    value={districtId}
+                    onChange={(e) => setDistrictId(e.target.value)}
+                    disabled={
+                      contactLocked ||
+                      !provinceId ||
+                      districtLoading ||
+                      districtListFailed
+                    }
+                    autoComplete="address-level2"
+                    aria-describedby={
+                      districtListFailed ? "account-district-retry-hint" : undefined
+                    }
+                  >
+                    <option value="">
+                      {!provinceId
+                        ? "Select a province first"
+                        : districtLoading
+                          ? "Loading districts…"
+                          : districtListFailed
+                            ? "Could not load districts"
                             : "Select a district"}
+                    </option>
+                    {districts.map((d) => (
+                      <option key={d.id} value={String(d.id)}>
+                        {d.name}
                       </option>
-                      {districts.map((d) => (
-                        <option key={d.id} value={String(d.id)}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
+                    ))}
+                  </select>
+                  {provinceId && districtListFailed && !districtLoading && !contactLocked && (
+                    <div className="account-district-retry-wrap" id="account-district-retry-hint">
+                      <p className="account-district-retry-text">
+                        The district list could not be loaded. You can try again without leaving
+                        this page.
+                      </p>
+                      <button
+                        type="button"
+                        className="account-district-retry-btn"
+                        onClick={() => {
+                          setDistrictId("");
+                          setDistrictListFailed(false);
+                          setDistrictRetryNonce((n) => n + 1);
+                        }}
+                      >
+                        Retry loading districts
+                      </button>
+                    </div>
                   )}
                 </label>
               </div>
@@ -626,6 +707,21 @@ function AccountProfilePage() {
             indicates required fields
           </p>
         </div>
+
+        <section className="account-delete-panel" aria-label="Delete account">
+          <h2 className="account-delete-panel-title">Delete your account</h2>
+          <p className="account-delete-panel-lead">
+            Permanently remove your account and all data stored on Pavia for this email.
+          </p>
+          <button
+            type="button"
+            className="account-delete-account-btn"
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={loading || saving}
+          >
+            Delete account
+          </button>
+        </section>
       </main>
       <Footer />
     </div>

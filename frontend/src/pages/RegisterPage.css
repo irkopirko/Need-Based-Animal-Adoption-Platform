@@ -71,6 +71,11 @@
   font-size: 30px;
 }
 
+.register-role-icon .register-role-svg {
+  width: 40px;
+  height: 40px;
+}
+
 .register-role-icon-green {
   background: #28d35f;
   color: white;

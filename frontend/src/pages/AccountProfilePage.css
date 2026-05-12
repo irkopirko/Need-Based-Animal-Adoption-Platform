@@ -8,7 +8,10 @@
 .account-main {
   flex: 1;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  justify-content: flex-start;
   padding: 48px 20px 64px;
 }
 
@@ -226,6 +229,84 @@
   filter: brightness(1.05);
 }
 
+.account-district-retry-wrap {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.account-district-retry-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6a4a00;
+}
+
+.account-district-retry-btn {
+  align-self: flex-start;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid #cfe8d8;
+  background: #f4fff7;
+  color: #0b5d2a;
+  font-family: inherit;
+}
+
+.account-district-retry-btn:hover {
+  background: #e8f8ee;
+}
+
+.account-delete-panel {
+  width: 100%;
+  max-width: 520px;
+  box-sizing: border-box;
+  background: #fffafa;
+  border-radius: 20px;
+  border: 1px solid #f0d4d4;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.06);
+  padding: 32px 28px 36px;
+}
+
+.account-delete-panel-title {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 800;
+  color: #5c1010;
+  line-height: 1.3;
+}
+
+.account-delete-panel-lead {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6a4a4a;
+}
+
+.account-delete-account-btn {
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid #e8b4b4;
+  background: #fff5f5;
+  color: #8c1515;
+  font-family: inherit;
+}
+
+.account-delete-account-btn:hover:not(:disabled) {
+  background: #fde8e8;
+}
+
+.account-delete-account-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .account-required-note {
   margin: 22px 0 0;
   padding-top: 16px;
@@ -242,7 +323,8 @@
 }
 
 @media (max-width: 540px) {
-  .account-card {
+  .account-card,
+  .account-delete-panel {
     padding: 24px 20px 28px;
   }
 
