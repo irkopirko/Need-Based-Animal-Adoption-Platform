@@ -55,6 +55,10 @@ function Navbar() {
   const getMenuItems = () => {
     if (!user) return [];
 
+    if (normalizedRole === "ADMIN") {
+      return [{ label: "Moderation dashboard", path: "/adminhomepage" }];
+    }
+
     if (normalizedRole === "OWNER") {
       const items = [];
       if (user.ownerProfileCompleted === false) {
@@ -65,7 +69,7 @@ function Navbar() {
         { label: "Listed animals", path: "/owner-listings" },
         { label: "Register an animal", path: "/register-animal" },
         { label: "Adoption requests", path: "/owner-requests" },
-        { label: "Messages", path: "/owner-messages" }
+        { label: "Inquiries", path: "/owner-messages" }
       );
       return items;
     }
@@ -205,11 +209,13 @@ function Navbar() {
                           "Signed in"}
                       </p>
                       <p className="nav-profile-role">
-                        {normalizedRole === "OWNER"
-                          ? user?.ownerListingType === "SHELTER"
-                            ? "Shelter"
-                            : "Owner"
-                          : "Adopter"}
+                        {normalizedRole === "ADMIN"
+                          ? "Administrator"
+                          : normalizedRole === "OWNER"
+                            ? user?.ownerListingType === "SHELTER"
+                              ? "Shelter"
+                              : "Owner"
+                            : "Adopter"}
                       </p>
                     </div>
                   </div>

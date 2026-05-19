@@ -24,6 +24,7 @@ import CompleteAdopterProfilePage from "./pages/CompleteAdopterProfilePage";
 import CompleteOwnerProfilePage from "./pages/CompleteOwnerProfilePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
+import AdminHomePage from "./pages/AdminHomePage";
 import { PopupProvider } from "./components/PopupProvider";
 
 
@@ -42,6 +43,7 @@ function App() {
           <Route path="/account" element={<AccountProfilePage />} />
           <Route path="/adopterhomepage" element={<AdopterHomePage />} />
           <Route path="/ownerhomepage" element={<OwnerHomePage />} />
+          <Route path="/adminhomepage" element={<AdminHomePage />} />
           <Route path="/complete-adopter-profile" element={<CompleteAdopterProfilePage />} />
           <Route path="/complete-owner-profile" element={<CompleteOwnerProfilePage />} />
           <Route path="/adoption-request" element={<AdoptionRequestPage />} />

@@ -114,6 +114,15 @@
   box-shadow: 0 0 0 3px rgba(43, 216, 93, 0.2);
 }
 
+.complete-profile-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6d736d;
+  font-weight: 400;
+}
+
 .complete-profile-select {
   cursor: pointer;
 }

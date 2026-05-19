@@ -169,3 +169,64 @@
   font-size: 12px;
   color: #888;
 }
+
+.adopter-inquiry-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.adopter-inquiry-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.65rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+.adopter-inquiry-item.is-selected {
+  border-color: #0ea5a4;
+  background: #f0faf8;
+}
+
+.adopter-inquiry-thread-panel {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid #e8eaed;
+}
+
+.adopter-inquiry-messages {
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 1rem 0;
+}
+
+.adopter-inquiry-msg {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  max-width: 90%;
+}
+
+.adopter-inquiry-msg-adopter {
+  background: #eef6ef;
+  margin-left: auto;
+}
+
+.adopter-inquiry-msg-owner {
+  background: #f5f5f5;
+}
+
+.adopter-inquiry-compose textarea {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  padding: 0.5rem;
+}

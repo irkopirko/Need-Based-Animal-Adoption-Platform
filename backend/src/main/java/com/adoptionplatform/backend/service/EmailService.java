@@ -46,6 +46,54 @@ public class EmailService {
         );
     }
 
+    public void sendListingModerationNotice(
+            String recipientEmail,
+            String listingCode,
+            Long listingId,
+            String action,
+            String reason
+    ) {
+        String safeAction = action == null ? "updated" : action.trim().toLowerCase();
+        String safeReason = reason == null || reason.isBlank()
+                ? "A platform review determined this action was necessary."
+                : reason.trim();
+        String subject = "Your Pavia listing " + listingCode + " was " + safeAction;
+        String inner = "Your listing " + listingCode + " (ID " + listingId + ") was "
+                + safeAction + " by a platform administrator.<br/><br/>"
+                + "<strong>Reason:</strong> " + escapeHtml(safeReason);
+        sendHtmlEmail(recipientEmail, subject, inner);
+    }
+
+    private void sendHtmlEmail(String recipientEmail, String subject, String htmlBody) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, "UTF-8");
+            helper.setFrom(fromEmail);
+            helper.setTo(recipientEmail);
+            helper.setSubject(subject);
+            helper.setText(buildHtmlWrapper(htmlBody), true);
+            mailSender.send(message);
+        } catch (Exception exception) {
+            throw new RuntimeException("Failed to send email", exception);
+        }
+    }
+
+    private static String buildHtmlWrapper(String innerHtml) {
+        return "<div style=\"margin:0;padding:0;background:#f6f7f8;font-family:Arial,Helvetica,sans-serif;\">"
+                + "<div style=\"max-width:520px;margin:24px auto;background:#ffffff;border-radius:12px;padding:24px 20px;border:1px solid #e8eaed;\">"
+                + "<p style=\"margin:0;font-size:14px;line-height:1.5;color:#2c2c2c;\">"
+                + innerHtml
+                + "</p></div></div>";
+    }
+
+    private static String escapeHtml(String input) {
+        return input
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
     private void sendCodeEmail(String recipientEmail, String subject, String description, String code) {
         try {
             MimeMessage message = mailSender.createMimeMessage();

@@ -8,7 +8,11 @@ import {
   broadcastStoredUserRefresh,
   formatTurkishPhoneInput,
   getApiBaseUrl,
+  getBirthYearSelectOptions,
+  getLatestAllowedBirthYear,
   getStoredUser,
+  isBirthYearValidForMinAge,
+  MIN_PROFILE_AGE_YEARS,
   normalizeRole,
   normalizeTurkishMobileToE164
 } from "../utils/auth";
@@ -17,6 +21,8 @@ import { fetchDistrictsForProvince } from "../data/turkeyGeoApi";
 import "./AccountProfilePage.css";
 
 const MIN_STREET_ADDRESS_LENGTH = 10;
+const BIRTH_YEAR_OPTIONS = getBirthYearSelectOptions();
+const LATEST_BIRTH_YEAR = getLatestAllowedBirthYear();
 /** Same separator as RegisterPage when building `location` */
 const LOCATION_SEP = " / ";
 
@@ -336,16 +342,11 @@ function AccountProfilePage() {
         return;
       }
       yearNum = parseInt(birthYear.trim(), 10);
-      const currentYear = new Date().getFullYear();
-      if (
-        !Number.isFinite(yearNum) ||
-        yearNum < 1900 ||
-        yearNum > currentYear - 13
-      ) {
+      if (!isBirthYearValidForMinAge(yearNum)) {
         showPopup({
           type: "warning",
           title: "Birth year required",
-          message: "Enter a valid birth year. You must be at least 13."
+          message: `Select a valid birth year. You must be at least ${MIN_PROFILE_AGE_YEARS} years old (latest allowed year: ${LATEST_BIRTH_YEAR}).`
         });
         return;
       }
@@ -648,16 +649,26 @@ function AccountProfilePage() {
                     <span className="account-label-heading">
                       Birth year <span className="account-req" aria-hidden="true">*</span>
                     </span>
-                    <input
-                      className={`account-input ${contactLocked ? "account-input-readonly" : ""}`}
-                      type="number"
+                    <select
+                      className={`account-select ${contactLocked ? "account-input-readonly" : ""}`}
                       value={birthYear}
                       onChange={(e) => setBirthYear(e.target.value)}
-                      readOnly={contactLocked}
-                      placeholder="e.g. 1998"
-                      min={1900}
-                      max={new Date().getFullYear()}
-                    />
+                      disabled={contactLocked}
+                      required
+                    >
+                      <option value="">Select birth year</option>
+                      {BIRTH_YEAR_OPTIONS.map((year) => (
+                        <option key={year} value={String(year)}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                    {!contactLocked && (
+                      <span className="account-field-hint">
+                        Latest year shown: {LATEST_BIRTH_YEAR} (at least{" "}
+                        {MIN_PROFILE_AGE_YEARS} years old).
+                      </span>
+                    )}
                   </label>
 
                   <label className="account-label">

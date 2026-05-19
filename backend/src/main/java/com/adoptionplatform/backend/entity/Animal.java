@@ -1,5 +1,6 @@
 package com.adoptionplatform.backend.entity;
 
+import com.adoptionplatform.backend.util.ListingCodeUtil;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -253,5 +254,10 @@ public class Animal {
     @JsonProperty("ownerId")
     public Long getOwnerId() {
         return owner == null ? null : owner.getId();
+    }
+
+    @JsonProperty("listingCode")
+    public String getListingCode() {
+        return ListingCodeUtil.format(id);
     }
 }

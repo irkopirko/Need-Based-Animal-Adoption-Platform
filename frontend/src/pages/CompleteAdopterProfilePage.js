@@ -7,7 +7,11 @@ import { usePopup } from "../components/PopupProvider";
 import {
   broadcastStoredUserRefresh,
   getApiBaseUrl,
+  getBirthYearSelectOptions,
+  getLatestAllowedBirthYear,
   getStoredUser,
+  isBirthYearValidForMinAge,
+  MIN_PROFILE_AGE_YEARS,
   normalizeRole
 } from "../utils/auth";
 import "./CompleteAdopterProfilePage.css";
@@ -19,6 +23,9 @@ const GENDER_OPTIONS = [
   { value: "MALE", label: "Male" },
   { value: "FEMALE", label: "Female" }
 ];
+
+const BIRTH_YEAR_OPTIONS = getBirthYearSelectOptions();
+const LATEST_BIRTH_YEAR = getLatestAllowedBirthYear();
 
 function CompleteAdopterProfilePage() {
   const navigate = useNavigate();
@@ -125,12 +132,11 @@ function CompleteAdopterProfilePage() {
       return;
     }
     const yearNum = parseInt(String(birthYear).trim(), 10);
-    const currentYear = new Date().getFullYear();
-    if (!Number.isFinite(yearNum) || yearNum < 1900 || yearNum > currentYear - 13) {
+    if (!isBirthYearValidForMinAge(yearNum)) {
       showPopup({
         type: "warning",
         title: "Birth year required",
-        message: "Enter a valid birth year. You must be at least 13."
+        message: `Select a valid birth year. You must be at least ${MIN_PROFILE_AGE_YEARS} years old (latest allowed year: ${LATEST_BIRTH_YEAR}).`
       });
       return;
     }
@@ -312,15 +318,23 @@ function CompleteAdopterProfilePage() {
                 <span className="complete-profile-label-heading">
                   Birth year <span className="complete-profile-req" aria-hidden="true">*</span>
                 </span>
-                <input
-                  className="complete-profile-input"
-                  type="number"
+                <select
+                  className="complete-profile-select"
                   value={birthYear}
                   onChange={(e) => setBirthYear(e.target.value)}
-                  placeholder="e.g. 1998"
-                  min={1900}
-                  max={new Date().getFullYear()}
-                />
+                  required
+                >
+                  <option value="">Select birth year</option>
+                  {BIRTH_YEAR_OPTIONS.map((year) => (
+                    <option key={year} value={String(year)}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+                <span className="complete-profile-field-hint">
+                  Only years that mean you are at least {MIN_PROFILE_AGE_YEARS} years old are
+                  listed (latest: {LATEST_BIRTH_YEAR}).
+                </span>
               </label>
 
               <label className="complete-profile-label">

@@ -12,6 +12,11 @@ import {
   resolveAnimalImageUrl,
   fetchStrongMatchAnimals
 } from "../utils/adopterJourney";
+import {
+  fetchSavedAnimalIds,
+  saveAnimalForUser,
+  unsaveAnimalForUser
+} from "../utils/platformApi";
 
 function CompatibleAnimalsPage() {
   const navigate = useNavigate();
@@ -97,6 +102,17 @@ function CompatibleAnimalsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestIdFromUrl]);
 
+  useEffect(() => {
+    const user = getStoredUser();
+    const uid = getResolvedUserId(user);
+    if (uid == null) {
+      return;
+    }
+    fetchSavedAnimalIds(uid)
+      .then((ids) => setSavedIds(ids))
+      .catch(() => setSavedIds([]));
+  }, [animals.length]);
+
   let filteredAnimals = [...animals];
 
   const animalTypeLabel = (t) => {
@@ -128,23 +144,44 @@ function CompatibleAnimalsPage() {
     filteredAnimals.sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  const handleSave = (animalId) => {
-    if (savedIds.includes(animalId)) {
-      setSavedIds(savedIds.filter((id) => id !== animalId));
+  const handleSave = async (animalId, e) => {
+    e?.stopPropagation?.();
+    const uid = getResolvedUserId(getStoredUser());
+    if (uid == null) {
       showPopup({
         type: "warning",
-        title: "Removed From Saved",
-        message: "Animal removed from your saved list."
+        title: "Sign in required",
+        message: "Log in as an adopter to save animals."
       });
       return;
     }
-
-    setSavedIds([...savedIds, animalId]);
-    showPopup({
-      type: "success",
-      title: "Saved",
-      message: "Animal added to your saved list."
-    });
+    const idNum = Number(animalId);
+    const isSaved = savedIds.includes(idNum);
+    try {
+      if (isSaved) {
+        await unsaveAnimalForUser(uid, idNum);
+        setSavedIds(savedIds.filter((id) => id !== idNum));
+        showPopup({
+          type: "info",
+          title: "Removed",
+          message: "Animal removed from your saved list."
+        });
+      } else {
+        await saveAnimalForUser(uid, idNum);
+        setSavedIds([...savedIds, idNum]);
+        showPopup({
+          type: "success",
+          title: "Saved",
+          message: "Animal added to your saved list."
+        });
+      }
+    } catch (err) {
+      showPopup({
+        type: "error",
+        title: "Could not update",
+        message: err.message || "Try again."
+      });
+    }
   };
 
   const goToAnimalDetail = (animalId) => {
@@ -360,6 +397,18 @@ function CompatibleAnimalsPage() {
                   alt={animal.name}
                   className="compatible-card-image"
                 />
+                <button
+                  type="button"
+                  className={`compatible-heart-btn ${
+                    savedIds.includes(Number(animal.id)) ? "is-saved" : ""
+                  }`}
+                  onClick={(e) => handleSave(animal.id, e)}
+                  aria-label={
+                    savedIds.includes(Number(animal.id)) ? "Unsave" : "Save"
+                  }
+                >
+                  {savedIds.includes(Number(animal.id)) ? "♥" : "♡"}
+                </button>
                 <span className="compatible-score-pill">
                   {animal.compatibilityScore || 0}% compatibility
                 </span>
@@ -396,14 +445,10 @@ function CompatibleAnimalsPage() {
 
                   <button
                     type="button"
-                    className={`compatible-save-btn ${
-                      savedIds.includes(animal.id)
-                        ? "compatible-save-btn-active"
-                        : ""
-                    }`}
-                    onClick={() => handleSave(animal.id)}
+                    className="compatible-secondary-outline-btn"
+                    onClick={() => goToAnimalDetail(animal.id)}
                   >
-                    {savedIds.includes(animal.id) ? "Saved" : "Save"}
+                    Report / details
                   </button>
                 </div>
               </div>

@@ -118,7 +118,32 @@ public class AnimalService {
 
      */
     public List<Animal> getCompatibleAnimals(Double threshold) {
-        return animalRepository.findByCompatibilityScoreGreaterThanEqual(threshold);
+        return animalRepository.findByCompatibilityScoreGreaterThanEqual(threshold).stream()
+                .filter(this::isVisibleForCompatibility)
+                .toList();
+    }
+
+    public boolean isVisibleForCompatibility(Animal animal) {
+        String status = animal.getListingStatus();
+        if (status == null || status.isBlank()) {
+            return true;
+        }
+        String t = status.trim().toUpperCase(Locale.ROOT);
+        return !"ARCHIVED".equals(t) && !"DELETED".equals(t);
+    }
+
+    @Transactional
+    public Animal archiveListing(Long id, Long viewerId) {
+        Animal animal = assertAnimalOwnedBy(id, viewerId);
+        animal.setListingStatus("ARCHIVED");
+        return animalRepository.save(animal);
+    }
+
+    @Transactional
+    public Animal unarchiveListing(Long id, Long viewerId) {
+        Animal animal = assertAnimalOwnedBy(id, viewerId);
+        animal.setListingStatus("ACTIVE");
+        return animalRepository.save(animal);
     }
 
     private Animal assertAnimalOwnedBy(Long id, Long viewerId) {

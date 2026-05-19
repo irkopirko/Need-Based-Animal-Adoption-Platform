@@ -1,5 +1,6 @@
 package com.adoptionplatform.backend.service;
 
+import com.adoptionplatform.backend.config.AdminConfig;
 import com.adoptionplatform.backend.dto.DeleteAccountRequest;
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
@@ -75,6 +76,9 @@ public class AuthService {
 
     @Autowired
     private AdopterProfileRepository adopterProfileRepository;
+
+    @Autowired
+    private AdminConfig adminConfig;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long EMAIL_VERIFICATION_EXPIRY_MS = 10 * 60 * 1000;
@@ -316,16 +320,27 @@ public class AuthService {
         User user = userOptional.get();
         pendingLogins.remove(email);
 
+        if (adminConfig.isAdminEmail(email)) {
+            if (user.getRole() != Role.ADMIN) {
+                user.setRole(Role.ADMIN);
+                userRepository.save(user);
+            }
+        }
+
         saveLoginLog(
                 user.getId(),
                 user.getEmail(),
-                user.getRole().toString(),
+                adminConfig.isAdminEmail(email) ? Role.ADMIN.name() : user.getRole().toString(),
                 true,
                 "Login successful"
         );
 
         response.put("message", "Login successful");
-        response.put("role", user.getRole().name());
+        if (adminConfig.isAdminEmail(email)) {
+            response.put("role", Role.ADMIN.name());
+        } else {
+            response.put("role", user.getRole().name());
+        }
         response.put("fullName", user.getFullName());
         response.put("userId", String.valueOf(user.getId()));
         response.put("adopterProfileCompleted", adopterProfileCompletedResponseValue(user));
@@ -772,8 +787,8 @@ public class AuthService {
             }
             int year = request.getBirthYear();
             int currentYear = LocalDateTime.now(ZoneId.of("Europe/Istanbul")).getYear();
-            if (year < 1900 || year > currentYear - 13) {
-                response.put("error", "Enter a valid birth year (you must be at least 13)");
+            if (year < 1900 || year > currentYear - 18) {
+                response.put("error", "Enter a valid birth year (you must be at least 18)");
                 return response;
             }
             String genderValue = request.getGender() == null ? "" : request.getGender().trim().toUpperCase(Locale.ROOT);
@@ -853,8 +868,8 @@ public class AuthService {
         }
         int year = request.getBirthYear();
         int currentYear = LocalDateTime.now(ZoneId.of("Europe/Istanbul")).getYear();
-        if (year < 1900 || year > currentYear - 13) {
-            response.put("error", "Enter a valid birth year (you must be at least 13).");
+        if (year < 1900 || year > currentYear - 18) {
+            response.put("error", "Enter a valid birth year (you must be at least 18).");
             return response;
         }
         String gender = request.getGender() == null ? "" : request.getGender().trim().toUpperCase(Locale.ROOT);

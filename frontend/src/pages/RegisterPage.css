@@ -234,6 +234,13 @@
   gap: 10px;
 }
 
+.register-submit-btn:disabled {
+  background: #b8dfc4;
+  color: #f4fff7;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
 .register-arrow {
   font-size: 24px;
   line-height: 1;

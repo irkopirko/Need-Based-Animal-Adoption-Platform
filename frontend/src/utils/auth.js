@@ -18,13 +18,23 @@ export const normalizeRole = (role) => {
     compactRole === "OWNER" ||
     compactRole === "SHELTER_OWNER" ||
     compactRole === "ROLE_OWNER" ||
-    compactRole.includes("OWNER")
+    (compactRole.includes("OWNER") && !compactRole.includes("ADOPTER"))
   ) {
     return "OWNER";
   }
 
+  if (compactRole === "ADMIN" || compactRole === "ROLE_ADMIN") {
+    return "ADMIN";
+  }
+
   return normalizedRole;
 };
+
+export const ADMIN_EMAIL = "21soft1087@isik.edu.tr";
+
+export const isAdminEmail = (email) =>
+  email != null &&
+  String(email).trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
 export const isValidEmail = (email) => {
   if (!email) {
@@ -95,6 +105,10 @@ export const getHomePathByRole = (role) => {
 
   if (normalizedRole === "OWNER") {
     return "/ownerhomepage";
+  }
+
+  if (normalizedRole === "ADMIN") {
+    return "/adminhomepage";
   }
 
   return "/";
@@ -233,3 +247,44 @@ export const getMissingPasswordRequirements = (rawPassword) => {
 
 export const isPasswordValid = (rawPassword) =>
   getMissingPasswordRequirements(rawPassword).length === 0;
+
+/** Minimum age for profile birth year (complete profile, account). */
+export const MIN_PROFILE_AGE_YEARS = 18;
+
+/**
+ * Latest birth year that satisfies minimum age as of {@code referenceDate}
+ * (e.g. in 2026 → 2008 for 18+).
+ */
+export function getLatestAllowedBirthYear(
+  minAgeYears = MIN_PROFILE_AGE_YEARS,
+  referenceDate = new Date()
+) {
+  return referenceDate.getFullYear() - minAgeYears;
+}
+
+/** Descending birth years from latest allowed down to 1900 (for &lt;select&gt;). */
+export function getBirthYearSelectOptions(
+  minAgeYears = MIN_PROFILE_AGE_YEARS,
+  referenceDate = new Date()
+) {
+  const latest = getLatestAllowedBirthYear(minAgeYears, referenceDate);
+  const earliest = 1900;
+  const options = [];
+  for (let y = latest; y >= earliest; y -= 1) {
+    options.push(y);
+  }
+  return options;
+}
+
+export function isBirthYearValidForMinAge(
+  year,
+  minAgeYears = MIN_PROFILE_AGE_YEARS,
+  referenceDate = new Date()
+) {
+  const y = Number(year);
+  if (!Number.isFinite(y)) {
+    return false;
+  }
+  const latest = getLatestAllowedBirthYear(minAgeYears, referenceDate);
+  return y >= 1900 && y <= latest;
+}

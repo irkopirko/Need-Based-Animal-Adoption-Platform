@@ -95,6 +95,15 @@
   opacity: 0.85;
 }
 
+.account-field-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #6d736d;
+  font-weight: 400;
+}
+
 .account-loading {
   margin: 12px 0 0;
   color: #6a6a6a;

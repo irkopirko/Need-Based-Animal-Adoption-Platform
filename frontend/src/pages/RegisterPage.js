@@ -62,6 +62,7 @@ function RegisterPage() {
     districtId: "",
     districtManual: "",
     phone: "",
+    confirmOver18: false,
     agreeToTerms: false
   });
 
@@ -73,6 +74,7 @@ function RegisterPage() {
     province: false,
     district: false,
     phone: false,
+    confirmOver18: false,
     agreeToTerms: false
   });
 
@@ -207,6 +209,7 @@ function RegisterPage() {
       province: false,
       district: false,
       phone: false,
+      confirmOver18: false,
       agreeToTerms: false
     };
 
@@ -259,6 +262,11 @@ function RegisterPage() {
 
     if (!/^5\d{9}$/.test(phoneDigits) || !isValidTurkishMobileInput(formData.phone)) {
       newErrors.phone = true;
+      hasError = true;
+    }
+
+    if (!formData.confirmOver18) {
+      newErrors.confirmOver18 = true;
       hasError = true;
     }
 
@@ -582,6 +590,18 @@ function RegisterPage() {
             <label className="register-checkbox-row">
               <input
                 type="checkbox"
+                name="confirmOver18"
+                checked={formData.confirmOver18}
+                onChange={handleChange}
+              />
+              <span className={errors.confirmOver18 ? "checkbox-text-error" : ""}>
+                I confirm that I am at least 18 years old.
+              </span>
+            </label>
+
+            <label className="register-checkbox-row">
+              <input
+                type="checkbox"
                 name="agreeToTerms"
                 checked={formData.agreeToTerms}
                 onChange={handleChange}
@@ -593,7 +613,11 @@ function RegisterPage() {
               </span>
             </label>
 
-            <button type="submit" className="register-submit-btn">
+            <button
+              type="submit"
+              className="register-submit-btn"
+              disabled={!formData.confirmOver18 || !formData.agreeToTerms}
+            >
               Create Account
               <span className="register-arrow">→</span>
             </button>

@@ -1,0 +1,174 @@
+import { getApiBaseUrl } from "./auth";
+
+function apiUrl(path) {
+  const base = (getApiBaseUrl() || "").replace(/\/$/, "");
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return base ? `${base}${p}` : p;
+}
+
+async function parseJson(res) {
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const msg = data?.error || data?.message || `Request failed (${res.status})`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+export const REPORT_REASONS = [
+  { value: "MISLEADING_INFO", label: "Misleading information" },
+  { value: "INAPPROPRIATE_CONTENT", label: "Inappropriate content" },
+  { value: "ANIMAL_WELFARE_CONCERN", label: "Animal welfare concern" },
+  { value: "DUPLICATE_LISTING", label: "Duplicate listing" },
+  { value: "OTHER", label: "Other" }
+];
+
+export async function submitListingReport({ reporterUserId, animalId, reason, note }) {
+  const res = await fetch(apiUrl("/api/reports"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reporterUserId, animalId, reason, note })
+  });
+  return parseJson(res);
+}
+
+export async function fetchPendingReports(adminEmail) {
+  const res = await fetch(
+    apiUrl(`/api/admin/moderation/reports?adminEmail=${encodeURIComponent(adminEmail)}`)
+  );
+  return parseJson(res);
+}
+
+export async function adminArchiveListing(animalId, adminEmail, reason) {
+  const res = await fetch(apiUrl(`/api/admin/moderation/listings/${animalId}/archive`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminEmail, reason })
+  });
+  return parseJson(res);
+}
+
+export async function adminDeleteListing(animalId, adminEmail, reason) {
+  const res = await fetch(apiUrl(`/api/admin/moderation/listings/${animalId}/delete`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adminEmail, reason })
+  });
+  return parseJson(res);
+}
+
+export async function resolveReport(reportId, adminEmail) {
+  const res = await fetch(
+    apiUrl(
+      `/api/admin/moderation/reports/${reportId}/resolve?adminEmail=${encodeURIComponent(adminEmail)}`
+    ),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export async function saveAnimalForUser(userId, animalId) {
+  const res = await fetch(
+    apiUrl(`/api/saved?userId=${userId}&animalId=${animalId}`),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export async function unsaveAnimalForUser(userId, animalId) {
+  const res = await fetch(
+    apiUrl(`/api/saved?userId=${userId}&animalId=${animalId}`),
+    { method: "DELETE" }
+  );
+  return parseJson(res);
+}
+
+export async function fetchSavedAnimalIds(userId) {
+  const res = await fetch(apiUrl(`/api/saved/${userId}`));
+  const animals = await parseJson(res);
+  return (Array.isArray(animals) ? animals : []).map((a) => Number(a.id));
+}
+
+export async function createListingInquiry({ adopterUserId, animalId, message }) {
+  const res = await fetch(apiUrl("/api/inquiries"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ adopterUserId, animalId, message })
+  });
+  return parseJson(res);
+}
+
+export async function fetchOwnerInquiries(ownerId) {
+  const res = await fetch(apiUrl(`/api/inquiries/owner/${ownerId}`));
+  return parseJson(res);
+}
+
+export async function fetchAdopterInquiries(adopterId) {
+  const res = await fetch(apiUrl(`/api/inquiries/adopter/${adopterId}`));
+  return parseJson(res);
+}
+
+export async function fetchInquiryThread(inquiryId, viewerId) {
+  const res = await fetch(
+    apiUrl(`/api/inquiries/${inquiryId}?viewerId=${viewerId}`)
+  );
+  return parseJson(res);
+}
+
+export async function acceptInquiry(inquiryId, ownerId) {
+  const res = await fetch(
+    apiUrl(`/api/inquiries/${inquiryId}/accept?ownerId=${ownerId}`),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export async function rejectInquiry(inquiryId, ownerId) {
+  const res = await fetch(
+    apiUrl(`/api/inquiries/${inquiryId}/reject?ownerId=${ownerId}`),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export async function sendInquiryMessage(inquiryId, { userId, senderRole, body }) {
+  const res = await fetch(apiUrl(`/api/inquiries/${inquiryId}/messages`), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, senderRole, body })
+  });
+  return parseJson(res);
+}
+
+export async function fetchAdopterRequestForInquiry(inquiryId, ownerId) {
+  const res = await fetch(
+    apiUrl(`/api/inquiries/${inquiryId}/adopter-request?ownerId=${ownerId}`)
+  );
+  return parseJson(res);
+}
+
+export async function archiveOwnerListing(animalId, viewerId) {
+  const res = await fetch(
+    apiUrl(`/api/animals/${animalId}/archive?viewerId=${viewerId}`),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export async function unarchiveOwnerListing(animalId, viewerId) {
+  const res = await fetch(
+    apiUrl(`/api/animals/${animalId}/unarchive?viewerId=${viewerId}`),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export function formatListingCode(animal) {
+  if (animal?.listingCode) {
+    return animal.listingCode;
+  }
+  if (animal?.id != null) {
+    return `^PAV${String(animal.id).padStart(6, "0")}`;
+  }
+  return "";
+}

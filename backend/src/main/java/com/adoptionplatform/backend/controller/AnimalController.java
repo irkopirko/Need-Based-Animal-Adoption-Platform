@@ -118,6 +118,30 @@ public class AnimalController {
         }
     }
 
+    @PostMapping("/{id}/archive")
+    public ResponseEntity<?> archiveListing(
+            @PathVariable Long id,
+            @RequestParam("viewerId") Long viewerId
+    ) {
+        try {
+            return ResponseEntity.ok(animalService.archiveListing(id, viewerId));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/unarchive")
+    public ResponseEntity<?> unarchiveListing(
+            @PathVariable Long id,
+            @RequestParam("viewerId") Long viewerId
+    ) {
+        try {
+            return ResponseEntity.ok(animalService.unarchiveListing(id, viewerId));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteAnimal(
             @PathVariable Long id,

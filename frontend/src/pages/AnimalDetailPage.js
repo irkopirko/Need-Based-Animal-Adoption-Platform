@@ -3,18 +3,25 @@ import { useParams, useNavigate } from "react-router-dom";
 import "./AnimalDetailPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import ReportListingModal from "../components/ReportListingModal";
+import ContactOwnerModal from "../components/ContactOwnerModal";
 import { usePopup } from "../components/PopupProvider";
 import {
   STRONG_MATCH_THRESHOLD,
   resolveMediaUrl
 } from "../utils/adopterJourney";
-import { recordOwnerInquiry } from "../utils/ownerJourney";
 import {
   getApiBaseUrl,
   getResolvedUserId,
   getStoredUser,
   normalizeRole
 } from "../utils/auth";
+import {
+  fetchSavedAnimalIds,
+  formatListingCode,
+  saveAnimalForUser,
+  unsaveAnimalForUser
+} from "../utils/platformApi";
 
 function AnimalDetailPage() {
   const user = getStoredUser();
@@ -25,10 +32,13 @@ function AnimalDetailPage() {
   const [animal, setAnimal] = useState(null);
   const [selectedImage, setSelectedImage] = useState("");
   const [saved, setSaved] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
 
   const role = normalizeRole(user?.role);
   const isOwner = role === "OWNER";
   const isAdopter = role === "ADOPTER";
+  const adopterUid = getResolvedUserId(user);
 
   useEffect(() => {
     const fetchAnimal = async () => {
@@ -47,62 +57,64 @@ function AnimalDetailPage() {
     fetchAnimal();
   }, [id]);
 
-  const handleSave = () => {
-    setSaved(!saved);
+  useEffect(() => {
+    if (!isAdopter || adopterUid == null || !animal?.id) {
+      return;
+    }
+    let cancelled = false;
+    fetchSavedAnimalIds(adopterUid)
+      .then((ids) => {
+        if (!cancelled) {
+          setSaved(ids.includes(Number(animal.id)));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdopter, adopterUid, animal?.id]);
+
+  const handleSave = async () => {
+    if (adopterUid == null || !animal?.id) {
+      return;
+    }
+    try {
+      if (saved) {
+        await unsaveAnimalForUser(adopterUid, animal.id);
+        setSaved(false);
+        showPopup({
+          type: "info",
+          title: "Removed",
+          message: "Removed from saved animals."
+        });
+      } else {
+        await saveAnimalForUser(adopterUid, animal.id);
+        setSaved(true);
+        showPopup({
+          type: "success",
+          title: "Saved",
+          message: "Animal added to your saved list."
+        });
+      }
+    } catch (e) {
+      showPopup({
+        type: "error",
+        title: "Could not update",
+        message: e.message || "Try again."
+      });
+    }
   };
 
-  const handleGetInContact = () => {
-    const adopterUid = getResolvedUserId(user);
-    if (!animal?.ownerId || adopterUid == null) {
-      showPopup({
-        type: "error",
-        title: "Cannot send",
-        message: "Missing owner or account information."
-      });
-      return;
-    }
-    const adopterName =
-      user.firstName ||
-      user.fullName ||
-      user.name ||
-      user.email ||
-      "Adopter";
-    const res = recordOwnerInquiry({
-      ownerId: animal.ownerId,
-      adopterUserId: adopterUid,
-      adopterName,
-      animalId: animal.id,
-      animalName: animal.name,
-      summary: `Interested in ${animal.name} — sent from animal profile.`
-    });
-    if (!res.ok) {
-      if (res.error === "duplicate") {
-        showPopup({
-          type: "warning",
-          title: "Already sent",
-          message: "You already sent an inquiry for this animal."
-        });
-        return;
-      }
-      showPopup({
-        type: "error",
-        title: "Could not send",
-        message: res.error || "Try again."
-      });
-      return;
-    }
-    showPopup({
-      type: "success",
-      title: "Inquiry sent",
-      message: "The owner can see this under Manage requests and Messages."
-    });
-  };
+  const isStrongMatch =
+    animal?.compatibilityScore != null &&
+    Math.round(animal.compatibilityScore) >= STRONG_MATCH_THRESHOLD;
 
   if (!animal) {
     return <div className="loading">Loading...</div>;
   }
 
   const apiBase = getApiBaseUrl();
+  const listingCode = formatListingCode(animal);
 
   return (
     <div className="animal-detail-page">
@@ -126,6 +138,16 @@ function AnimalDetailPage() {
                 >
                   No photo
                 </div>
+              )}
+              {isAdopter && (
+                <button
+                  type="button"
+                  className={`animal-detail-heart-btn ${saved ? "is-saved" : ""}`}
+                  onClick={handleSave}
+                  aria-label={saved ? "Unsave animal" : "Save animal"}
+                >
+                  {saved ? "♥" : "♡"}
+                </button>
               )}
               <div className="animal-detail-image-topbar">
                 <span className="animal-detail-status-badge">
@@ -161,6 +183,11 @@ function AnimalDetailPage() {
           </div>
 
           <div className="animal-detail-hero-right">
+            {listingCode && (
+              <p className="animal-listing-code" title="Listing ID">
+                {listingCode}
+              </p>
+            )}
             <h1>{animal.name}</h1>
             <p className="animal-breed">
               {animal.breed} • {animal.animalType}
@@ -168,7 +195,7 @@ function AnimalDetailPage() {
 
             {isAdopter && animal.compatibilityScore != null && (
               <p className="animal-compatibility-threshold-note">
-                {(animal.compatibilityScore ?? 0) >= STRONG_MATCH_THRESHOLD
+                {isStrongMatch
                   ? `Strong match — ${Math.round(
                       animal.compatibilityScore
                     )}% compatibility (platform uses ≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`
@@ -198,20 +225,24 @@ function AnimalDetailPage() {
                   >
                     Send Adoption Request
                   </button>
-                  {animal.ownerId != null &&
-                    animal.compatibilityScore != null &&
-                    Math.round(animal.compatibilityScore) >=
-                      STRONG_MATCH_THRESHOLD && (
-                      <button
-                        type="button"
-                        className="secondary-btn animal-detail-contact-btn"
-                        onClick={handleGetInContact}
-                      >
-                        Get in contact with owner
-                      </button>
-                    )}
-                  <button className="secondary-btn" onClick={handleSave}>
-                    {saved ? "Saved ✓" : "Save Animal"}
+                  {animal.ownerId != null && isStrongMatch && (
+                    <button
+                      type="button"
+                      className="secondary-btn animal-detail-contact-btn"
+                      onClick={() => setContactOpen(true)}
+                    >
+                      Contact owner
+                    </button>
+                  )}
+                  <button type="button" className="secondary-btn" onClick={handleSave}>
+                    {saved ? "Saved ✓" : "Save animal"}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary-btn animal-detail-report-btn"
+                    onClick={() => setReportOpen(true)}
+                  >
+                    Report listing
                   </button>
                 </>
               )}
@@ -230,12 +261,31 @@ function AnimalDetailPage() {
                   >
                     Manage Requests
                   </button>
+                  <button
+                    className="secondary-btn"
+                    onClick={() => navigate("/owner-messages")}
+                  >
+                    Inquiries
+                  </button>
                 </>
               )}
             </div>
           </div>
         </section>
       </main>
+
+      <ReportListingModal
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        animalId={Number(animal.id)}
+        reporterUserId={adopterUid}
+      />
+      <ContactOwnerModal
+        open={contactOpen}
+        onClose={() => setContactOpen(false)}
+        animal={animal}
+        adopterUserId={adopterUid}
+      />
 
       <Footer />
     </div>

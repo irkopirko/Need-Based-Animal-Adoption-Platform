@@ -174,7 +174,9 @@ function Verify2FAPage() {
         message: "You have logged in successfully."
       });
 
-      if (resolvedRole === "ADOPTER" && !adopterProfileCompleted) {
+      if (resolvedRole === "ADMIN") {
+        navigate("/adminhomepage", { replace: true });
+      } else if (resolvedRole === "ADOPTER" && !adopterProfileCompleted) {
         navigate("/complete-adopter-profile", { replace: true });
       } else if (resolvedRole === "OWNER" && !ownerProfileCompleted) {
         navigate("/complete-owner-profile", { replace: true });

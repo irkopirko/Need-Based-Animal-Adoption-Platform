@@ -258,6 +258,38 @@
   box-shadow: 0 10px 24px rgba(16, 24, 16, 0.03);
 }
 
+.compatible-heart-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #ccc;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.compatible-heart-btn.is-saved {
+  color: #e74c3c;
+}
+
+.compatible-secondary-outline-btn {
+  flex: 1;
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid #d8ded6;
+  background: #fff;
+  color: #616861;
+}
+
 .compatible-card-image-wrap {
   position: relative;
   width: 100%;
