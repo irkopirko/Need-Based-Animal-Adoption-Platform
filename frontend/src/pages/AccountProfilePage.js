@@ -695,6 +695,14 @@ function AccountProfilePage() {
                 <button
                   type="button"
                   className="account-btn account-btn-ghost"
+                  onClick={() => navigate("/account/change-password")}
+                  disabled={saving}
+                >
+                  Change password
+                </button>
+                <button
+                  type="button"
+                  className="account-btn account-btn-ghost"
                   onClick={() => navigate(-1)}
                   disabled={saving}
                 >

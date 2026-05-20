@@ -1,6 +1,7 @@
 package com.adoptionplatform.backend.service;
 
 import com.adoptionplatform.backend.config.AdminConfig;
+import com.adoptionplatform.backend.dto.ChangePasswordRequest;
 import com.adoptionplatform.backend.dto.DeleteAccountRequest;
 import com.adoptionplatform.backend.dto.LoginRequest;
 import com.adoptionplatform.backend.dto.RegisterRequest;
@@ -633,6 +634,70 @@ public class AuthService {
         pendingPasswordResets.remove(email);
 
         response.put("message", "Password updated successfully.");
+        return response;
+    }
+
+    public Map<String, String> changePassword(ChangePasswordRequest request) {
+        Map<String, String> response = new HashMap<>();
+        if (request == null || request.getUserId() == null) {
+            response.put("error", "User id is required");
+            return response;
+        }
+
+        String currentPassword = request.getCurrentPassword() == null ? "" : request.getCurrentPassword();
+        String newPassword = request.getNewPassword() == null ? "" : request.getNewPassword();
+        String confirmPassword = request.getConfirmPassword() == null ? "" : request.getConfirmPassword();
+
+        if (currentPassword.trim().isEmpty() || newPassword.trim().isEmpty() || confirmPassword.trim().isEmpty()) {
+            response.put("error", "Current password, new password, and confirmation are required.");
+            return response;
+        }
+
+        Optional<User> userOptional = userRepository.findById(request.getUserId());
+        if (userOptional.isEmpty()) {
+            response.put("error", "User not found");
+            return response;
+        }
+
+        User user = userOptional.get();
+        String storedPassword = user.getPassword() == null ? "" : user.getPassword();
+
+        boolean currentMatches;
+        if (storedPassword.startsWith("$2a$") || storedPassword.startsWith("$2b$")) {
+            currentMatches = passwordEncoder.matches(currentPassword, storedPassword);
+        } else {
+            currentMatches = storedPassword.equals(currentPassword);
+            if (currentMatches) {
+                user.setPassword(passwordEncoder.encode(currentPassword));
+                userRepository.save(user);
+            }
+        }
+
+        if (!currentMatches) {
+            response.put("error", "Current password is incorrect.");
+            return response;
+        }
+
+        if (!newPassword.equals(confirmPassword)) {
+            response.put("error", "New passwords do not match.");
+            return response;
+        }
+
+        if (currentPassword.equals(newPassword)) {
+            response.put("error", "New password must be different from current password.");
+            return response;
+        }
+
+        String passwordValidationError = getPasswordValidationError(newPassword);
+        if (passwordValidationError != null) {
+            response.put("error", passwordValidationError);
+            return response;
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        response.put("message", "Password changed successfully.");
         return response;
     }
 

@@ -25,6 +25,7 @@ import CompleteOwnerProfilePage from "./pages/CompleteOwnerProfilePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminHomePage from "./pages/AdminHomePage";
+import ChangePasswordPage from "./pages/ChangePasswordPage";
 import { PopupProvider } from "./components/PopupProvider";
 
 
@@ -41,6 +42,7 @@ function App() {
           <Route path="/reset-password/new" element={<ResetPasswordPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/account" element={<AccountProfilePage />} />
+          <Route path="/account/change-password" element={<ChangePasswordPage />} />
           <Route path="/adopterhomepage" element={<AdopterHomePage />} />
           <Route path="/ownerhomepage" element={<OwnerHomePage />} />
           <Route path="/adminhomepage" element={<AdminHomePage />} />
