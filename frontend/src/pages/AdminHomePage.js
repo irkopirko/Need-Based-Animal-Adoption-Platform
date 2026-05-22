@@ -153,6 +153,13 @@ function AdminHomePage() {
                   />
                 </label>
                 <div className="admin-report-actions">
+                  <button
+                    type="button"
+                    className="admin-btn-view"
+                    onClick={() => navigate(`/animal/${r.animalId}?from=admin`)}
+                  >
+                    View listing details
+                  </button>
                   <button type="button" className="admin-btn-archive" onClick={() => handleArchive(r)}>
                     Archive listing
                   </button>

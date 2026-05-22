@@ -46,9 +46,6 @@ public class AnimalService {
     private static final String SQL_ANIMAL_IDS_BY_OWNER = "SELECT id FROM animals WHERE owner_id = ?";
     private static final Pattern API_IMAGE_PATH =
             Pattern.compile("/api/animals/(\\d+)/images/(\\d+)");
-    private static final Pattern DESCRIPTION_SENTENCE_START =
-            Pattern.compile("(^|[.!?]\\s+)(\\p{L})");
-    private static final Locale TEXT_LOCALE = Locale.forLanguageTag("tr-TR");
     private static final int MAX_JPEG_BYTES = 5 * 1024 * 1024;
 
     private final AnimalRepository animalRepository;
@@ -224,60 +221,6 @@ public class AnimalService {
                 // Archive succeeds even if email delivery fails.
             }
         });
-    }
-
-    static String requireAnimalGender(String raw) {
-        if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("Animal gender is required (Male or Female)");
-        }
-        String g = raw.trim().toUpperCase(Locale.ROOT);
-        if ("MALE".equals(g) || "M".equals(g)) {
-            return "MALE";
-        }
-        if ("FEMALE".equals(g) || "F".equals(g)) {
-            return "FEMALE";
-        }
-        throw new IllegalArgumentException("Animal gender must be Male or Female");
-    }
-
-    static String capitalizeWords(String value) {
-        if (value == null || value.isBlank()) {
-            return value;
-        }
-        String[] parts = value.trim().split("\\s+");
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                sb.append(' ');
-            }
-            String word = parts[i];
-            if (word.isEmpty()) {
-                continue;
-            }
-            String lower = word.toLowerCase(TEXT_LOCALE);
-            sb.append(Character.toUpperCase(lower.charAt(0)));
-            if (lower.length() > 1) {
-                sb.append(lower.substring(1));
-            }
-        }
-        return sb.toString();
-    }
-
-    static String capitalizeDescription(String value) {
-        if (value == null || value.isBlank()) {
-            return value;
-        }
-        String trimmed = value.trim();
-        Matcher matcher = DESCRIPTION_SENTENCE_START.matcher(trimmed);
-        StringBuilder out = new StringBuilder();
-        while (matcher.find()) {
-            matcher.appendReplacement(
-                    out,
-                    matcher.group(1)
-                            + matcher.group(2).toUpperCase(TEXT_LOCALE));
-        }
-        matcher.appendTail(out);
-        return out.toString();
     }
 
     static String normalizeListingStatus(String raw) {
@@ -570,11 +513,8 @@ public class AnimalService {
         existingAnimal.setSpecialNeeds(updatedAnimal.getSpecialNeeds());
         existingAnimal.setGoodWithChildren(updatedAnimal.getGoodWithChildren());
         existingAnimal.setGoodWithPets(updatedAnimal.getGoodWithPets());
-        existingAnimal.setDescription(capitalizeDescription(updatedAnimal.getDescription()));
+        existingAnimal.setDescription(updatedAnimal.getDescription());
         existingAnimal.setHousingLocation(updatedAnimal.getHousingLocation());
-        if (updatedAnimal.getGender() != null && !updatedAnimal.getGender().isBlank()) {
-            existingAnimal.setGender(requireAnimalGender(updatedAnimal.getGender()));
-        }
         existingAnimal.setListingStatus(normalizeListingStatus(updatedAnimal.getListingStatus()));
         existingAnimal.setCompatibilityScore(updatedAnimal.getCompatibilityScore());
         reconcileImageUrls(existingAnimal, updatedAnimal.getImages());
@@ -617,9 +557,8 @@ public class AnimalService {
         animal.setGoodWithPets(request.getGoodWithPets());
         animal.setGroomingNeed(request.getGroomingNeed());
         animal.setSpecialNeeds(request.getSpecialNeeds());
-        animal.setDescription(capitalizeDescription(request.getDescription()));
+        animal.setDescription(request.getDescription());
         animal.setHousingLocation(request.getHousingLocation());
-        animal.setGender(requireAnimalGender(request.getGender()));
 
         Animal saved = animalRepository.save(animal);
         ensureOwnerListingInSavedAnimals(saved);
@@ -700,45 +639,8 @@ public class AnimalService {
 
     @Transactional
     public void deleteAnimal(Long id, Long viewerId) {
-        Animal animal = assertAnimalOwnedBy(id, viewerId);
-        Long animalId = animal.getId();
-        String animalName = animal.getName();
-        Long ownerUserId = animal.getOwnerId();
-
-        matchSnapshotRepository.deleteByAnimalId(animalId);
-        savedAnimalRepository.deleteByAnimalIdIn(List.of(animalId));
-        purgeListingDependents(animalId);
-        animalRepository.delete(animal);
-
-        notifyOwnerListingDeleted(ownerUserId, animalName);
-    }
-
-    private void purgeListingDependents(Long animalId) {
-        jdbcTemplate.update(
-                "DELETE FROM inquiry_messages WHERE inquiry_id IN "
-                        + "(SELECT id FROM listing_inquiries WHERE animal_id = ?)",
-                animalId
-        );
-        jdbcTemplate.update("DELETE FROM adoption_cases WHERE animal_id = ?", animalId);
-        jdbcTemplate.update("DELETE FROM listing_inquiries WHERE animal_id = ?", animalId);
-        jdbcTemplate.update("DELETE FROM listing_reports WHERE animal_id = ?", animalId);
-        jdbcTemplate.update("DELETE FROM animal_images WHERE animal_id = ?", animalId);
-    }
-
-    private void notifyOwnerListingDeleted(Long ownerUserId, String animalName) {
-        if (ownerUserId == null) {
-            return;
-        }
-        userRepository.findById(ownerUserId).ifPresent(owner -> {
-            String email = owner.getEmail();
-            if (email == null || email.isBlank()) {
-                return;
-            }
-            try {
-                emailService.sendOwnerListingDeletedNotice(email.trim(), animalName);
-            } catch (RuntimeException ex) {
-                // Deletion succeeds even if email delivery fails.
-            }
-        });
+        assertAnimalOwnedBy(id, viewerId);
+        savedAnimalRepository.deleteByAnimalIdIn(List.of(id));
+        animalRepository.deleteById(id);
     }
 }

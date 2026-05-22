@@ -53,6 +53,8 @@ function AnimalDetailPage() {
   const role = normalizeRole(user?.role);
   const isOwner = role === "OWNER";
   const isAdopter = role === "ADOPTER";
+  const isAdmin = role === "ADMIN";
+  const fromAdmin = searchParams.get("from") === "admin";
   const viewerUid = getResolvedUserId(user);
   const adopterUid = viewerUid;
 
@@ -237,6 +239,17 @@ function AnimalDetailPage() {
       <Navbar />
 
       <main className="animal-detail-main">
+        {isAdmin && fromAdmin && (
+          <p className="animal-detail-admin-back">
+            <button
+              type="button"
+              className="animal-detail-admin-back-btn"
+              onClick={() => navigate("/adminhomepage")}
+            >
+              ← Back to moderation
+            </button>
+          </p>
+        )}
         <section className="animal-detail-hero">
           <div className="animal-detail-hero-left">
             <div className="animal-detail-main-image-wrap">

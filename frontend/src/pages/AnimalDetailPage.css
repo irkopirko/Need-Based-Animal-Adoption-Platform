@@ -11,6 +11,25 @@
   padding: 0 20px;
 }
 
+.animal-detail-admin-back {
+  margin: 0 0 1rem;
+}
+
+.animal-detail-admin-back-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #2c6e49;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.animal-detail-admin-back-btn:hover {
+  color: #1e4d33;
+}
+
 .animal-detail-hero {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;

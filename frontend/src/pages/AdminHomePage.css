@@ -97,6 +97,11 @@
   font-size: 0.85rem;
 }
 
+.admin-btn-view {
+  background: #2c6e49;
+  color: #fff;
+}
+
 .admin-btn-archive {
   background: #f0ad4e;
   color: #1a1a1a;

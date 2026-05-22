@@ -73,19 +73,6 @@ public class EmailService {
         sendHtmlEmail(recipientEmail, subject, inner);
     }
 
-    public void sendOwnerListingDeletedNotice(String recipientEmail, String animalName) {
-        String safeName = animalName == null || animalName.isBlank() ? "your animal" : animalName.trim();
-        String subject = "Your listing was removed from Pavia";
-        String inner = "We are sorry that you are deleting <strong>" + escapeHtml(safeName)
-                + "</strong>&rsquo;s listing.<br/><br/>"
-                + "Your listing has been permanently removed from Pavia. "
-                + "We know this can be a difficult decision, and we appreciate the care you have shown along the way.<br/><br/>"
-                + "If you wish, you can easily list a new listing for <strong>" + escapeHtml(safeName)
-                + "</strong> whenever you are ready — every new listing is another step toward helping them find their forever home.<br/><br/>"
-                + "Thank you for being part of the Pavia community.";
-        sendHtmlEmail(recipientEmail, subject, inner);
-    }
-
     public void sendOwnerListingArchivedNotice(
             String recipientEmail,
             String animalName,
@@ -94,105 +81,17 @@ public class EmailService {
     ) {
         String safeName = animalName == null || animalName.isBlank() ? "your listing" : animalName.trim();
         String safeCode = listingCode == null || listingCode.isBlank() ? "" : listingCode.trim();
-        String idLabel = listingId == null ? "—" : String.valueOf(listingId);
-        String subject = "Your listing was archived successfully";
-        String inner = "We have successfully archived your listing with ID <strong>" + escapeHtml(idLabel)
-                + "</strong>.<br/><br/>"
-                + "<strong>" + escapeHtml(safeName) + "</strong>"
+        String subject = "Your Pavia listing was archived successfully";
+        String inner = "Your listing <strong>" + escapeHtml(safeName) + "</strong>"
                 + (safeCode.isEmpty() ? "" : " (" + escapeHtml(safeCode) + ")")
-                + " is now hidden from compatibility matching for adopters.<br/><br/>"
-                + "You can restore it at any time from <strong>Listed animals → Archived</strong> "
-                + "in your owner dashboard.";
-        sendHtmlEmail(recipientEmail, subject, inner);
-    }
-
-    public void sendOwnerNewMessageRequestNotice(
-            String recipientEmail,
-            String adopterDisplayName,
-            String animalName,
-            String listingCode,
-            Long listingId,
-            String messagePreview
-    ) {
-        String safeAdopter = adopterDisplayName == null || adopterDisplayName.isBlank()
-                ? "An adopter"
-                : adopterDisplayName.trim();
-        String safeName = animalName == null || animalName.isBlank() ? "your listing" : animalName.trim();
-        String safeCode = listingCode == null || listingCode.isBlank() ? "" : listingCode.trim();
-        String idLabel = listingId == null ? "—" : String.valueOf(listingId);
-        String preview = truncatePreview(messagePreview, 500);
-        String subject = "New message request on your Pavia listing";
-        String inner = "Someone is interested in your listing with ID <strong>" + escapeHtml(idLabel)
-                + "</strong>.<br/><br/>"
-                + "<strong>Listing:</strong> " + escapeHtml(safeName)
-                + (safeCode.isEmpty() ? "" : " (" + escapeHtml(safeCode) + ")")
-                + "<br/>"
-                + "<strong>From:</strong> " + escapeHtml(safeAdopter)
-                + "<br/><br/>"
-                + "<strong>Message preview:</strong>"
-                + previewBlock(preview)
-                + "<br/>Sign in to Pavia to review the full adoption profile, approve or decline the request, "
-                + "and reply from <strong>Messages</strong> or <strong>Manage requests</strong>.";
-        sendHtmlEmail(recipientEmail, subject, inner);
-    }
-
-    public void sendAdopterInquiryAcceptedNotice(
-            String recipientEmail,
-            String animalName,
-            String listingCode,
-            Long listingId
-    ) {
-        String safeName = animalName == null || animalName.isBlank() ? "this listing" : animalName.trim();
-        String safeCode = listingCode == null || listingCode.isBlank() ? "" : listingCode.trim();
-        String idLabel = listingId == null ? "—" : String.valueOf(listingId);
-        String subject = "Your message request was accepted";
-        String inner = "The owner has accepted your message request for <strong>" + escapeHtml(safeName)
-                + "</strong> on Pavia.<br/><br/>"
-                + "<strong>Listing ID:</strong> " + escapeHtml(idLabel)
-                + (safeCode.isEmpty() ? "" : "<br/><strong>Listing code:</strong> " + escapeHtml(safeCode))
-                + "<br/><br/>"
-                + "You can continue the conversation from <strong>Messages</strong> in your adopter dashboard.";
-        sendHtmlEmail(recipientEmail, subject, inner);
-    }
-
-    public void sendOwnerListingAdoptedThankYouNotice(
-            String recipientEmail,
-            String animalName,
-            String listingCode,
-            Long listingId
-    ) {
-        String safeName = animalName == null || animalName.isBlank() ? "your animal" : animalName.trim();
-        String safeCode = listingCode == null || listingCode.isBlank() ? "" : listingCode.trim();
-        String listingLabel = safeCode.isEmpty()
-                ? escapeHtml(safeName)
-                : escapeHtml(safeName) + " (" + escapeHtml(safeCode) + ")";
-        String subject = "Thank you for helping " + safeName + " find a forever home";
-        String inner = "<strong>Thank you for using Pavia!</strong><br/><br/>"
-                + "Thank you for helping <strong>" + listingLabel + "</strong> find their forever home.<br/><br/>"
-                + "View your listing and message history anytime from "
-                + "<strong>My animal listings &rarr; Adopted</strong> in your owner dashboard.";
-        sendHtmlEmail(recipientEmail, subject, inner);
-    }
-
-    private static String previewBlock(String preview) {
-        String safe = preview == null || preview.isBlank()
-                ? "<em>No message text provided.</em>"
-                : escapeHtml(preview).replace("\n", "<br/>");
-        return "<blockquote style=\"margin:12px 0 0;padding:12px 14px;background:#f4f7f5;"
-                + "border-left:4px solid #22c55e;border-radius:6px;font-size:14px;color:#374151;\">"
-                + safe
-                + "</blockquote>";
-    }
-
-    private static String truncatePreview(String text, int maxLen) {
-        if (text == null) {
-            return "";
+                + " has been archived successfully.<br/><br/>"
+                + "It will no longer appear in compatibility matching for adopters. "
+                + "You can restore it anytime from <strong>Listed animals → Archived</strong> "
+                + "in your owner menu.";
+        if (listingId != null) {
+            inner += "<br/><br/>Listing ID: " + listingId;
         }
-        String trimmed = text.trim();
-        if (trimmed.length() <= maxLen) {
-            return trimmed;
-        }
-        return trimmed.substring(0, maxLen) + "…";
+        sendHtmlEmail(recipientEmail, subject, inner);
     }
 
     public void sendListingModerationNotice(
