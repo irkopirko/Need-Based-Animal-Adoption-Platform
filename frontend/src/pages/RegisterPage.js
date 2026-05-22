@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./RegisterPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import ProvinceDistrictFields from "../components/ProvinceDistrictFields";
 import {
   getApiBaseUrl,
   getMissingPasswordRequirements,
@@ -11,8 +12,7 @@ import {
   isValidTurkishMobileInput
 } from "../utils/auth";
 import { usePopup } from "../components/PopupProvider";
-import { TURKEY_PROVINCES } from "../data/turkeyProvinces";
-import { fetchDistrictsForProvince } from "../data/turkeyGeoApi";
+import { buildLocationFromIdsAsync } from "../utils/turkeyLocation";
 
 function AdopterRoleIcon() {
   return (
@@ -60,7 +60,6 @@ function RegisterPage() {
     password: "",
     provinceId: "",
     districtId: "",
-    districtManual: "",
     phone: "",
     confirmOver18: false,
     agreeToTerms: false
@@ -78,47 +77,7 @@ function RegisterPage() {
     agreeToTerms: false
   });
 
-  const [districts, setDistricts] = useState([]);
-  const [districtLoading, setDistrictLoading] = useState(false);
-  const [districtLoadError, setDistrictLoadError] = useState(false);
-
   const missingPasswordRequirements = getMissingPasswordRequirements(formData.password);
-
-  useEffect(() => {
-    const pid = formData.provinceId;
-
-    if (!pid) {
-      setDistricts([]);
-      setDistrictLoadError(false);
-      return;
-    }
-
-    let cancelled = false;
-    setDistrictLoading(true);
-    setDistrictLoadError(false);
-
-    fetchDistrictsForProvince(Number(pid))
-      .then((list) => {
-        if (!cancelled) {
-          setDistricts(list);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDistricts([]);
-          setDistrictLoadError(true);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setDistrictLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [formData.provinceId]);
 
   const formatPhoneBody = (value) => {
     let digits = value.replace(/\D/g, "");
@@ -156,34 +115,7 @@ function RegisterPage() {
       return;
     }
 
-    if (name === "provinceId") {
-      setFormData({
-        ...formData,
-        provinceId: value,
-        districtId: "",
-        districtManual: ""
-      });
-
-      setErrors({
-        ...errors,
-        province: false,
-        district: false
-      });
-
-      return;
-    }
-
-    if (name === "districtId" || name === "districtManual") {
-      setFormData({
-        ...formData,
-        [name]: value
-      });
-
-      setErrors({
-        ...errors,
-        district: false
-      });
-
+    if (name === "provinceId" || name === "districtId") {
       return;
     }
 
@@ -245,15 +177,7 @@ function RegisterPage() {
       hasError = true;
     }
 
-    let districtOk = false;
-
-    if (districtLoadError) {
-      districtOk = formData.districtManual.trim().length > 0;
-    } else {
-      districtOk = Boolean(formData.districtId);
-    }
-
-    if (!districtOk) {
+    if (!formData.districtId) {
       newErrors.district = true;
       hasError = true;
     }
@@ -286,21 +210,22 @@ function RegisterPage() {
       return;
     }
 
-    const provinceName =
-      TURKEY_PROVINCES.find((p) => String(p.id) === String(formData.provinceId))?.name ||
-      "";
-
-    let districtName = "";
-
-    if (districtLoadError) {
-      districtName = formData.districtManual.trim();
-    } else {
-      districtName =
-        districts.find((d) => String(d.id) === String(formData.districtId))?.name || "";
+    const location = await buildLocationFromIdsAsync(
+      formData.provinceId,
+      formData.districtId
+    );
+    if (!location) {
+      setErrors((prev) => ({ ...prev, province: true, district: true }));
+      showPopup({
+        type: "warning",
+        title: "District list unavailable",
+        message:
+          "Could not load districts for your province. Use “Retry loading districts” below the district field, then select from the list."
+      });
+      return;
     }
 
     const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
-    const location = `${provinceName} / ${districtName}`;
 
     const userData = {
       role,
@@ -497,59 +422,25 @@ function RegisterPage() {
                 </div>
               </div>
 
-              <div className="register-input-group">
-                <label htmlFor="provinceId">Province</label>
-                <select
-                  id="provinceId"
-                  name="provinceId"
-                  value={formData.provinceId}
-                  onChange={handleChange}
-                  className={`register-select ${errors.province ? "input-error" : ""}`}
-                >
-                  <option value="">Select a province</option>
-                  {TURKEY_PROVINCES.map((p) => (
-                    <option key={p.id} value={String(p.id)}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="register-input-group">
-                <label htmlFor="districtId">District</label>
-
-                {districtLoadError ? (
-                  <input
-                    id="districtManual"
-                    type="text"
-                    name="districtManual"
-                    placeholder="Type your district"
-                    value={formData.districtManual}
-                    onChange={handleChange}
-                    className={errors.district ? "input-error" : ""}
-                    autoComplete="address-level3"
-                  />
-                ) : (
-                  <select
-                    id="districtId"
-                    name="districtId"
-                    value={formData.districtId}
-                    onChange={handleChange}
-                    disabled={!formData.provinceId || districtLoading}
-                    className={`register-select ${errors.district ? "input-error" : ""}`}
-                  >
-                    <option value="">
-                      {districtLoading ? "Loading…" : "Select a district"}
-                    </option>
-
-                    {districts.map((d) => (
-                      <option key={d.id} value={String(d.id)}>
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
+              <ProvinceDistrictFields
+                provinceId={formData.provinceId}
+                districtId={formData.districtId}
+                onProvinceChange={(id) => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    provinceId: id,
+                    districtId: ""
+                  }));
+                  setErrors((prev) => ({ ...prev, province: false, district: false }));
+                }}
+                onDistrictChange={(id) => {
+                  setFormData((prev) => ({ ...prev, districtId: id }));
+                  setErrors((prev) => ({ ...prev, district: false }));
+                }}
+                selectClassName="register-select"
+                errorProvince={errors.province}
+                errorDistrict={errors.district}
+              />
             </div>
 
             <div className="register-input-group register-full-width-group register-password-block">

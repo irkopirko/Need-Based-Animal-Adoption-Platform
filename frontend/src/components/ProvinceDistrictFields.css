@@ -1,0 +1,41 @@
+.province-district-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.province-district-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.province-district-label-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.province-district-req {
+  color: #c0392b;
+}
+
+.province-district-retry {
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0ea5a4;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.province-district-retry:hover {
+  color: #0b8483;
+}
+
+.province-district-error {
+  border-color: #e74c3c !important;
+}

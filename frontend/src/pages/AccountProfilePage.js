@@ -11,6 +11,7 @@ import {
   getBirthYearSelectOptions,
   getLatestAllowedBirthYear,
   getStoredUser,
+  isAdminEmail,
   isBirthYearValidForMinAge,
   MIN_PROFILE_AGE_YEARS,
   normalizeRole,
@@ -85,6 +86,8 @@ function AccountProfilePage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   const isAdopter = normalizeRole(role) === "ADOPTER";
+  const isProtectedAdmin =
+    normalizeRole(role) === "ADMIN" || isAdminEmail(email);
   const contactLocked = isAdopter && hasDraftAdoptionRequest;
 
   useEffect(() => {
@@ -727,20 +730,22 @@ function AccountProfilePage() {
           </p>
         </div>
 
-        <section className="account-delete-panel" aria-label="Delete account">
-          <h2 className="account-delete-panel-title">Delete your account</h2>
-          <p className="account-delete-panel-lead">
-            Permanently remove your account and all data stored on Pavia for this email.
-          </p>
-          <button
-            type="button"
-            className="account-delete-account-btn"
-            onClick={() => setDeleteDialogOpen(true)}
-            disabled={loading || saving}
-          >
-            Delete account
-          </button>
-        </section>
+        {!isProtectedAdmin && (
+          <section className="account-delete-panel" aria-label="Delete account">
+            <h2 className="account-delete-panel-title">Delete your account</h2>
+            <p className="account-delete-panel-lead">
+              Permanently remove your account and all data stored on Pavia for this email.
+            </p>
+            <button
+              type="button"
+              className="account-delete-account-btn"
+              onClick={() => setDeleteDialogOpen(true)}
+              disabled={loading || saving}
+            >
+              Delete account
+            </button>
+          </section>
+        )}
       </main>
       <Footer />
     </div>

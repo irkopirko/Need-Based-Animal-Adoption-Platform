@@ -47,6 +47,7 @@ public class User {
     @Column(name = "emailVerified")
     private boolean emailVerified = false;
 
+    @Column(nullable = false)
     private boolean active = true;
 
     private String emailVerificationCode;

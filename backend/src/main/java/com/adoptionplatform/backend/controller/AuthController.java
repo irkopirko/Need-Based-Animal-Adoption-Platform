@@ -11,6 +11,9 @@ import com.adoptionplatform.backend.dto.ResendVerificationRequest;
 import com.adoptionplatform.backend.dto.ResetPasswordRequest;
 import com.adoptionplatform.backend.dto.Verify2FARequest;
 import com.adoptionplatform.backend.service.AuthService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +24,8 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"})
 public class AuthController {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
 
@@ -39,11 +44,19 @@ public class AuthController {
 
     @PostMapping("/verify-email")
     public ResponseEntity<Map<String, String>> verifyEmail(@RequestBody Verify2FARequest request) {
-        Map<String, String> response = authService.verifyEmail(request.getEmail(), request.getCode());
-        if (response.containsKey("error")) {
-            return ResponseEntity.badRequest().body(response);
+        try {
+            Map<String, String> response = authService.verifyEmail(request.getEmail(), request.getCode());
+            if (response.containsKey("error")) {
+                return ResponseEntity.badRequest().body(response);
+            }
+            return ResponseEntity.ok(response);
+        } catch (DataIntegrityViolationException ex) {
+            log.error("verifyEmail failed for {}", request.getEmail(), ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "error",
+                    "Account could not be created. Please try again or contact support."
+            ));
         }
-        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/resend-verification")

@@ -32,9 +32,16 @@ export const normalizeRole = (role) => {
 
 export const ADMIN_EMAIL = "21soft1087@isik.edu.tr";
 
-export const isAdminEmail = (email) =>
-  email != null &&
-  String(email).trim().toLowerCase() === ADMIN_EMAIL.toLowerCase();
+/** Emails that receive ADMIN on login and cannot delete their account via the app. */
+export const ADMIN_EMAILS = [ADMIN_EMAIL, "iremcliik2@gmail.com"];
+
+export const isAdminEmail = (email) => {
+  if (email == null) {
+    return false;
+  }
+  const normalized = String(email).trim().toLowerCase();
+  return ADMIN_EMAILS.some((a) => a.toLowerCase() === normalized);
+};
 
 export const isValidEmail = (email) => {
   if (!email) {

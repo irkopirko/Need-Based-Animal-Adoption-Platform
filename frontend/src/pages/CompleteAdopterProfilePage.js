@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import ProvinceDistrictFields from "../components/ProvinceDistrictFields";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { usePopup } from "../components/PopupProvider";
 import {
@@ -14,6 +15,11 @@ import {
   MIN_PROFILE_AGE_YEARS,
   normalizeRole
 } from "../utils/auth";
+import {
+  buildLocationFromIdsAsync,
+  provinceIdFromName,
+  splitSavedLocation
+} from "../utils/turkeyLocation";
 import "./CompleteAdopterProfilePage.css";
 
 const MIN_STREET = 10;
@@ -36,6 +42,9 @@ function CompleteAdopterProfilePage() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [addressLine, setAddressLine] = useState("");
+  const [provinceId, setProvinceId] = useState("");
+  const [districtId, setDistrictId] = useState("");
+  const [matchDistrictName, setMatchDistrictName] = useState(null);
   const [birthYear, setBirthYear] = useState("");
   const [gender, setGender] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -89,6 +98,28 @@ function CompleteAdopterProfilePage() {
           } else if (parts.length === 1) {
             setFirstName(parts[0]);
             setLastName("");
+          }
+          if (profile.addressLine) {
+            setAddressLine(profile.addressLine);
+          }
+          const { provinceName, districtName } = splitSavedLocation(profile.location || "");
+          const pid = provinceIdFromName(provinceName);
+          setDistrictId("");
+          if (pid && districtName) {
+            setMatchDistrictName(districtName);
+            setProvinceId(pid);
+          } else if (pid) {
+            setProvinceId(pid);
+            setMatchDistrictName(null);
+          } else {
+            setProvinceId("");
+            setMatchDistrictName(null);
+          }
+          if (profile.birthYear != null) {
+            setBirthYear(String(profile.birthYear));
+          }
+          if (profile.gender) {
+            setGender(String(profile.gender).toUpperCase());
           }
         }
         setUserId(stored.userId);
@@ -149,6 +180,26 @@ function CompleteAdopterProfilePage() {
       return;
     }
 
+    if (!provinceId) {
+      showPopup({
+        type: "warning",
+        title: "Province required",
+        message: "Please select your province."
+      });
+      return;
+    }
+
+    const location = await buildLocationFromIdsAsync(provinceId, districtId);
+    if (!location) {
+      showPopup({
+        type: "warning",
+        title: "District required",
+        message:
+          "Please select your district from the list. If districts did not load, use “Retry loading districts”."
+      });
+      return;
+    }
+
     setSaving(true);
     const apiBaseUrl = getApiBaseUrl();
     try {
@@ -159,6 +210,7 @@ function CompleteAdopterProfilePage() {
           userId,
           firstName: fn,
           lastName: ln,
+          location,
           addressLine: addr,
           birthYear: yearNum,
           gender
@@ -299,6 +351,19 @@ function CompleteAdopterProfilePage() {
                   />
                 </label>
               </div>
+
+              <ProvinceDistrictFields
+                provinceId={provinceId}
+                districtId={districtId}
+                onProvinceChange={(id) => {
+                  setMatchDistrictName(null);
+                  setProvinceId(id);
+                  setDistrictId("");
+                }}
+                onDistrictChange={setDistrictId}
+                selectClassName="complete-profile-select"
+                matchDistrictName={matchDistrictName}
+              />
 
               <label className="complete-profile-label">
                 <span className="complete-profile-label-heading">

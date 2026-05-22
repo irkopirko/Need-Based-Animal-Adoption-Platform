@@ -427,13 +427,18 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(pendingRegistration.password));
         user.setLocation(pendingRegistration.location);
         user.setPhone(pendingRegistration.phone);
-        user.setRole(pendingRegistration.role);
+        user.setRole(adminConfig.isAdminEmail(email) ? Role.ADMIN : pendingRegistration.role);
         user.setEmailVerified(true);
+        user.setActive(true);
         user.setEmailVerificationCode(null);
         user.setEmailVerificationExpiresAt(null);
         user.setRegistrationTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
 
-        if (user.getRole() == Role.ADOPTER) {
+        if (user.getRole() == Role.ADMIN) {
+            user.setAdopterProfileCompleted(Boolean.TRUE);
+            user.setOwnerProfileCompleted(Boolean.TRUE);
+            user.setOwnerListingType(null);
+        } else if (user.getRole() == Role.ADOPTER) {
             user.setAdopterProfileCompleted(Boolean.FALSE);
             user.setOwnerProfileCompleted(null);
             user.setOwnerListingType(null);
@@ -927,6 +932,11 @@ public class AuthService {
             response.put("error", "Street address must be at least 10 characters");
             return response;
         }
+        String locationValue = trimOrNull(request.getLocation());
+        if (locationValue == null) {
+            response.put("error", "Province and district are required");
+            return response;
+        }
         if (request.getBirthYear() == null) {
             response.put("error", "Birth year is required");
             return response;
@@ -961,6 +971,7 @@ public class AuthService {
 
         user.setFullName(combinedName);
         user.setAddressLine(address);
+        user.setLocation(locationValue);
         user.setBirthYear(year);
         user.setGender(gender);
         user.setAdopterProfileCompleted(Boolean.TRUE);
@@ -1018,6 +1029,11 @@ public class AuthService {
         Optional<User> userOptional = userRepository.findById(userId);
         if (userOptional.isEmpty()) {
             response.put("error", "User not found");
+            return response;
+        }
+        User user = userOptional.get();
+        if (adminConfig.isProtectedAdmin(user)) {
+            response.put("error", "Admin accounts cannot be deleted");
             return response;
         }
 

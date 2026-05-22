@@ -5,6 +5,7 @@ import com.adoptionplatform.backend.dto.admin.AdminLoginLogDto;
 import com.adoptionplatform.backend.dto.admin.AdminRequestDto;
 import com.adoptionplatform.backend.dto.admin.AdminStatsDto;
 import com.adoptionplatform.backend.dto.admin.AdminUserDto;
+import com.adoptionplatform.backend.config.AdminConfig;
 import com.adoptionplatform.backend.entity.AdoptionRequest;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.entity.LoginLog;
@@ -28,17 +29,20 @@ public class AdminService {
     private final AnimalRepository animalRepository;
     private final AdoptionRequestRepository adoptionRequestRepository;
     private final LoginLogRepository loginLogRepository;
+    private final AdminConfig adminConfig;
 
     public AdminService(
             UserRepository userRepository,
             AnimalRepository animalRepository,
             AdoptionRequestRepository adoptionRequestRepository,
-            LoginLogRepository loginLogRepository
+            LoginLogRepository loginLogRepository,
+            AdminConfig adminConfig
     ) {
         this.userRepository = userRepository;
         this.animalRepository = animalRepository;
         this.adoptionRequestRepository = adoptionRequestRepository;
         this.loginLogRepository = loginLogRepository;
+        this.adminConfig = adminConfig;
     }
 
     public AdminStatsDto getStats() {
@@ -58,8 +62,10 @@ public class AdminService {
     }
 
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (adminConfig.isProtectedAdmin(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin accounts cannot be deleted");
         }
         userRepository.deleteById(id);
     }
@@ -67,6 +73,9 @@ public class AdminService {
     public AdminUserDto deactivateUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (adminConfig.isProtectedAdmin(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Admin accounts cannot be deactivated");
+        }
         user.setActive(false);
         userRepository.save(user);
         return toAdminUserDto(user);

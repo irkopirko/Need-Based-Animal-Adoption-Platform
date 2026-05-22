@@ -61,6 +61,10 @@
   gap: 18px;
 }
 
+.complete-profile-form .province-district-fields {
+  gap: 18px;
+}
+
 .complete-profile-name-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
