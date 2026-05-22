@@ -3,16 +3,22 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import "./OwnerMessagesPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getStoredUser, normalizeRole } from "../utils/auth";
+import { getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
 import {
   loadOwnerEngagementState,
   resolveOwnerScenario,
-  appendOwnerThreadMessage,
-  getInquiryPreview,
   formatInquiryDate,
+  getInquiryPreviewFromMessages,
   PAVIA_OWNER_ENGAGEMENT_UPDATED,
   STRONG_MATCH_THRESHOLD
 } from "../utils/ownerJourney";
+import {
+  acceptInquiry,
+  fetchInquiryThread,
+  rejectInquiry,
+  sendInquiryMessage
+} from "../utils/platformApi";
+import { usePopup } from "../components/PopupProvider";
 
 function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onSecondary }) {
   return (
@@ -45,77 +51,161 @@ function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onS
 function OwnerMessagesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
   const [scenario, setScenario] = useState("NO_LISTINGS");
-  const [engage, setEngage] = useState(null);
+  const [inquiries, setInquiries] = useState([]);
   const [selectedChatId, setSelectedChatId] = useState(null);
+  const [thread, setThread] = useState(null);
   const [draft, setDraft] = useState("");
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const user = getStoredUser();
+  const ownerId = getResolvedUserId(user);
 
   const refresh = useCallback(async () => {
-    const user = getStoredUser();
-    if (!user?.userId || normalizeRole(user.role) !== "OWNER") {
+    if (ownerId == null || normalizeRole(user?.role) !== "OWNER") {
       setScenario("NOT_OWNER");
-      setEngage(null);
+      setInquiries([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    const data = await loadOwnerEngagementState(user.userId);
-    const scen = resolveOwnerScenario({
-      hasListings: data.hasListings,
-      hasStrongMatchOnListings: data.hasStrongMatchOnListings,
-      hasInquiries: data.hasInquiries,
-      hasAnyMessages: data.hasAnyMessages
-    });
-    setEngage(data);
-    setScenario(scen);
+    try {
+      const data = await loadOwnerEngagementState(ownerId);
+      const scen = resolveOwnerScenario({
+        hasListings: data.hasListings,
+        hasStrongMatchOnListings: data.hasStrongMatchOnListings,
+        hasInquiries: data.hasInquiries,
+        hasAnyMessages: data.hasAnyMessages
+      });
+      setScenario(scen);
+      const list = Array.isArray(data.inquiries) ? data.inquiries : [];
+      setInquiries(list);
 
-    if (scen === "INQUIRY_NO_MESSAGES" || scen === "FULL") {
-      const sorted = [...(data.inquiries || [])].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      );
-      const fromUrl = searchParams.get("inquiry");
-      const pick = sorted.find((i) => i.id === fromUrl) || sorted[0] || null;
-      setSelectedChatId(pick?.id || null);
-    } else {
-      setSelectedChatId(null);
+      if (scen === "INQUIRY_NO_MESSAGES" || scen === "FULL") {
+        const sorted = [...list].sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        const fromUrl = searchParams.get("inquiry");
+        const pick =
+          sorted.find((i) => String(i.id) === String(fromUrl)) || sorted[0] || null;
+        setSelectedChatId(pick?.id ?? null);
+      } else {
+        setSelectedChatId(null);
+        setThread(null);
+      }
+    } catch (e) {
+      console.error(e);
+      setScenario("NO_LISTINGS");
+      setInquiries([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [searchParams]);
+  }, [ownerId, user?.role, searchParams]);
 
   useEffect(() => {
     refresh();
-    const fn = () => {
-      refresh();
-    };
+    const fn = () => refresh();
     window.addEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
     return () => window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
   }, [refresh]);
 
-  const selectedInquiry = useMemo(
-    () => engage?.inquiries?.find((i) => i.id === selectedChatId),
-    [engage, selectedChatId]
-  );
-
-  const selectedMessages = useMemo(() => {
-    if (!engage?.threads || !selectedChatId) {
-      return [];
-    }
-    return engage.threads[selectedChatId] || [];
-  }, [engage, selectedChatId]);
-
-  const handleSend = () => {
-    const user = getStoredUser();
-    const text = draft.trim();
-    if (!user?.userId || !selectedChatId || !text) {
+  useEffect(() => {
+    if (!selectedChatId || ownerId == null) {
+      setThread(null);
       return;
     }
-    appendOwnerThreadMessage(user.userId, selectedChatId, {
-      sender: "owner",
-      text
-    });
-    setDraft("");
-    refresh();
+    fetchInquiryThread(selectedChatId, ownerId)
+      .then(setThread)
+      .catch(() => setThread(null));
+  }, [selectedChatId, ownerId]);
+
+  const conversations = useMemo(
+    () =>
+      [...inquiries]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .map((inq) => ({
+          id: inq.id,
+          adopterName: inq.adopterName,
+          animalName: inq.animalName,
+          preview: getInquiryPreviewFromMessages(inq),
+          time: formatInquiryDate(inq.createdAt),
+          status: inq.status
+        })),
+    [inquiries]
+  );
+
+  const handleSend = async () => {
+    const text = draft.trim();
+    if (!text || !selectedChatId || ownerId == null) {
+      return;
+    }
+    if (thread?.status === "REJECTED") {
+      showPopup({
+        type: "warning",
+        title: "Thread closed",
+        message: "This inquiry was rejected. No further messages can be sent."
+      });
+      return;
+    }
+    try {
+      await sendInquiryMessage(selectedChatId, {
+        userId: ownerId,
+        senderRole: "OWNER",
+        body: text
+      });
+      setDraft("");
+      const updated = await fetchInquiryThread(selectedChatId, ownerId);
+      setThread(updated);
+      refresh();
+    } catch (e) {
+      showPopup({ type: "error", title: "Send failed", message: e.message });
+    }
+  };
+
+  const handleAccept = async () => {
+    if (!selectedChatId || ownerId == null) {
+      return;
+    }
+    setActionBusy(true);
+    try {
+      await acceptInquiry(selectedChatId, ownerId);
+      const updated = await fetchInquiryThread(selectedChatId, ownerId);
+      setThread(updated);
+      refresh();
+      showPopup({
+        type: "success",
+        title: "Inquiry accepted",
+        message: "You can continue messaging in this thread."
+      });
+    } catch (e) {
+      showPopup({ type: "error", title: "Could not accept", message: e.message });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedChatId || ownerId == null) {
+      return;
+    }
+    setActionBusy(true);
+    try {
+      await rejectInquiry(selectedChatId, ownerId);
+      const updated = await fetchInquiryThread(selectedChatId, ownerId);
+      setThread(updated);
+      refresh();
+      showPopup({
+        type: "info",
+        title: "Inquiry rejected",
+        message: "The thread is closed. No new messages can be sent."
+      });
+    } catch (e) {
+      showPopup({ type: "error", title: "Could not reject", message: e.message });
+    } finally {
+      setActionBusy(false);
+    }
   };
 
   if (loading) {
@@ -135,7 +225,7 @@ function OwnerMessagesPage() {
       <Gate
         badge="Owners only"
         title="Owner messages"
-        body="Sign in with an owner account to use this inbox."
+        body="Sign in with an owner or shelter account to use this inbox."
         primaryLabel="Sign in"
         onPrimary={() => navigate("/login")}
       />
@@ -147,7 +237,7 @@ function OwnerMessagesPage() {
       <Gate
         badge="No listings"
         title="Register an animal first"
-        body="Messaging opens after you have at least one listing. When adopters reach out, threads show up here."
+        body="Messaging opens after you have at least one listing. When adopters reach out, threads are stored in the database."
         primaryLabel="Register animal"
         onPrimary={() => navigate("/register-animal")}
         secondaryLabel="Owner home"
@@ -161,7 +251,7 @@ function OwnerMessagesPage() {
       <Gate
         badge="No strong matches on your listings"
         title="None of your animals appear in adopters’ strong-match results yet"
-        body={`Adopters only see animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher (inclusive). None of your current listings are in that pool right now—check listing quality or wait for new adopters.`}
+        body={`Adopters only see animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher. None of your current listings are in that pool right now.`}
         primaryLabel="View my listings"
         onPrimary={() => navigate("/ownerhomepage")}
         secondaryLabel="Manage requests"
@@ -175,7 +265,7 @@ function OwnerMessagesPage() {
       <Gate
         badge="No inquiries yet"
         title="Strong matches exist, but no inquiries"
-        body={`Your listing(s) can appear for adopters at ${STRONG_MATCH_THRESHOLD}% or higher. No one has sent an inquiry yet. You can remind adopters to use “Get in contact” on the animal page.`}
+        body="When an adopter uses Get in contact on a listing, the conversation is saved here for both sides."
         primaryLabel="Manage requests"
         onPrimary={() => navigate("/owner-requests")}
         secondaryLabel="Owner home"
@@ -184,22 +274,8 @@ function OwnerMessagesPage() {
     );
   }
 
-  const conversations = (engage?.inquiries || [])
-    .slice()
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .map((inq) => ({
-      id: inq.id,
-      adopterName: inq.adopterName,
-      animalName: inq.animalName,
-      preview: getInquiryPreview(engage?.threads, inq.id),
-      time: formatInquiryDate(inq.createdAt),
-      status: engage?.threads?.[inq.id]?.length ? "Active" : "New inquiry"
-    }));
-
-  const showInquiryCta =
-    scenario === "INQUIRY_NO_MESSAGES" &&
-    selectedInquiry &&
-    selectedMessages.length === 0;
+  const canCompose = thread && thread.status !== "REJECTED";
+  const showPendingActions = thread?.status === "PENDING";
 
   return (
     <div className="owner-messages-page">
@@ -209,27 +285,15 @@ function OwnerMessagesPage() {
         <section className="owner-messages-hero">
           <div className="owner-messages-hero-left">
             <p className="owner-messages-tag">Owner Messages</p>
-            <h1>Connect with adopters who reached out</h1>
+            <h1>Connect with adopters</h1>
             <p>
-              Inquiries arrive when an adopter uses Get in contact on a strong
-              match (≥ {STRONG_MATCH_THRESHOLD}%). Reply here to keep the adoption
-              process moving.
+              Conversations are saved in the database for the adoption process. Reply
+              when an adopter contacts you about a strong match (≥ {STRONG_MATCH_THRESHOLD}%).
             </p>
-          </div>
-
-          <div className="owner-messages-hero-right">
-            <div className="owner-messages-highlight-card">
-              <span className="owner-highlight-badge">Inbox</span>
-              <h3>Threads follow real inquiries</h3>
-              <p>
-                No inquiry yet means no thread—once an inquiry exists, you can
-                send the first message or wait for the adopter.
-              </p>
-            </div>
           </div>
         </section>
 
-        <section className="owner-messages-layout">
+        <section className="owner-messages-layout owner-messages-layout-main">
           <div className="owner-conversation-panel">
             <h2>Conversations</h2>
             <div className="owner-conversation-list">
@@ -242,14 +306,11 @@ function OwnerMessagesPage() {
                   }`}
                   onClick={() => setSelectedChatId(c.id)}
                 >
-                  <div
-                    className="owner-conversation-avatar-placeholder"
-                    aria-hidden="true"
-                  />
                   <div className="owner-conversation-content">
                     <h3>{c.adopterName}</h3>
                     <p>Regarding {c.animalName}</p>
                     <span className="owner-conversation-preview">{c.preview}</span>
+                    <span className="owner-conversation-status-pill">{c.status}</span>
                   </div>
                   <span className="owner-conversation-time">{c.time}</span>
                 </button>
@@ -258,64 +319,73 @@ function OwnerMessagesPage() {
           </div>
 
           <div className="owner-chat-panel">
-            {selectedInquiry ? (
+            {thread ? (
               <>
                 <div className="owner-chat-header">
                   <div>
-                    <h2>{selectedInquiry.adopterName}</h2>
-                    <p className="owner-chat-sub">Regarding {selectedInquiry.animalName}</p>
+                    <h2>{thread.adopterName}</h2>
+                    <p className="owner-chat-sub">
+                      {thread.animalName} · {thread.listingCode}
+                    </p>
                   </div>
-                  <span className="owner-chat-badge">
-                    {selectedMessages.length ? "Active" : "New inquiry"}
-                  </span>
+                  <span className="owner-chat-badge">{thread.status}</span>
                 </div>
 
-                {showInquiryCta && (
-                  <div className="owner-chat-get-contact-banner">
-                    <strong>Get in contact</strong>
-                    <p>
-                      There are no messages in this thread yet. Send a short reply
-                      to introduce yourself and next steps—the adopter will see it
-                      here when they return.
-                    </p>
+                {showPendingActions && (
+                  <div className="owner-inquiry-decision-btns">
+                    <button
+                      type="button"
+                      className="owner-request-accept-btn"
+                      disabled={actionBusy}
+                      onClick={handleAccept}
+                    >
+                      Accept inquiry
+                    </button>
+                    <button
+                      type="button"
+                      className="owner-secondary-outline-btn"
+                      disabled={actionBusy}
+                      onClick={handleReject}
+                    >
+                      Decline
+                    </button>
                   </div>
                 )}
 
-                <div className="owner-chat-messages">
-                  {selectedMessages.map((message) => (
+                <div className="owner-inquiry-thread">
+                  {(thread.messages || []).map((m) => (
                     <div
-                      key={message.id}
-                      className={`owner-chat-bubble-row ${
-                        message.sender === "owner"
-                          ? "owner-chat-user"
-                          : "owner-chat-adopter"
-                      }`}
+                      key={m.id}
+                      className={`owner-inquiry-msg owner-inquiry-msg-${m.senderRole?.toLowerCase()}`}
                     >
-                      <div className="owner-chat-bubble">
-                        <p>{message.text}</p>
-                        <span>{message.time}</span>
-                      </div>
+                      <p>{m.body}</p>
+                      <time>
+                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : ""}
+                      </time>
                     </div>
                   ))}
                 </div>
 
-                <div className="owner-chat-input-area">
-                  <input
-                    type="text"
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    placeholder="Write your message…"
-                    className="owner-chat-input"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        handleSend();
-                      }
-                    }}
-                  />
-                  <button type="button" className="owner-chat-send-btn" onClick={handleSend}>
-                    Send
-                  </button>
-                </div>
+                {canCompose ? (
+                  <div className="owner-inquiry-compose">
+                    <textarea
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      rows={3}
+                      placeholder="Write your message…"
+                      maxLength={1000}
+                    />
+                    <button
+                      type="button"
+                      className="owner-chat-send-btn"
+                      onClick={handleSend}
+                    >
+                      Send
+                    </button>
+                  </div>
+                ) : (
+                  <p className="owner-chat-closed-note">This thread is closed.</p>
+                )}
               </>
             ) : (
               <p className="owner-chat-empty-select">Select a conversation.</p>

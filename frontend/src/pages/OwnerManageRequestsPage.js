@@ -70,11 +70,11 @@ function OwnerManageRequestsPage() {
   );
 
   const threadMessages = useMemo(() => {
-    if (!engage?.threads || !selectedRequestId) {
+    if (!selectedInquiry?.messages) {
       return [];
     }
-    return engage.threads[selectedRequestId] || [];
-  }, [engage, selectedRequestId]);
+    return selectedInquiry.messages;
+  }, [selectedInquiry]);
 
   const listings = engage?.listings || [];
   const inquiriesSorted = useMemo(
@@ -298,7 +298,7 @@ function OwnerManageRequestsPage() {
                     </span>
                   </div>
 
-                  <p className="owner-request-summary">{request.summary}</p>
+                  <p className="owner-request-summary">{request.initialMessage}</p>
 
                   <div className="owner-request-meta">
                     <span className="owner-request-status">{request.status}</span>
@@ -342,7 +342,7 @@ function OwnerManageRequestsPage() {
                 <div className="owner-request-detail-grid">
                   <div className="owner-request-detail-card owner-request-detail-card-wide">
                     <h3>Inquiry</h3>
-                    <p>{selectedInquiry.summary}</p>
+                    <p>{selectedInquiry.initialMessage}</p>
                   </div>
 
                   <div className="owner-request-detail-card">

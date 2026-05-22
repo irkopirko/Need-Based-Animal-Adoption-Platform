@@ -251,22 +251,29 @@ function AdopterMessagesPage() {
                   </div>
                 ))}
               </div>
-              {thread.status === "ACCEPTED" ? (
+              {thread.status === "REJECTED" ? (
+                <p className="adopter-inquiry-wait">
+                  This inquiry was declined. The conversation is closed.
+                </p>
+              ) : (
                 <div className="adopter-inquiry-compose">
                   <textarea
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}
                     rows={3}
                     placeholder="Type a message…"
+                    maxLength={1000}
                   />
                   <button type="button" className="messages-primary-btn" onClick={handleSend}>
                     Send
                   </button>
+                  {thread.status === "PENDING" && (
+                    <p className="adopter-inquiry-hint">
+                      Your messages are saved. The owner can accept to continue the adoption
+                      process.
+                    </p>
+                  )}
                 </div>
-              ) : (
-                <p className="adopter-inquiry-wait">
-                  Waiting for the owner to accept your inquiry before you can send more messages.
-                </p>
               )}
             </section>
           )}

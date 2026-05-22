@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./CompatibleAnimalsPage.css";
 import Navbar from "../components/Navbar";
+import SaveHeartButton from "../components/SaveHeartButton";
 import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
 import { getStoredUser, getApiBaseUrl, getResolvedUserId } from "../utils/auth";
@@ -397,18 +398,10 @@ function CompatibleAnimalsPage() {
                   alt={animal.name}
                   className="compatible-card-image"
                 />
-                <button
-                  type="button"
-                  className={`compatible-heart-btn ${
-                    savedIds.includes(Number(animal.id)) ? "is-saved" : ""
-                  }`}
+                <SaveHeartButton
+                  saved={savedIds.includes(Number(animal.id))}
                   onClick={(e) => handleSave(animal.id, e)}
-                  aria-label={
-                    savedIds.includes(Number(animal.id)) ? "Unsave" : "Save"
-                  }
-                >
-                  {savedIds.includes(Number(animal.id)) ? "♥" : "♡"}
-                </button>
+                />
                 <span className="compatible-score-pill">
                   {animal.compatibilityScore || 0}% compatibility
                 </span>

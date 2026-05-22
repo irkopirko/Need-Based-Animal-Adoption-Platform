@@ -156,8 +156,8 @@ public class InquiryService {
                 .orElseThrow(() -> new IllegalArgumentException("Inquiry not found"));
         assertParticipant(inquiry, request.getUserId());
 
-        if (!"ACCEPTED".equalsIgnoreCase(inquiry.getStatus())) {
-            throw new IllegalArgumentException("Messaging is available after the owner accepts the inquiry");
+        if ("REJECTED".equalsIgnoreCase(inquiry.getStatus())) {
+            throw new IllegalArgumentException("This inquiry was closed and no further messages can be sent");
         }
 
         String role = resolveSenderRole(inquiry, request.getUserId(), request.getSenderRole());

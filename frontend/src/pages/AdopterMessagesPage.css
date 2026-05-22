@@ -223,6 +223,12 @@
   background: #f5f5f5;
 }
 
+.adopter-inquiry-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #5c5c5c;
+}
+
 .adopter-inquiry-compose textarea {
   width: 100%;
   margin-bottom: 0.5rem;

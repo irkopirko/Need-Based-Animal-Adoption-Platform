@@ -115,6 +115,15 @@
   color: #666;
 }
 
+.owner-conversation-status-pill {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #0ea5a4;
+}
+
 .owner-conversation-preview {
   display: block;
   font-size: 12px;

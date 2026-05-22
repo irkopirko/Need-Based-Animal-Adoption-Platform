@@ -4,6 +4,7 @@ import {
   resolveMediaUrl,
   STRONG_MATCH_THRESHOLD
 } from "./adopterJourney";
+import { fetchOwnerInquiries } from "./platformApi";
 
 const INQUIRIES_KEY = "paviaOwnerInquiries";
 const THREADS_KEY = "paviaOwnerMessageThreads";
@@ -206,20 +207,47 @@ export async function loadOwnerEngagementState(ownerId) {
   const listings = filterListingsForOwner(animals, ownerId);
   const strongMatches = await fetchStrongMatchAnimals();
   const matchedListings = ownerListingsInStrongMatches(listings, strongMatches);
-  const inquiries = readOwnerInquiries(ownerId);
-  const threads = readOwnerThreads(ownerId);
+  let inquiries = [];
+  try {
+    const fromApi = await fetchOwnerInquiries(ownerId);
+    inquiries = Array.isArray(fromApi) ? fromApi : [];
+  } catch {
+    inquiries = [];
+  }
+  const hasAnyMessages = inquiries.some(
+    (inq) => Array.isArray(inq.messages) && inq.messages.length > 0
+  );
 
   return {
     listings,
     strongMatches,
     matchedListings,
     inquiries,
-    threads,
     hasListings: listings.length > 0,
     hasStrongMatchOnListings: matchedListings.length > 0,
     hasInquiries: inquiries.length > 0,
-    hasAnyMessages: hasAnyThreadMessages(threads)
+    hasAnyMessages
   };
+}
+
+/** Inquiries for one listing from the database (owner/shelter ↔ adopter threads). */
+export async function fetchInquiriesForAnimal(ownerId, animalId) {
+  const oid = Number(ownerId);
+  const aid = Number(animalId);
+  try {
+    const all = await fetchOwnerInquiries(oid);
+    return (Array.isArray(all) ? all : []).filter((i) => Number(i.animalId) === aid);
+  } catch {
+    return [];
+  }
+}
+
+export function getInquiryPreviewFromMessages(inquiry) {
+  const msgs = inquiry?.messages;
+  if (Array.isArray(msgs) && msgs.length > 0) {
+    return msgs[msgs.length - 1].body || "";
+  }
+  return inquiry?.initialMessage || "No messages yet";
 }
 
 export function recordOwnerInquiry({
@@ -322,6 +350,7 @@ export function formatInquiryDate(iso) {
     return "";
   }
 }
+/** @deprecated use {@link getInquiryPreviewFromMessages} with API inquiry rows */
 export function getInquiryPreview(threads, inquiryId) {
   const arr = threads?.[inquiryId];
   if (!Array.isArray(arr) || arr.length === 0) {

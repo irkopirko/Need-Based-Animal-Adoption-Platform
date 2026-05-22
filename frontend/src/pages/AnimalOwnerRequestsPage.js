@@ -6,10 +6,8 @@ import Footer from "../components/Footer";
 import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
 import {
   normalizeAnimalFromApi,
-  readInquiriesForAnimal,
-  readOwnerThreads,
+  fetchInquiriesForAnimal,
   formatInquiryDate,
-  PAVIA_OWNER_ENGAGEMENT_UPDATED,
   STRONG_MATCH_THRESHOLD
 } from "../utils/ownerJourney";
 
@@ -20,30 +18,19 @@ function AnimalOwnerRequestsPage() {
   const [forbidden, setForbidden] = useState(false);
   const [animal, setAnimal] = useState(null);
   const [inquiries, setInquiries] = useState([]);
-  const [threads, setThreads] = useState({});
   const [selectedId, setSelectedId] = useState(null);
 
   const aid = Number(animalId);
 
-  const refreshLocal = useCallback(() => {
-    const user = getStoredUser();
-    if (!user?.userId || normalizeRole(user.role) !== "OWNER") {
-      setForbidden(true);
-      setInquiries([]);
-      setThreads({});
-      return;
-    }
-    const oid = Number(user.userId);
-    const list = readInquiriesForAnimal(oid, aid).sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
-    setInquiries(list);
-    setThreads(readOwnerThreads(oid));
+  const loadInquiries = useCallback(async (ownerUserId) => {
+    const list = await fetchInquiriesForAnimal(ownerUserId, aid);
+    const sorted = list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    setInquiries(sorted);
     setSelectedId((prev) => {
-      if (prev && list.some((i) => i.id === prev)) {
+      if (prev && sorted.some((i) => i.id === prev)) {
         return prev;
       }
-      return list[0]?.id || null;
+      return sorted[0]?.id || null;
     });
   }, [aid]);
 
@@ -79,7 +66,7 @@ function AnimalOwnerRequestsPage() {
           setAnimal(null);
         } else {
           setAnimal(data);
-          refreshLocal();
+          await loadInquiries(Number(user.userId));
         }
       } catch {
         setForbidden(true);
@@ -88,13 +75,7 @@ function AnimalOwnerRequestsPage() {
       setLoading(false);
     };
     load();
-  }, [aid, refreshLocal]);
-
-  useEffect(() => {
-    const fn = () => refreshLocal();
-    window.addEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
-    return () => window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
-  }, [refreshLocal]);
+  }, [aid, loadInquiries]);
 
   const selected = useMemo(
     () => inquiries.find((i) => i.id === selectedId),
@@ -102,11 +83,11 @@ function AnimalOwnerRequestsPage() {
   );
 
   const threadMessages = useMemo(() => {
-    if (!selectedId) {
+    if (!selected?.messages) {
       return [];
     }
-    return threads[selectedId] || [];
-  }, [threads, selectedId]);
+    return selected.messages;
+  }, [selected]);
 
   const goToMessages = (inquiryId) => {
     if (inquiryId) {
@@ -188,7 +169,7 @@ function AnimalOwnerRequestsPage() {
             <div className="owner-request-list-head">
               <div>
                 <h2>Inquiries for this animal</h2>
-                <p>Stored on this device for demo flows</p>
+                <p>Saved in the database for this listing</p>
               </div>
               <span className="owner-request-count">{inquiries.length}</span>
             </div>
@@ -218,7 +199,7 @@ function AnimalOwnerRequestsPage() {
                         {formatInquiryDate(request.createdAt)}
                       </span>
                     </div>
-                    <p className="owner-request-summary">{request.summary}</p>
+                    <p className="owner-request-summary">{request.initialMessage}</p>
                     <div className="owner-request-meta">
                       <span className="owner-request-status">{request.status}</span>
                     </div>
@@ -243,8 +224,8 @@ function AnimalOwnerRequestsPage() {
                   <div className="owner-request-get-contact-panel">
                     <strong>Message this adopter</strong>
                     <p>
-                      Open Messages to send an introduction or answer questions. Threads are stored
-                      locally for this demo.
+                      Open Messages to send an introduction or answer questions. Message history
+                      is stored for both you and the adopter.
                     </p>
                     <button
                       type="button"
@@ -259,7 +240,7 @@ function AnimalOwnerRequestsPage() {
                 <div className="owner-request-detail-grid">
                   <div className="owner-request-detail-card owner-request-detail-card-wide">
                     <h3>Inquiry</h3>
-                    <p>{selected.summary}</p>
+                    <p>{selected.initialMessage}</p>
                   </div>
                   <div className="owner-request-detail-card">
                     <h3>Thread</h3>

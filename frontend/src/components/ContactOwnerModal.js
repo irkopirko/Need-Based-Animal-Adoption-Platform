@@ -33,7 +33,8 @@ function ContactOwnerModal({ open, onClose, animal, adopterUserId }) {
       showPopup({
         type: "success",
         title: "Message sent",
-        message: "Your inquiry was sent. You can continue in Messages once the owner accepts."
+        message:
+          "Your inquiry was sent. Continue the conversation in Messages — history is saved for you and the owner."
       });
       setMessage("");
       onClose(true);

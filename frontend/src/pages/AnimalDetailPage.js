@@ -5,6 +5,7 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import ReportListingModal from "../components/ReportListingModal";
 import ContactOwnerModal from "../components/ContactOwnerModal";
+import SaveHeartButton from "../components/SaveHeartButton";
 import { usePopup } from "../components/PopupProvider";
 import {
   STRONG_MATCH_THRESHOLD,
@@ -140,14 +141,7 @@ function AnimalDetailPage() {
                 </div>
               )}
               {isAdopter && (
-                <button
-                  type="button"
-                  className={`animal-detail-heart-btn ${saved ? "is-saved" : ""}`}
-                  onClick={handleSave}
-                  aria-label={saved ? "Unsave animal" : "Save animal"}
-                >
-                  {saved ? "♥" : "♡"}
-                </button>
+                <SaveHeartButton saved={saved} onClick={handleSave} />
               )}
               <div className="animal-detail-image-topbar">
                 <span className="animal-detail-status-badge">
