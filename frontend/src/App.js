@@ -25,6 +25,8 @@ import CompleteOwnerProfilePage from "./pages/CompleteOwnerProfilePage";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import AdminHomePage from "./pages/AdminHomePage";
+import AdopterAdoptionsPage from "./pages/AdopterAdoptionsPage";
+import OwnerAdoptionsPage from "./pages/OwnerAdoptionsPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
 import { PopupProvider } from "./components/PopupProvider";
 
@@ -61,6 +63,8 @@ function App() {
           <Route path="/owner-listings" element={<OwnerListingsPage />} />
           <Route path="/compatible-animals" element={<CompatibleAnimalsPage />} />
           <Route path="/my-adoption-requests" element={<AdopterMyRequestsPage />} />
+          <Route path="/my-adoptions" element={<AdopterAdoptionsPage />} />
+          <Route path="/owner-adoptions" element={<OwnerAdoptionsPage />} />
         </Routes>
       </Router>
     </PopupProvider>

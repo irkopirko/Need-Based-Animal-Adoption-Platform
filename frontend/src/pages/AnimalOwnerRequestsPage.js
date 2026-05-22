@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import "./OwnerManageRequestsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { getApiBaseUrl, getStoredUser, normalizeRole } from "../utils/auth";
+import { getApiBaseUrl, getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
+import OwnerAdoptionProfilePanel from "../components/OwnerAdoptionProfilePanel";
 import {
   normalizeAnimalFromApi,
   fetchInquiriesForAnimal,
@@ -21,6 +22,7 @@ function AnimalOwnerRequestsPage() {
   const [selectedId, setSelectedId] = useState(null);
 
   const aid = Number(animalId);
+  const ownerId = getResolvedUserId(getStoredUser());
 
   const loadInquiries = useCallback(async (ownerUserId) => {
     const list = await fetchInquiriesForAnimal(ownerUserId, aid);
@@ -237,9 +239,15 @@ function AnimalOwnerRequestsPage() {
                   </div>
                 )}
 
+                <OwnerAdoptionProfilePanel
+                  inquiryId={selected.id}
+                  ownerId={ownerId}
+                  adopterName={selected.adopterName}
+                />
+
                 <div className="owner-request-detail-grid">
                   <div className="owner-request-detail-card owner-request-detail-card-wide">
-                    <h3>Inquiry</h3>
+                    <h3>Message request</h3>
                     <p>{selected.initialMessage}</p>
                   </div>
                   <div className="owner-request-detail-card">

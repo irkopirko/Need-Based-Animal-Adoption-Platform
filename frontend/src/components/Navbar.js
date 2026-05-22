@@ -69,6 +69,7 @@ function Navbar() {
         { label: "Listed animals", path: "/owner-listings" },
         { label: "Register an animal", path: "/register-animal" },
         { label: "Adoption requests", path: "/owner-requests" },
+        { label: "Adoption pipeline", path: "/owner-adoptions" },
         { label: "Inquiries", path: "/owner-messages" }
       );
       return items;
@@ -84,6 +85,7 @@ function Navbar() {
       { label: "My adoption requests", path: "/my-adoption-requests" },
       { label: "Matching animals", path: "/matches" },
       { label: "Saved animals", path: "/saved-animals" },
+      { label: "My adoptions", path: "/my-adoptions" },
       { label: "Messages", path: "/adopter-messages" }
     );
     return adopterItems;

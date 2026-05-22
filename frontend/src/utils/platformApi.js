@@ -15,19 +15,16 @@ async function parseJson(res) {
   return data;
 }
 
-export const REPORT_REASONS = [
-  { value: "MISLEADING_INFO", label: "Misleading information" },
-  { value: "INAPPROPRIATE_CONTENT", label: "Inappropriate content" },
-  { value: "ANIMAL_WELFARE_CONCERN", label: "Animal welfare concern" },
-  { value: "DUPLICATE_LISTING", label: "Duplicate listing" },
-  { value: "OTHER", label: "Other" }
-];
-
-export async function submitListingReport({ reporterUserId, animalId, reason, note }) {
+export async function submitListingReport({
+  reporterUserId,
+  animalId,
+  title,
+  description
+}) {
   const res = await fetch(apiUrl("/api/reports"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reporterUserId, animalId, reason, note })
+    body: JSON.stringify({ reporterUserId, animalId, title, description })
   });
   return parseJson(res);
 }
@@ -143,6 +140,46 @@ export async function sendInquiryMessage(inquiryId, { userId, senderRole, body }
 export async function fetchAdopterRequestForInquiry(inquiryId, ownerId) {
   const res = await fetch(
     apiUrl(`/api/inquiries/${inquiryId}/adopter-request?ownerId=${ownerId}`)
+  );
+  return parseJson(res);
+}
+
+export async function fetchAdoptionCaseByInquiry(inquiryId, viewerId) {
+  const res = await fetch(
+    apiUrl(`/api/adoptions/inquiry/${inquiryId}?viewerId=${viewerId}`)
+  );
+  return parseJson(res);
+}
+
+export async function fetchOwnerAdoptionCases(ownerId) {
+  const res = await fetch(apiUrl(`/api/adoptions/owner/${ownerId}`));
+  return parseJson(res);
+}
+
+export async function fetchAdopterAdoptionCases(adopterId) {
+  const res = await fetch(apiUrl(`/api/adoptions/adopter/${adopterId}`));
+  return parseJson(res);
+}
+
+export async function fetchListingMatchSnapshots(animalId, ownerId) {
+  const res = await fetch(
+    apiUrl(`/api/adoptions/animals/${animalId}/matches?ownerId=${ownerId}`)
+  );
+  return parseJson(res);
+}
+
+export async function reserveAdoptionCase(caseId, ownerId) {
+  const res = await fetch(
+    apiUrl(`/api/adoptions/${caseId}/reserve?ownerId=${ownerId}`),
+    { method: "POST" }
+  );
+  return parseJson(res);
+}
+
+export async function completeAdoptionCase(caseId, ownerId) {
+  const res = await fetch(
+    apiUrl(`/api/adoptions/${caseId}/complete?ownerId=${ownerId}`),
+    { method: "POST" }
   );
   return parseJson(res);
 }

@@ -435,8 +435,40 @@
   margin: 0;
 }
 
+.owner-inquiry-decision-block {
+  margin-bottom: 12px;
+}
+
+.owner-inquiry-decision-hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: #525952;
+  line-height: 1.5;
+}
+
 .owner-inquiry-decision-btns {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  margin-left: auto;
+}
+
+.owner-inquiry-match-pill {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f8f46;
+}
+
+.owner-inquiry-lifecycle-btns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 12px;
+}
+
+.owner-adoption-case-status {
+  font-size: 12px;
+  font-weight: 700;
+  color: #666;
 }

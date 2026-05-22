@@ -14,11 +14,15 @@ import {
 } from "../utils/ownerJourney";
 import {
   acceptInquiry,
+  completeAdoptionCase,
+  fetchAdoptionCaseByInquiry,
   fetchInquiryThread,
   rejectInquiry,
+  reserveAdoptionCase,
   sendInquiryMessage
 } from "../utils/platformApi";
 import { usePopup } from "../components/PopupProvider";
+import OwnerAdoptionProfilePanel from "../components/OwnerAdoptionProfilePanel";
 
 function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onSecondary }) {
   return (
@@ -59,6 +63,7 @@ function OwnerMessagesPage() {
   const [thread, setThread] = useState(null);
   const [draft, setDraft] = useState("");
   const [actionBusy, setActionBusy] = useState(false);
+  const [adoptionCase, setAdoptionCase] = useState(null);
 
   const user = getStoredUser();
   const ownerId = getResolvedUserId(user);
@@ -119,6 +124,9 @@ function OwnerMessagesPage() {
     fetchInquiryThread(selectedChatId, ownerId)
       .then(setThread)
       .catch(() => setThread(null));
+    fetchAdoptionCaseByInquiry(selectedChatId, ownerId)
+      .then(setAdoptionCase)
+      .catch(() => setAdoptionCase(null));
   }, [selectedChatId, ownerId]);
 
   const conversations = useMemo(
@@ -173,14 +181,76 @@ function OwnerMessagesPage() {
       await acceptInquiry(selectedChatId, ownerId);
       const updated = await fetchInquiryThread(selectedChatId, ownerId);
       setThread(updated);
+      await reloadCase();
       refresh();
       showPopup({
         type: "success",
         title: "Inquiry accepted",
-        message: "You can continue messaging in this thread."
+        message: "The message request is approved. You can continue the conversation."
       });
     } catch (e) {
       showPopup({ type: "error", title: "Could not accept", message: e.message });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const reloadCase = async () => {
+    if (!selectedChatId || ownerId == null) {
+      return;
+    }
+    try {
+      const c = await fetchAdoptionCaseByInquiry(selectedChatId, ownerId);
+      setAdoptionCase(c);
+    } catch {
+      setAdoptionCase(null);
+    }
+  };
+
+  const handleReserve = async () => {
+    const caseId = adoptionCase?.id || thread?.adoptionCaseId;
+    if (!caseId || ownerId == null) {
+      return;
+    }
+    setActionBusy(true);
+    try {
+      await reserveAdoptionCase(caseId, ownerId);
+      await reloadCase();
+      refresh();
+      showPopup({
+        type: "success",
+        title: "Listing reserved",
+        message: "This animal is reserved for the adopter. Other pending cases were cancelled."
+      });
+    } catch (e) {
+      showPopup({ type: "error", title: "Reserve failed", message: e.message });
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const handleCompleteAdoption = async () => {
+    const caseId = adoptionCase?.id || thread?.adoptionCaseId;
+    if (!caseId || ownerId == null) {
+      return;
+    }
+    if (!window.confirm("Mark this adoption as completed? The listing will be closed.")) {
+      return;
+    }
+    setActionBusy(true);
+    try {
+      await completeAdoptionCase(caseId, ownerId);
+      await reloadCase();
+      const updated = await fetchInquiryThread(selectedChatId, ownerId);
+      setThread(updated);
+      refresh();
+      showPopup({
+        type: "success",
+        title: "Adoption completed",
+        message: "The listing is marked as adopted. Both parties were notified by email."
+      });
+    } catch (e) {
+      showPopup({ type: "error", title: "Could not complete", message: e.message });
     } finally {
       setActionBusy(false);
     }
@@ -276,6 +346,15 @@ function OwnerMessagesPage() {
 
   const canCompose = thread && thread.status !== "REJECTED";
   const showPendingActions = thread?.status === "PENDING";
+  const caseStatus = adoptionCase?.status || "";
+  const canReserve =
+    adoptionCase &&
+    (caseStatus === "ACCEPTED" || caseStatus === "PROPOSED") &&
+    thread?.status === "ACCEPTED";
+  const canComplete =
+    adoptionCase &&
+    (caseStatus === "ACCEPTED" || caseStatus === "RESERVED") &&
+    thread?.status === "ACCEPTED";
 
   return (
     <div className="owner-messages-page">
@@ -331,24 +410,69 @@ function OwnerMessagesPage() {
                   <span className="owner-chat-badge">{thread.status}</span>
                 </div>
 
+                <OwnerAdoptionProfilePanel
+                  inquiryId={selectedChatId}
+                  ownerId={ownerId}
+                  adopterName={thread.adopterName}
+                />
+
+                {thread.matchPercentageAtContact != null && (
+                  <p className="owner-inquiry-match-pill">
+                    Match at contact: {Math.round(thread.matchPercentageAtContact)}%
+                  </p>
+                )}
+
                 {showPendingActions && (
-                  <div className="owner-inquiry-decision-btns">
-                    <button
-                      type="button"
-                      className="owner-request-accept-btn"
-                      disabled={actionBusy}
-                      onClick={handleAccept}
-                    >
-                      Accept inquiry
-                    </button>
-                    <button
-                      type="button"
-                      className="owner-secondary-outline-btn"
-                      disabled={actionBusy}
-                      onClick={handleReject}
-                    >
-                      Decline
-                    </button>
+                  <div className="owner-inquiry-decision-block">
+                    <p className="owner-inquiry-decision-hint">
+                      You can read the adoption profile above and reply below before approving.
+                    </p>
+                    <div className="owner-inquiry-decision-btns">
+                      <button
+                        type="button"
+                        className="owner-request-accept-btn"
+                        disabled={actionBusy}
+                        onClick={handleAccept}
+                      >
+                        Approve message request
+                      </button>
+                      <button
+                        type="button"
+                        className="owner-secondary-outline-btn"
+                        disabled={actionBusy}
+                        onClick={handleReject}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(canReserve || canComplete) && (
+                  <div className="owner-inquiry-lifecycle-btns">
+                    {canReserve && (
+                      <button
+                        type="button"
+                        className="owner-secondary-outline-btn"
+                        disabled={actionBusy}
+                        onClick={handleReserve}
+                      >
+                        Reserve for adopter
+                      </button>
+                    )}
+                    {canComplete && (
+                      <button
+                        type="button"
+                        className="owner-request-accept-btn"
+                        disabled={actionBusy}
+                        onClick={handleCompleteAdoption}
+                      >
+                        Mark adoption complete
+                      </button>
+                    )}
+                    {adoptionCase?.status && (
+                      <span className="owner-adoption-case-status">Case: {adoptionCase.status}</span>
+                    )}
                   </div>
                 )}
 

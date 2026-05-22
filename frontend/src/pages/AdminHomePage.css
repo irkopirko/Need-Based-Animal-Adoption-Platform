@@ -42,8 +42,24 @@
   color: #444;
 }
 
-.admin-report-note {
+.admin-report-body {
+  margin: 12px 0;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-report-title-line {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1a1f1a;
+}
+
+.admin-report-description {
+  margin: 0;
   color: #333;
+  line-height: 1.55;
+  white-space: pre-wrap;
 }
 
 .admin-report-meta {

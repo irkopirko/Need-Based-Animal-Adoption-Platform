@@ -144,7 +144,27 @@ public class AnimalService {
             return true;
         }
         String t = status.trim().toUpperCase(Locale.ROOT);
-        return !"ARCHIVED".equals(t) && !"DELETED".equals(t);
+        return !"ARCHIVED".equals(t)
+                && !"DELETED".equals(t)
+                && !"ADOPTED".equals(t)
+                && !"RESERVED".equals(t);
+    }
+
+    @Transactional
+    public Animal markListingReserved(Long id, Long viewerId) {
+        Animal animal = assertAnimalOwnedBy(id, viewerId);
+        if ("ADOPTED".equalsIgnoreCase(String.valueOf(animal.getListingStatus()))) {
+            throw new IllegalArgumentException("This listing is already adopted");
+        }
+        animal.setListingStatus("RESERVED");
+        return animalRepository.save(animal);
+    }
+
+    @Transactional
+    public Animal markListingAdopted(Long id, Long viewerId) {
+        Animal animal = assertAnimalOwnedBy(id, viewerId);
+        animal.setListingStatus("ADOPTED");
+        return animalRepository.save(animal);
     }
 
     @Transactional

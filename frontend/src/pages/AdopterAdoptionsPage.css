@@ -1,0 +1,62 @@
+.adopter-adoptions-page {
+  min-height: 100vh;
+  background: #f7f7f5;
+  display: flex;
+  flex-direction: column;
+}
+
+.adopter-adoptions-main {
+  max-width: 800px;
+  margin: 2rem auto 3rem;
+  padding: 0 1.25rem;
+}
+
+.adopter-adoptions-tag {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #1f8f46;
+}
+
+.adopter-adoptions-list {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.adopter-adoptions-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  background: #fff;
+  border: 1px solid #e8e8e2;
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+}
+
+.adopter-adoptions-status {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef9f0;
+  color: #1f8f46;
+}
+
+.adopter-adoptions-status-completed {
+  background: #e8f4fd;
+  color: #1565c0;
+}
+
+.adopter-adoptions-row button {
+  border: none;
+  background: #1a1a1a;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+}

@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import "./CompatibleAnimalsPage.css";
 import Navbar from "../components/Navbar";
 import SaveHeartButton from "../components/SaveHeartButton";
+import ContactOwnerModal from "../components/ContactOwnerModal";
+import ReportListingModal from "../components/ReportListingModal";
 import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
 import { getStoredUser, getApiBaseUrl, getResolvedUserId } from "../utils/auth";
@@ -31,6 +33,13 @@ function CompatibleAnimalsPage() {
   const [sortBy, setSortBy] = useState("Highest Match");
   const [loading, setLoading] = useState(true);
   const [hasAdoptionRequest, setHasAdoptionRequest] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactAnimal, setContactAnimal] = useState(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportAnimalId, setReportAnimalId] = useState(null);
+
+  const user = getStoredUser();
+  const adopterUid = getResolvedUserId(user);
 
   useEffect(() => {
     let cancelled = false;
@@ -436,19 +445,62 @@ function CompatibleAnimalsPage() {
                     View Profile
                   </button>
 
-                  <button
-                    type="button"
-                    className="compatible-secondary-outline-btn"
-                    onClick={() => goToAnimalDetail(animal.id)}
-                  >
-                    Report / details
-                  </button>
+                  {hasAdoptionRequest && animal.ownerId != null && (
+                    <button
+                      type="button"
+                      className="compatible-secondary-outline-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setContactAnimal(animal);
+                        setContactOpen(true);
+                      }}
+                    >
+                      Message owner
+                    </button>
+                  )}
+
+                  {adopterUid != null && (
+                    <button
+                      type="button"
+                      className="compatible-secondary-outline-btn compatible-report-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReportAnimalId(animal.id);
+                        setReportOpen(true);
+                      }}
+                    >
+                      Report listing
+                    </button>
+                  )}
                 </div>
               </div>
             </article>
           ))}
         </section>
       </main>
+
+      <ContactOwnerModal
+        open={contactOpen}
+        onClose={(sent) => {
+          setContactOpen(false);
+          setContactAnimal(null);
+          if (sent) {
+            navigate("/adopter-messages");
+          }
+        }}
+        animal={contactAnimal}
+        adopterUserId={adopterUid}
+      />
+
+      <ReportListingModal
+        open={reportOpen}
+        onClose={() => {
+          setReportOpen(false);
+          setReportAnimalId(null);
+        }}
+        animalId={reportAnimalId}
+        reporterUserId={adopterUid}
+      />
 
       <Footer />
     </div>

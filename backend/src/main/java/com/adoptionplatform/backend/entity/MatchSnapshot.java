@@ -10,35 +10,29 @@ import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "listing_inquiries")
-public class ListingInquiry {
+@Table(name = "match_snapshots")
+public class MatchSnapshot {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)
-    private Long animalId;
-
-    @Column(nullable = false)
     private Long adopterUserId;
 
     @Column(nullable = false)
-    private Long ownerUserId;
+    private Long animalId;
 
-    @Column(length = 1000)
-    private String initialMessage;
-
-    /** PENDING, ACCEPTED, REJECTED */
-    @Column(nullable = false, length = 32)
-    private String status = "PENDING";
-
+    @Column(nullable = false)
     private Long adoptionRequestId;
 
-    private Double matchPercentageAtContact;
+    @Column(nullable = false)
+    private Double matchPercentage;
+
+    @Column(length = 4000)
+    private String matchReasonsJson;
 
     private LocalDateTime createdAt;
-
     private LocalDateTime updatedAt;
 
     public Long getId() {
@@ -49,14 +43,6 @@ public class ListingInquiry {
         this.id = id;
     }
 
-    public Long getAnimalId() {
-        return animalId;
-    }
-
-    public void setAnimalId(Long animalId) {
-        this.animalId = animalId;
-    }
-
     public Long getAdopterUserId() {
         return adopterUserId;
     }
@@ -65,28 +51,12 @@ public class ListingInquiry {
         this.adopterUserId = adopterUserId;
     }
 
-    public Long getOwnerUserId() {
-        return ownerUserId;
+    public Long getAnimalId() {
+        return animalId;
     }
 
-    public void setOwnerUserId(Long ownerUserId) {
-        this.ownerUserId = ownerUserId;
-    }
-
-    public String getInitialMessage() {
-        return initialMessage;
-    }
-
-    public void setInitialMessage(String initialMessage) {
-        this.initialMessage = initialMessage;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
+    public void setAnimalId(Long animalId) {
+        this.animalId = animalId;
     }
 
     public Long getAdoptionRequestId() {
@@ -97,12 +67,20 @@ public class ListingInquiry {
         this.adoptionRequestId = adoptionRequestId;
     }
 
-    public Double getMatchPercentageAtContact() {
-        return matchPercentageAtContact;
+    public Double getMatchPercentage() {
+        return matchPercentage;
     }
 
-    public void setMatchPercentageAtContact(Double matchPercentageAtContact) {
-        this.matchPercentageAtContact = matchPercentageAtContact;
+    public void setMatchPercentage(Double matchPercentage) {
+        this.matchPercentage = matchPercentage;
+    }
+
+    public String getMatchReasonsJson() {
+        return matchReasonsJson;
+    }
+
+    public void setMatchReasonsJson(String matchReasonsJson) {
+        this.matchReasonsJson = matchReasonsJson;
     }
 
     public LocalDateTime getCreatedAt() {

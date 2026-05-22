@@ -225,7 +225,7 @@ function AnimalDetailPage() {
                       className="secondary-btn animal-detail-contact-btn"
                       onClick={() => setContactOpen(true)}
                     >
-                      Contact owner
+                      Message owner
                     </button>
                   )}
                   <button type="button" className="secondary-btn" onClick={handleSave}>
@@ -276,7 +276,12 @@ function AnimalDetailPage() {
       />
       <ContactOwnerModal
         open={contactOpen}
-        onClose={() => setContactOpen(false)}
+        onClose={(sent) => {
+          setContactOpen(false);
+          if (sent) {
+            navigate("/adopter-messages");
+          }
+        }}
         animal={animal}
         adopterUserId={adopterUid}
       />

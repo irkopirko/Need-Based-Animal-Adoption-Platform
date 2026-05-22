@@ -1,0 +1,89 @@
+.owner-adoption-profile-panel {
+  background: #fafbf9;
+  border: 1px solid #e2e8e0;
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.owner-adoption-profile-head {
+  margin-bottom: 10px;
+}
+
+.owner-adoption-profile-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: #1a1f1a;
+}
+
+.owner-adoption-profile-adopter {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.owner-adoption-profile-lead {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4a524a;
+}
+
+.owner-adoption-profile-meta {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #888;
+}
+
+.owner-adoption-profile-muted,
+.owner-adoption-profile-error {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.owner-adoption-profile-error {
+  color: #b42318;
+}
+
+.owner-adoption-profile-sections {
+  display: grid;
+  gap: 14px;
+}
+
+.owner-adoption-profile-section h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #1f8f46;
+}
+
+.owner-adoption-profile-grid {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.owner-adoption-profile-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.owner-adoption-profile-row dt {
+  margin: 0;
+  font-weight: 600;
+  color: #555;
+}
+
+.owner-adoption-profile-row dd {
+  margin: 0;
+  color: #1a1f1a;
+}

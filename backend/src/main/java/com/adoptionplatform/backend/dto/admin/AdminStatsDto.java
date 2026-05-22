@@ -5,6 +5,7 @@ public class AdminStatsDto {
     private long totalUsers;
     private long totalAnimals;
     private long totalAdoptionRequests;
+    private long totalCompletedAdoptions;
     private long totalSuccessfulLogins;
     private long totalFailedLogins;
 
@@ -30,6 +31,14 @@ public class AdminStatsDto {
 
     public void setTotalAdoptionRequests(long totalAdoptionRequests) {
         this.totalAdoptionRequests = totalAdoptionRequests;
+    }
+
+    public long getTotalCompletedAdoptions() {
+        return totalCompletedAdoptions;
+    }
+
+    public void setTotalCompletedAdoptions(long totalCompletedAdoptions) {
+        this.totalCompletedAdoptions = totalCompletedAdoptions;
     }
 
     public long getTotalSuccessfulLogins() {

@@ -38,6 +38,7 @@
   font-weight: 600;
 }
 
+.report-modal-label input,
 .report-modal-label select,
 .report-modal-label textarea {
   font-weight: 400;

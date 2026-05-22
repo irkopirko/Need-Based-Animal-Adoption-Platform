@@ -14,9 +14,14 @@ import java.util.StringJoiner;
 public class AdoptionRequestService {
 
     private final AdoptionRequestRepository adoptionRequestRepository;
+    private final MatchSnapshotService matchSnapshotService;
 
-    public AdoptionRequestService(AdoptionRequestRepository adoptionRequestRepository) {
+    public AdoptionRequestService(
+            AdoptionRequestRepository adoptionRequestRepository,
+            MatchSnapshotService matchSnapshotService
+    ) {
         this.adoptionRequestRepository = adoptionRequestRepository;
+        this.matchSnapshotService = matchSnapshotService;
     }
 
     public AdoptionRequest saveRequest(AdoptionRequestDto dto) {
@@ -78,7 +83,13 @@ public class AdoptionRequestService {
             return request;
         }
         request.setRequestPhase("SUBMITTED");
-        return adoptionRequestRepository.save(request);
+        AdoptionRequest saved = adoptionRequestRepository.save(request);
+        matchSnapshotService.refreshSnapshotsForRequest(
+                userId,
+                saved.getId(),
+                MatchService.STRONG_MATCH_THRESHOLD
+        );
+        return saved;
     }
 
     public List<AdoptionRequest> getRequestsByUserId(Long userId) {

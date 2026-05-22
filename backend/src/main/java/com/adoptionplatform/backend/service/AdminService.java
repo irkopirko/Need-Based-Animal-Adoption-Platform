@@ -10,6 +10,7 @@ import com.adoptionplatform.backend.entity.AdoptionRequest;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.entity.LoginLog;
 import com.adoptionplatform.backend.entity.User;
+import com.adoptionplatform.backend.repository.AdoptionCaseRepository;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import com.adoptionplatform.backend.repository.LoginLogRepository;
@@ -28,6 +29,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final AnimalRepository animalRepository;
     private final AdoptionRequestRepository adoptionRequestRepository;
+    private final AdoptionCaseRepository adoptionCaseRepository;
     private final LoginLogRepository loginLogRepository;
     private final AdminConfig adminConfig;
 
@@ -35,12 +37,14 @@ public class AdminService {
             UserRepository userRepository,
             AnimalRepository animalRepository,
             AdoptionRequestRepository adoptionRequestRepository,
+            AdoptionCaseRepository adoptionCaseRepository,
             LoginLogRepository loginLogRepository,
             AdminConfig adminConfig
     ) {
         this.userRepository = userRepository;
         this.animalRepository = animalRepository;
         this.adoptionRequestRepository = adoptionRequestRepository;
+        this.adoptionCaseRepository = adoptionCaseRepository;
         this.loginLogRepository = loginLogRepository;
         this.adminConfig = adminConfig;
     }
@@ -50,6 +54,11 @@ public class AdminService {
         dto.setTotalUsers(userRepository.count());
         dto.setTotalAnimals(animalRepository.count());
         dto.setTotalAdoptionRequests(adoptionRequestRepository.count());
+        dto.setTotalCompletedAdoptions(
+                adoptionCaseRepository.findAll().stream()
+                        .filter(c -> "COMPLETED".equalsIgnoreCase(String.valueOf(c.getStatus())))
+                        .count()
+        );
         dto.setTotalSuccessfulLogins(loginLogRepository.countBySuccessful(true));
         dto.setTotalFailedLogins(loginLogRepository.countBySuccessful(false));
         return dto;

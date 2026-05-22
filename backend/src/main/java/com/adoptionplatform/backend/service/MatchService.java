@@ -18,6 +18,8 @@ import java.util.stream.Collectors;
 @Service
 public class MatchService {
 
+    public static final double STRONG_MATCH_THRESHOLD = 75.0;
+
     private final AdoptionRequestRepository adoptionRequestRepository;
     private final AnimalRepository animalRepository;
     private final SavedAnimalRepository savedRepo;
@@ -125,17 +127,27 @@ public class MatchService {
                 .orElse(null);
     }
 
-    private boolean isListedForPublicMatching(Animal animal) {
+    public boolean isListedForPublicMatching(Animal animal) {
         String s = animal.getListingStatus();
         if (s == null || s.isBlank()) {
             return true;
         }
-        String t = s.trim();
-        if ("ARCHIVED".equalsIgnoreCase(t)) {
-            return false;
-        }
-        return true;
+        String t = s.trim().toUpperCase(java.util.Locale.ROOT);
+        return !"ARCHIVED".equals(t)
+                && !"DELETED".equals(t)
+                && !"ADOPTED".equals(t)
+                && !"RESERVED".equals(t);
     }
+
+    /**
+     * Score one animal against an adoption request (same engine as {@link #getMatches}).
+     */
+    public AnimalMatchScore scoreAnimal(AdoptionRequest request, Animal animal) {
+        DetailedScore detailed = calculateDetailedScore(request, animal);
+        return new AnimalMatchScore(detailed.percentage, detailed.reasons);
+    }
+
+    public record AnimalMatchScore(double percentage, List<String> reasons) {}
 
     private DetailedScore calculateDetailedScore(AdoptionRequest request, Animal animal) {
         List<String> reasons = new ArrayList<>();

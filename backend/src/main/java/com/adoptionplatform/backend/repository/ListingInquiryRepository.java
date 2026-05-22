@@ -15,4 +15,6 @@ public interface ListingInquiryRepository extends JpaRepository<ListingInquiry, 
     List<ListingInquiry> findByAdopterUserIdOrderByCreatedAtDesc(Long adopterUserId);
 
     Optional<ListingInquiry> findByAnimalIdAndAdopterUserId(Long animalId, Long adopterUserId);
+
+    List<ListingInquiry> findByAnimalId(Long animalId);
 }

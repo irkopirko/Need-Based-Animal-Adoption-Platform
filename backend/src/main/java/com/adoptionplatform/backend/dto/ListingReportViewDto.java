@@ -12,6 +12,8 @@ public class ListingReportViewDto {
     private String reporterEmail;
     private String reason;
     private String note;
+    private String title;
+    private String description;
     private String status;
     private LocalDateTime createdAt;
 
@@ -77,6 +79,22 @@ public class ListingReportViewDto {
 
     public void setNote(String note) {
         this.note = note;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public String getStatus() {

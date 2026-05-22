@@ -4,6 +4,7 @@ import com.adoptionplatform.backend.dto.CreateListingReportRequest;
 import com.adoptionplatform.backend.dto.ListingReportViewDto;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.entity.ListingReport;
+import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import com.adoptionplatform.backend.repository.ListingReportRepository;
@@ -49,13 +50,18 @@ public class ListingReportService {
         if (request.getReporterUserId() == null || request.getAnimalId() == null) {
             throw new IllegalArgumentException("Reporter and animal are required");
         }
-        String reason = normalizeReason(request.getReason());
-        String note = normalizeNote(request.getNote());
+        String title = normalizeTitle(request.getTitle());
+        String description = normalizeDescription(request.getDescription());
+        String reason = resolveReason(request.getReason());
+        String note = description.length() > 280 ? description.substring(0, 280) : description;
 
         Animal animal = animalRepository.findById(request.getAnimalId())
                 .orElseThrow(() -> new IllegalArgumentException("Listing not found"));
-        userRepository.findById(request.getReporterUserId())
+        User reporter = userRepository.findById(request.getReporterUserId())
                 .orElseThrow(() -> new IllegalArgumentException("Reporter not found"));
+        if (reporter.getRole() != Role.ADOPTER) {
+            throw new IllegalArgumentException("Only adopters can report listings");
+        }
 
         if (reportRepository.existsByAnimalIdAndReporterUserIdAndStatus(
                 request.getAnimalId(), request.getReporterUserId(), "PENDING")) {
@@ -67,6 +73,8 @@ public class ListingReportService {
         report.setReporterUserId(request.getReporterUserId());
         report.setReason(reason);
         report.setNote(note);
+        report.setTitle(title);
+        report.setDescription(description);
         report.setStatus("PENDING");
         report.setCreatedAt(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
         return reportRepository.save(report);
@@ -98,6 +106,12 @@ public class ListingReportService {
         dto.setReporterUserId(r.getReporterUserId());
         dto.setReason(r.getReason());
         dto.setNote(r.getNote());
+        dto.setTitle(r.getTitle() != null && !r.getTitle().isBlank() ? r.getTitle() : r.getReason());
+        dto.setDescription(
+                r.getDescription() != null && !r.getDescription().isBlank()
+                        ? r.getDescription()
+                        : r.getNote()
+        );
         dto.setStatus(r.getStatus());
         dto.setCreatedAt(r.getCreatedAt());
 
@@ -106,24 +120,41 @@ public class ListingReportService {
         return dto;
     }
 
-    private static String normalizeReason(String raw) {
+    private static String resolveReason(String raw) {
         if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("Report reason is required");
+            return "OTHER";
         }
         String key = raw.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
         if (!ALLOWED_REASONS.contains(key)) {
-            throw new IllegalArgumentException("Invalid report reason");
+            return "OTHER";
         }
         return key;
     }
 
-    private static String normalizeNote(String raw) {
-        if (raw == null) {
-            return "";
+    private static String normalizeTitle(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Report title is required");
         }
         String t = raw.trim();
-        if (t.length() > 280) {
-            return t.substring(0, 280);
+        if (t.length() < 3) {
+            throw new IllegalArgumentException("Report title must be at least 3 characters");
+        }
+        if (t.length() > 120) {
+            return t.substring(0, 120);
+        }
+        return t;
+    }
+
+    private static String normalizeDescription(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Report description is required");
+        }
+        String t = raw.trim();
+        if (t.length() < 10) {
+            throw new IllegalArgumentException("Report description must be at least 10 characters");
+        }
+        if (t.length() > 1000) {
+            return t.substring(0, 1000);
         }
         return t;
     }

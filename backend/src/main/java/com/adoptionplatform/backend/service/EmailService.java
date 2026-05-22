@@ -46,6 +46,13 @@ public class EmailService {
         );
     }
 
+    public void sendAdoptionLifecycleNotice(String recipientEmail, String subject, String body) {
+        String safeBody = body == null || body.isBlank()
+                ? "Your adoption activity on Pavia was updated."
+                : body.trim();
+        sendHtmlEmail(recipientEmail, subject, escapeHtml(safeBody));
+    }
+
     public void sendListingModerationNotice(
             String recipientEmail,
             String listingCode,

@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import "./ReportListingModal.css";
-import { REPORT_REASONS, submitListingReport } from "../utils/platformApi";
+import { submitListingReport } from "../utils/platformApi";
 import { usePopup } from "./PopupProvider";
 
 function ReportListingModal({ open, onClose, animalId, reporterUserId }) {
   const { showPopup } = usePopup();
-  const [reason, setReason] = useState(REPORT_REASONS[0].value);
-  const [note, setNote] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   if (!open) {
@@ -23,20 +23,39 @@ function ReportListingModal({ open, onClose, animalId, reporterUserId }) {
       });
       return;
     }
+    const trimmedTitle = title.trim();
+    const trimmedDescription = description.trim();
+    if (trimmedTitle.length < 3) {
+      showPopup({
+        type: "warning",
+        title: "Title required",
+        message: "Enter a short title (at least 3 characters)."
+      });
+      return;
+    }
+    if (trimmedDescription.length < 10) {
+      showPopup({
+        type: "warning",
+        title: "Description required",
+        message: "Describe the issue in at least 10 characters."
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       await submitListingReport({
         reporterUserId,
         animalId,
-        reason,
-        note: note.trim()
+        title: trimmedTitle,
+        description: trimmedDescription
       });
       showPopup({
         type: "success",
         title: "Report submitted",
-        message: "Thank you. Our team will review this listing."
+        message: "Thank you. An administrator will review your report."
       });
-      setNote("");
+      setTitle("");
+      setDescription("");
       onClose();
     } catch (err) {
       showPopup({
@@ -60,27 +79,30 @@ function ReportListingModal({ open, onClose, animalId, reporterUserId }) {
       >
         <h2 id="report-modal-title">Report listing</h2>
         <p className="report-modal-lead">
-          Tell us why this listing should be reviewed. Add a short note if helpful.
+          Provide a clear title and description. Administrators see both when reviewing this
+          listing.
         </p>
         <form onSubmit={handleSubmit}>
           <label className="report-modal-label">
-            Reason
-            <select value={reason} onChange={(e) => setReason(e.target.value)} required>
-              {REPORT_REASONS.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+            Report title
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              maxLength={120}
+              placeholder="e.g. Misleading photos or incorrect breed"
+              required
+            />
           </label>
           <label className="report-modal-label">
-            Short explanation
+            Description
             <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              maxLength={280}
-              rows={3}
-              placeholder="Optional details (max 280 characters)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={1000}
+              rows={5}
+              placeholder="Explain what is wrong with this listing and why it should be reviewed…"
+              required
             />
           </label>
           <div className="report-modal-actions">

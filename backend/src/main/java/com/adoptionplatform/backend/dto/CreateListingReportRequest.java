@@ -4,6 +4,9 @@ public class CreateListingReportRequest {
 
     private Long reporterUserId;
     private Long animalId;
+    private String title;
+    private String description;
+    /** Legacy; optional if title/description are sent. */
     private String reason;
     private String note;
 
@@ -21,6 +24,22 @@ public class CreateListingReportRequest {
 
     public void setAnimalId(Long animalId) {
         this.animalId = animalId;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     public String getReason() {

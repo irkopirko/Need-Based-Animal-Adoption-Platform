@@ -1,10 +1,8 @@
 package com.adoptionplatform.backend.dto;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
-public class InquiryThreadDto {
+public class AdoptionCaseViewDto {
 
     private Long id;
     private Long animalId;
@@ -14,14 +12,15 @@ public class InquiryThreadDto {
     private String adopterName;
     private String adopterEmail;
     private Long ownerUserId;
-    private String status;
-    private String initialMessage;
+    private Long inquiryId;
     private Long adoptionRequestId;
-    private Double matchPercentageAtContact;
-    private Long adoptionCaseId;
-    private LocalDateTime createdAt;
+    private Double matchPercentageSnapshot;
+    private String status;
+    private LocalDateTime proposedAt;
+    private LocalDateTime acceptedAt;
+    private LocalDateTime reservedAt;
+    private LocalDateTime completedAt;
     private LocalDateTime updatedAt;
-    private List<InquiryMessageDto> messages = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -87,20 +86,12 @@ public class InquiryThreadDto {
         this.ownerUserId = ownerUserId;
     }
 
-    public String getStatus() {
-        return status;
+    public Long getInquiryId() {
+        return inquiryId;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getInitialMessage() {
-        return initialMessage;
-    }
-
-    public void setInitialMessage(String initialMessage) {
-        this.initialMessage = initialMessage;
+    public void setInquiryId(Long inquiryId) {
+        this.inquiryId = inquiryId;
     }
 
     public Long getAdoptionRequestId() {
@@ -111,28 +102,52 @@ public class InquiryThreadDto {
         this.adoptionRequestId = adoptionRequestId;
     }
 
-    public Double getMatchPercentageAtContact() {
-        return matchPercentageAtContact;
+    public Double getMatchPercentageSnapshot() {
+        return matchPercentageSnapshot;
     }
 
-    public void setMatchPercentageAtContact(Double matchPercentageAtContact) {
-        this.matchPercentageAtContact = matchPercentageAtContact;
+    public void setMatchPercentageSnapshot(Double matchPercentageSnapshot) {
+        this.matchPercentageSnapshot = matchPercentageSnapshot;
     }
 
-    public Long getAdoptionCaseId() {
-        return adoptionCaseId;
+    public String getStatus() {
+        return status;
     }
 
-    public void setAdoptionCaseId(Long adoptionCaseId) {
-        this.adoptionCaseId = adoptionCaseId;
+    public void setStatus(String status) {
+        this.status = status;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public LocalDateTime getProposedAt() {
+        return proposedAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setProposedAt(LocalDateTime proposedAt) {
+        this.proposedAt = proposedAt;
+    }
+
+    public LocalDateTime getAcceptedAt() {
+        return acceptedAt;
+    }
+
+    public void setAcceptedAt(LocalDateTime acceptedAt) {
+        this.acceptedAt = acceptedAt;
+    }
+
+    public LocalDateTime getReservedAt() {
+        return reservedAt;
+    }
+
+    public void setReservedAt(LocalDateTime reservedAt) {
+        this.reservedAt = reservedAt;
+    }
+
+    public LocalDateTime getCompletedAt() {
+        return completedAt;
+    }
+
+    public void setCompletedAt(LocalDateTime completedAt) {
+        this.completedAt = completedAt;
     }
 
     public LocalDateTime getUpdatedAt() {
@@ -141,13 +156,5 @@ public class InquiryThreadDto {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
-    }
-
-    public List<InquiryMessageDto> getMessages() {
-        return messages;
-    }
-
-    public void setMessages(List<InquiryMessageDto> messages) {
-        this.messages = messages;
     }
 }

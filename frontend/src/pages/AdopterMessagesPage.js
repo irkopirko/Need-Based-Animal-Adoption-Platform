@@ -269,8 +269,8 @@ function AdopterMessagesPage() {
                   </button>
                   {thread.status === "PENDING" && (
                     <p className="adopter-inquiry-hint">
-                      Your messages are saved. The owner can accept to continue the adoption
-                      process.
+                      Your messages are saved. The owner can read your adoption profile and
+                      reply before approving this request.
                     </p>
                   )}
                 </div>

@@ -11,6 +11,8 @@ import {
   PAVIA_OWNER_ENGAGEMENT_UPDATED,
   STRONG_MATCH_THRESHOLD
 } from "../utils/ownerJourney";
+import OwnerAdoptionProfilePanel from "../components/OwnerAdoptionProfilePanel";
+import { getResolvedUserId } from "../utils/auth";
 
 function OwnerManageRequestsPage() {
   const navigate = useNavigate();
@@ -18,6 +20,8 @@ function OwnerManageRequestsPage() {
   const [scenario, setScenario] = useState("NO_LISTINGS");
   const [engage, setEngage] = useState(null);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
+
+  const ownerId = getResolvedUserId(getStoredUser());
 
   const refresh = useCallback(async () => {
     const user = getStoredUser();
@@ -339,9 +343,15 @@ function OwnerManageRequestsPage() {
                   </div>
                 )}
 
+                <OwnerAdoptionProfilePanel
+                  inquiryId={selectedInquiry.id}
+                  ownerId={ownerId}
+                  adopterName={selectedInquiry.adopterName}
+                />
+
                 <div className="owner-request-detail-grid">
                   <div className="owner-request-detail-card owner-request-detail-card-wide">
-                    <h3>Inquiry</h3>
+                    <h3>Message request</h3>
                     <p>{selectedInquiry.initialMessage}</p>
                   </div>
 

@@ -12,14 +12,6 @@ import {
   resolveReport
 } from "../utils/platformApi";
 
-const REASON_LABELS = {
-  MISLEADING_INFO: "Misleading information",
-  INAPPROPRIATE_CONTENT: "Inappropriate content",
-  ANIMAL_WELFARE_CONCERN: "Animal welfare concern",
-  DUPLICATE_LISTING: "Duplicate listing",
-  OTHER: "Other"
-};
-
 function AdminHomePage() {
   const navigate = useNavigate();
   const { showPopup } = usePopup();
@@ -123,17 +115,19 @@ function AdminHomePage() {
                   <h3>{r.animalName || "Listing"}</h3>
                   <span className="admin-listing-code">{r.listingCode}</span>
                 </div>
-                <p>
-                  <strong>Reason:</strong>{" "}
-                  {REASON_LABELS[r.reason] || r.reason}
-                </p>
-                {r.note && (
-                  <p className="admin-report-note">
-                    <strong>Note:</strong> {r.note}
+                <div className="admin-report-body">
+                  <p className="admin-report-title-line">
+                    <strong>Title:</strong> {r.title || "—"}
                   </p>
-                )}
+                  <p className="admin-report-description">
+                    <strong>Description:</strong> {r.description || "—"}
+                  </p>
+                </div>
                 <p className="admin-report-meta">
                   Reporter: {r.reporterEmail || r.reporterUserId} · Listing ID: {r.animalId}
+                  {r.createdAt
+                    ? ` · ${new Date(r.createdAt).toLocaleString()}`
+                    : ""}
                 </p>
                 <label className="admin-reason-input">
                   Owner email reason

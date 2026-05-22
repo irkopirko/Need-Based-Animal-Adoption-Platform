@@ -10,6 +10,7 @@ import com.adoptionplatform.backend.entity.InquiryMessage;
 import com.adoptionplatform.backend.entity.ListingInquiry;
 import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
+import com.adoptionplatform.backend.repository.AdoptionCaseRepository;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import com.adoptionplatform.backend.repository.InquiryMessageRepository;
@@ -35,19 +36,28 @@ public class InquiryService {
     private final AnimalRepository animalRepository;
     private final UserRepository userRepository;
     private final AdoptionRequestRepository adoptionRequestRepository;
+    private final MatchSnapshotService matchSnapshotService;
+    private final AdoptionCaseService adoptionCaseService;
+    private final AdoptionCaseRepository adoptionCaseRepository;
 
     public InquiryService(
             ListingInquiryRepository inquiryRepository,
             InquiryMessageRepository messageRepository,
             AnimalRepository animalRepository,
             UserRepository userRepository,
-            AdoptionRequestRepository adoptionRequestRepository
+            AdoptionRequestRepository adoptionRequestRepository,
+            MatchSnapshotService matchSnapshotService,
+            AdoptionCaseService adoptionCaseService,
+            AdoptionCaseRepository adoptionCaseRepository
     ) {
         this.inquiryRepository = inquiryRepository;
         this.messageRepository = messageRepository;
         this.animalRepository = animalRepository;
         this.userRepository = userRepository;
         this.adoptionRequestRepository = adoptionRequestRepository;
+        this.matchSnapshotService = matchSnapshotService;
+        this.adoptionCaseService = adoptionCaseService;
+        this.adoptionCaseRepository = adoptionCaseRepository;
     }
 
     @Transactional
@@ -66,12 +76,32 @@ public class InquiryService {
             throw new IllegalArgumentException("Only adopters can contact owners");
         }
 
+        List<AdoptionRequest> adopterRequests = adoptionRequestRepository.findByUserId(request.getAdopterUserId());
+        boolean hasSubmitted = adopterRequests != null && adopterRequests.stream()
+                .anyMatch(r -> "SUBMITTED".equalsIgnoreCase(String.valueOf(r.getRequestPhase())));
+        if (!hasSubmitted) {
+            throw new IllegalArgumentException(
+                    "Submit your adoption request before contacting an owner");
+        }
+
         Animal animal = animalRepository.findById(request.getAnimalId())
                 .orElseThrow(() -> new IllegalArgumentException("Listing not found"));
         Long ownerId = animal.getOwnerId();
         if (ownerId == null) {
             throw new IllegalArgumentException("Listing has no owner");
         }
+        String listingStatus = animal.getListingStatus() == null ? "" : animal.getListingStatus().trim().toUpperCase(Locale.ROOT);
+        if ("ADOPTED".equals(listingStatus) || "RESERVED".equals(listingStatus) || "ARCHIVED".equals(listingStatus)) {
+            throw new IllegalArgumentException("This listing is no longer available for new inquiries");
+        }
+
+        AdoptionRequest submittedRequest = latestSubmittedRequest(request.getAdopterUserId());
+        Long adoptionRequestId = submittedRequest != null ? submittedRequest.getId() : null;
+        Double matchPct = matchSnapshotService.resolveMatchPercentage(
+                request.getAdopterUserId(),
+                animal.getId(),
+                adoptionRequestId
+        );
 
         Optional<ListingInquiry> existing = inquiryRepository.findByAnimalIdAndAdopterUserId(
                 request.getAnimalId(), request.getAdopterUserId());
@@ -86,9 +116,13 @@ public class InquiryService {
         inquiry.setOwnerUserId(ownerId);
         inquiry.setInitialMessage(message);
         inquiry.setStatus("PENDING");
+        inquiry.setAdoptionRequestId(adoptionRequestId);
+        inquiry.setMatchPercentageAtContact(matchPct);
         inquiry.setCreatedAt(now);
         inquiry.setUpdatedAt(now);
         ListingInquiry saved = inquiryRepository.save(inquiry);
+
+        adoptionCaseService.ensureProposedCase(saved, adoptionRequestId, matchPct);
 
         InquiryMessage first = new InquiryMessage();
         first.setInquiryId(saved.getId());
@@ -131,7 +165,9 @@ public class InquiryService {
         }
         inquiry.setStatus("ACCEPTED");
         inquiry.setUpdatedAt(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
-        return toThreadDto(inquiryRepository.save(inquiry), true);
+        ListingInquiry saved = inquiryRepository.save(inquiry);
+        adoptionCaseService.acceptCaseForInquiry(inquiryId, ownerId);
+        return toThreadDto(saved, true);
     }
 
     @Transactional
@@ -184,6 +220,12 @@ public class InquiryService {
         if (requests == null || requests.isEmpty()) {
             return null;
         }
+        Optional<AdoptionRequest> submitted = requests.stream()
+                .filter(r -> "SUBMITTED".equalsIgnoreCase(String.valueOf(r.getRequestPhase())))
+                .max(Comparator.comparing(AdoptionRequest::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+        if (submitted.isPresent()) {
+            return submitted.get();
+        }
         return requests.stream()
                 .max(Comparator.comparing(AdoptionRequest::getId, Comparator.nullsLast(Comparator.naturalOrder())))
                 .orElse(null);
@@ -229,8 +271,12 @@ public class InquiryService {
         dto.setOwnerUserId(inquiry.getOwnerUserId());
         dto.setStatus(inquiry.getStatus());
         dto.setInitialMessage(inquiry.getInitialMessage());
+        dto.setAdoptionRequestId(inquiry.getAdoptionRequestId());
+        dto.setMatchPercentageAtContact(inquiry.getMatchPercentageAtContact());
         dto.setCreatedAt(inquiry.getCreatedAt());
         dto.setUpdatedAt(inquiry.getUpdatedAt());
+
+        adoptionCaseRepository.findByInquiryId(inquiry.getId()).ifPresent(c -> dto.setAdoptionCaseId(c.getId()));
 
         animalRepository.findById(inquiry.getAnimalId()).ifPresent(a -> dto.setAnimalName(a.getName()));
         userRepository.findById(inquiry.getAdopterUserId()).ifPresent(u -> {
@@ -257,6 +303,17 @@ public class InquiryService {
         dto.setBody(m.getBody());
         dto.setCreatedAt(m.getCreatedAt());
         return dto;
+    }
+
+    private AdoptionRequest latestSubmittedRequest(Long adopterUserId) {
+        List<AdoptionRequest> requests = adoptionRequestRepository.findByUserId(adopterUserId);
+        if (requests == null || requests.isEmpty()) {
+            return null;
+        }
+        return requests.stream()
+                .filter(r -> "SUBMITTED".equalsIgnoreCase(String.valueOf(r.getRequestPhase())))
+                .max(Comparator.comparing(AdoptionRequest::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                .orElse(null);
     }
 
     private static String normalizeMessage(String raw) {

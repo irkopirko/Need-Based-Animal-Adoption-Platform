@@ -34,7 +34,7 @@ function ContactOwnerModal({ open, onClose, animal, adopterUserId }) {
         type: "success",
         title: "Message sent",
         message:
-          "Your inquiry was sent. Continue the conversation in Messages — history is saved for you and the owner."
+          "Your message request was sent. The owner can review your adoption profile and reply before approving the conversation."
       });
       setMessage("");
       onClose(true);
@@ -57,10 +57,10 @@ function ContactOwnerModal({ open, onClose, animal, adopterUserId }) {
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2>Contact owner</h2>
+        <h2>Message owner</h2>
         <p className="contact-modal-lead">
-          About <strong>{animal?.name}</strong>. Your message is saved in history for both
-          you and the owner.
+          About <strong>{animal?.name}</strong>. The owner receives a message request and can
+          read your submitted adoption profile before approving the conversation.
         </p>
         <form onSubmit={handleSubmit}>
           <label className="contact-modal-label">
