@@ -428,7 +428,7 @@ function RegisterAnimalPage() {
           const formPayloadUp = new FormData();
           images.forEach((image) => formPayloadUp.append("images", image));
           const upRes = await fetch(
-            `${apiBaseUrl}/api/animals/owner-upload-images?viewerId=${encodeURIComponent(ownerId)}`,
+            `${apiBaseUrl}/api/animals/${encodeURIComponent(editAnimalId)}/images?viewerId=${encodeURIComponent(ownerId)}`,
             { method: "POST", body: formPayloadUp }
           );
           const upJson = await upRes.json().catch(() => ({}));

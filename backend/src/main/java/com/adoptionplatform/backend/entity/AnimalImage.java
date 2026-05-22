@@ -11,6 +11,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * row in {@code animal_images}, primary key is {@code (animal_id, sort_order)} — no surrogate {@code id} column
@@ -39,6 +41,14 @@ public class AnimalImage {
     @Column(name = "image_url", nullable = false, length = 2048)
     private String imageUrl;
 
+    @JdbcTypeCode(SqlTypes.BLOB)
+    @Column(name = "image_data", columnDefinition = "LONGBLOB")
+    @JsonIgnore
+    private byte[] imageData;
+
+    @Column(name = "content_type", nullable = false, length = 64)
+    private String contentType = "image/jpeg";
+
     public AnimalImage() {
     }
 
@@ -65,5 +75,26 @@ public class AnimalImage {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    @JsonIgnore
+    public byte[] getImageData() {
+        return imageData;
+    }
+
+    public void setImageData(byte[] imageData) {
+        this.imageData = imageData;
+    }
+
+    public String getContentType() {
+        return contentType;
+    }
+
+    public void setContentType(String contentType) {
+        this.contentType = contentType;
+    }
+
+    public boolean hasStoredBytes() {
+        return imageData != null && imageData.length > 0;
     }
 }

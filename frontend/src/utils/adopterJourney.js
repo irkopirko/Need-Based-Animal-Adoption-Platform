@@ -172,10 +172,14 @@ function isLoopbackPage() {
   return h === "localhost" || h === "127.0.0.1" || h === "[::1]";
 }
 
-function loopbackUploadsPathname(urlString) {
+function isApiAnimalImagePath(pathname) {
+  return /^\/api\/animals\/\d+\/images\/\d+/.test(pathname);
+}
+
+function loopbackRelativeMediaPathname(urlString) {
   try {
     const u = new URL(urlString);
-    if (!u.pathname.startsWith("/uploads/")) {
+    if (!u.pathname.startsWith("/uploads/") && !isApiAnimalImagePath(u.pathname)) {
       return null;
     }
     const h = u.hostname;
@@ -225,7 +229,7 @@ export function resolveMediaUrl(path, apiBaseUrl) {
   }
   if (/^https?:\/\//i.test(s)) {
     if (isLoopbackPage()) {
-      const rel = loopbackUploadsPathname(s);
+      const rel = loopbackRelativeMediaPathname(s);
       if (rel) {
         return rel;
       }
@@ -233,7 +237,7 @@ export function resolveMediaUrl(path, apiBaseUrl) {
     return s;
   }
   const p = s.startsWith("/") ? s : `/${s}`;
-  if (isLoopbackPage() && p.startsWith("/uploads/")) {
+  if (isLoopbackPage() && (p.startsWith("/uploads/") || isApiAnimalImagePath(p))) {
     return p;
   }
   let base = uploadBaseForBrowser(apiBaseUrl, p).replace(/\/$/, "");

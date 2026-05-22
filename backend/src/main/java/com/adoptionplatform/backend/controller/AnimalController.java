@@ -3,6 +3,7 @@ package com.adoptionplatform.backend.controller;
 import com.adoptionplatform.backend.dto.AnimalRequest;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.service.AnimalService;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -77,6 +78,46 @@ public class AnimalController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    /**
+     * Serves JPEG bytes from {@code animal_images.image_data}, or legacy disk {@code /uploads/...} paths.
+     */
+    @GetMapping("/{animalId}/images/{sortOrder}")
+    public ResponseEntity<byte[]> getListingImage(
+            @PathVariable Long animalId,
+            @PathVariable int sortOrder
+    ) {
+        return animalService.serveAnimalImage(animalId, sortOrder);
+    }
+
+    /**
+     * Owner-only: append JPEGs to an existing listing (returns public image URLs).
+     */
+    @PostMapping(value = "/{animalId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> appendListingImages(
+            @PathVariable Long animalId,
+            @RequestParam("viewerId") Long viewerId,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images
+    ) {
+        try {
+            List<String> urls = animalService.appendJpegImagesToListing(animalId, viewerId, images);
+            return ResponseEntity.ok(Map.of("urls", urls));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (DataIntegrityViolationException ex) {
+            log.error("appendListingImages data error animalId={}", animalId, ex);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error",
+                    "Image could not be saved. Use JPEG files under 5 MB each, then restart the backend."
+            ));
+        } catch (Exception ex) {
+            log.error("appendListingImages failed animalId={} viewerId={}", animalId, viewerId, ex);
+            String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                    ? ex.getMessage()
+                    : "Upload failed.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
 
@@ -161,20 +202,21 @@ public class AnimalController {
     }
 
     /**
-     * Ooner-only: uploads JPEGs and returns public image URLs (for edit listing without replacing all photos).
+     * @deprecated use {@code POST /api/animals/{animalId}/images} with {@code viewerId}.
      */
     @PostMapping(value = "/owner-upload-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadOwnerListingImages(
             @RequestParam("viewerId") Long viewerId,
+            @RequestParam("animalId") Long animalId,
             @RequestPart(value = "images", required = false) List<MultipartFile> images
     ) {
         try {
-            List<String> urls = animalService.uploadJpegImagesForOwner(viewerId, images);
+            List<String> urls = animalService.uploadJpegImagesForOwner(animalId, viewerId, images);
             return ResponseEntity.ok(Map.of("urls", urls));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
         } catch (Exception ex) {
-            log.error("uploadOwnerListingImages failed viewerId={}", viewerId, ex);
+            log.error("uploadOwnerListingImages failed animalId={} viewerId={}", animalId, viewerId, ex);
             String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
                     ? ex.getMessage()
                     : "Upload failed.";
@@ -194,6 +236,18 @@ public class AnimalController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        } catch (DataIntegrityViolationException ex) {
+            log.error("createAnimalWithImages data error", ex);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error",
+                    "Image could not be saved. Use JPEG files under 5 MB each, then restart the backend if this persists."
+            ));
+        } catch (RuntimeException ex) {
+            log.error("createAnimalWithImages failed", ex);
+            String msg = ex.getMessage() != null && !ex.getMessage().isBlank()
+                    ? ex.getMessage()
+                    : "Could not save listing.";
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", msg));
         }
     }
 }

@@ -129,6 +129,21 @@ public class Animal {
     /**
      * ordered image URLs persisted in {@code animal_images} (FK {@code animal_id} → {@link #id})
      */
+    @JsonIgnore
+    public List<AnimalImage> getAnimalImages() {
+        if (animalImages == null) {
+            animalImages = new ArrayList<>();
+        }
+        return animalImages;
+    }
+
+    public void replaceAnimalImages(List<AnimalImage> rows) {
+        getAnimalImages().clear();
+        if (rows != null) {
+            animalImages.addAll(rows);
+        }
+    }
+
     @JsonProperty("images")
     public List<String> getImages() {
         List<String> out = new ArrayList<>();
