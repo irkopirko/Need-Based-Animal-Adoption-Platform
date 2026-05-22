@@ -23,6 +23,7 @@ public class ModerationService {
     private final ListingReportRepository listingReportRepository;
     private final EmailService emailService;
     private final ListingReportService listingReportService;
+    private final AnimalService animalService;
 
     public ModerationService(
             AdminConfig adminConfig,
@@ -31,7 +32,8 @@ public class ModerationService {
             SavedAnimalRepository savedAnimalRepository,
             ListingReportRepository listingReportRepository,
             EmailService emailService,
-            ListingReportService listingReportService
+            ListingReportService listingReportService,
+            AnimalService animalService
     ) {
         this.adminConfig = adminConfig;
         this.animalRepository = animalRepository;
@@ -40,6 +42,7 @@ public class ModerationService {
         this.listingReportRepository = listingReportRepository;
         this.emailService = emailService;
         this.listingReportService = listingReportService;
+        this.animalService = animalService;
     }
 
     public void assertAdmin(String adminEmail) {
@@ -65,10 +68,9 @@ public class ModerationService {
         assertAdmin(adminEmail);
         Animal animal = animalRepository.findById(animalId)
                 .orElseThrow(() -> new IllegalArgumentException("Listing not found"));
-        notifyOwner(animal, "deleted", reason);
         resolveReportsForAnimal(animalId);
-        savedAnimalRepository.deleteByAnimalIdIn(List.of(animalId));
-        animalRepository.deleteById(animalId);
+        animalService.removeListingFromDatabase(animalId);
+        notifyOwner(animal, "deleted", reason);
     }
 
     private void resolveReportsForAnimal(Long animalId) {

@@ -13,6 +13,7 @@ import com.adoptionplatform.backend.repository.MatchSnapshotRepository;
 import com.adoptionplatform.backend.repository.SavedAnimalRepository;
 import com.adoptionplatform.backend.repository.UserRepository;
 import com.adoptionplatform.backend.util.ListingCodeUtil;
+import jakarta.persistence.EntityManager;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -21,6 +22,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -46,6 +49,9 @@ public class AnimalService {
     private static final String SQL_ANIMAL_IDS_BY_OWNER = "SELECT id FROM animals WHERE owner_id = ?";
     private static final Pattern API_IMAGE_PATH =
             Pattern.compile("/api/animals/(\\d+)/images/(\\d+)");
+    private static final Pattern DESCRIPTION_SENTENCE_START =
+            Pattern.compile("(^|[.!?]\\s+)(\\p{L})");
+    private static final Locale TEXT_LOCALE = Locale.forLanguageTag("tr-TR");
     private static final int MAX_JPEG_BYTES = 5 * 1024 * 1024;
 
     private final AnimalRepository animalRepository;
@@ -55,6 +61,7 @@ public class AnimalService {
     private final MatchSnapshotRepository matchSnapshotRepository;
     private final EmailService emailService;
     private final JdbcTemplate jdbcTemplate;
+    private final EntityManager entityManager;
     private final UploadRootHolder uploadRootHolder;
     private final String publicBaseUrl;
 
@@ -66,6 +73,7 @@ public class AnimalService {
             MatchSnapshotRepository matchSnapshotRepository,
             EmailService emailService,
             JdbcTemplate jdbcTemplate,
+            EntityManager entityManager,
             UploadRootHolder uploadRootHolder,
             @Value("${app.public-base-url:}") String publicBaseUrl
     ) {
@@ -76,6 +84,7 @@ public class AnimalService {
         this.matchSnapshotRepository = matchSnapshotRepository;
         this.emailService = emailService;
         this.jdbcTemplate = jdbcTemplate;
+        this.entityManager = entityManager;
         this.uploadRootHolder = uploadRootHolder;
         this.publicBaseUrl = publicBaseUrl != null ? publicBaseUrl.trim() : "";
     }
@@ -221,6 +230,60 @@ public class AnimalService {
                 // Archive succeeds even if email delivery fails.
             }
         });
+    }
+
+    static String requireAnimalGender(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Animal gender is required (Male or Female)");
+        }
+        String g = raw.trim().toUpperCase(Locale.ROOT);
+        if ("MALE".equals(g) || "M".equals(g)) {
+            return "MALE";
+        }
+        if ("FEMALE".equals(g) || "F".equals(g)) {
+            return "FEMALE";
+        }
+        throw new IllegalArgumentException("Animal gender must be Male or Female");
+    }
+
+    static String capitalizeWords(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        String[] parts = value.trim().split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                sb.append(' ');
+            }
+            String word = parts[i];
+            if (word.isEmpty()) {
+                continue;
+            }
+            String lower = word.toLowerCase(TEXT_LOCALE);
+            sb.append(Character.toUpperCase(lower.charAt(0)));
+            if (lower.length() > 1) {
+                sb.append(lower.substring(1));
+            }
+        }
+        return sb.toString();
+    }
+
+    static String capitalizeDescription(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        String trimmed = value.trim();
+        Matcher matcher = DESCRIPTION_SENTENCE_START.matcher(trimmed);
+        StringBuilder out = new StringBuilder();
+        while (matcher.find()) {
+            matcher.appendReplacement(
+                    out,
+                    matcher.group(1)
+                            + matcher.group(2).toUpperCase(TEXT_LOCALE));
+        }
+        matcher.appendTail(out);
+        return out.toString();
     }
 
     static String normalizeListingStatus(String raw) {
@@ -513,8 +576,11 @@ public class AnimalService {
         existingAnimal.setSpecialNeeds(updatedAnimal.getSpecialNeeds());
         existingAnimal.setGoodWithChildren(updatedAnimal.getGoodWithChildren());
         existingAnimal.setGoodWithPets(updatedAnimal.getGoodWithPets());
-        existingAnimal.setDescription(updatedAnimal.getDescription());
+        existingAnimal.setDescription(capitalizeDescription(updatedAnimal.getDescription()));
         existingAnimal.setHousingLocation(updatedAnimal.getHousingLocation());
+        if (updatedAnimal.getGender() != null && !updatedAnimal.getGender().isBlank()) {
+            existingAnimal.setGender(requireAnimalGender(updatedAnimal.getGender()));
+        }
         existingAnimal.setListingStatus(normalizeListingStatus(updatedAnimal.getListingStatus()));
         existingAnimal.setCompatibilityScore(updatedAnimal.getCompatibilityScore());
         reconcileImageUrls(existingAnimal, updatedAnimal.getImages());
@@ -557,8 +623,9 @@ public class AnimalService {
         animal.setGoodWithPets(request.getGoodWithPets());
         animal.setGroomingNeed(request.getGroomingNeed());
         animal.setSpecialNeeds(request.getSpecialNeeds());
-        animal.setDescription(request.getDescription());
+        animal.setDescription(capitalizeDescription(request.getDescription()));
         animal.setHousingLocation(request.getHousingLocation());
+        animal.setGender(requireAnimalGender(request.getGender()));
 
         Animal saved = animalRepository.save(animal);
         ensureOwnerListingInSavedAnimals(saved);
@@ -639,8 +706,75 @@ public class AnimalService {
 
     @Transactional
     public void deleteAnimal(Long id, Long viewerId) {
-        assertAnimalOwnedBy(id, viewerId);
-        savedAnimalRepository.deleteByAnimalIdIn(List.of(id));
-        animalRepository.deleteById(id);
+        Animal animal = assertAnimalOwnedBy(id, viewerId);
+        Long animalId = animal.getId();
+        String animalName = animal.getName() != null ? animal.getName() : "Listing";
+        Long ownerUserId = animal.getOwnerId();
+        entityManager.detach(animal);
+        removeListingFromDatabase(animalId);
+        scheduleOwnerListingDeletedEmail(ownerUserId, animalName);
+    }
+
+    /**
+     * Hard-deletes a listing and all dependent rows. Used by owner delete and admin moderation.
+     */
+    @Transactional
+    public void removeListingFromDatabase(Long animalId) {
+        if (animalId == null) {
+            throw new IllegalArgumentException("Listing id is required");
+        }
+        purgeListingDependents(animalId);
+        int removed = jdbcTemplate.update("DELETE FROM animals WHERE id = ?", animalId);
+        if (removed == 0) {
+            throw new RuntimeException("Animal not found with id: " + animalId);
+        }
+    }
+
+    private void purgeListingDependents(Long animalId) {
+        jdbcTemplate.update(
+                "DELETE FROM inquiry_messages WHERE inquiry_id IN ("
+                        + "SELECT id FROM (SELECT id FROM listing_inquiries WHERE animal_id = ?) AS li_ids"
+                        + ")",
+                animalId
+        );
+        jdbcTemplate.update("DELETE FROM adoption_cases WHERE animal_id = ?", animalId);
+        jdbcTemplate.update("DELETE FROM listing_inquiries WHERE animal_id = ?", animalId);
+        jdbcTemplate.update("DELETE FROM listing_reports WHERE animal_id = ?", animalId);
+        jdbcTemplate.update("DELETE FROM match_snapshots WHERE animal_id = ?", animalId);
+        jdbcTemplate.update("DELETE FROM saved_animals WHERE animal_id = ?", animalId);
+        jdbcTemplate.update("DELETE FROM animal_images WHERE animal_id = ?", animalId);
+    }
+
+    private void scheduleOwnerListingDeletedEmail(Long ownerUserId, String animalName) {
+        if (ownerUserId == null) {
+            return;
+        }
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            notifyOwnerListingDeleted(ownerUserId, animalName);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                notifyOwnerListingDeleted(ownerUserId, animalName);
+            }
+        });
+    }
+
+    private void notifyOwnerListingDeleted(Long ownerUserId, String animalName) {
+        if (ownerUserId == null) {
+            return;
+        }
+        userRepository.findById(ownerUserId).ifPresent(owner -> {
+            String email = owner.getEmail();
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            try {
+                emailService.sendOwnerListingDeletedNotice(email.trim(), animalName);
+            } catch (RuntimeException ex) {
+                // deletion succeeds even if the email delivery fails.
+            }
+        });
     }
 }
