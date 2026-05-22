@@ -103,6 +103,22 @@ export const formatTurkishPhoneInput = (value) => {
   return formatted;
 };
 
+export const isOwnerProfileComplete = (user) => {
+  if (normalizeRole(user?.role) !== "OWNER") {
+    return true;
+  }
+  return user?.ownerProfileCompleted === true || user?.ownerProfileCompleted === "true";
+};
+
+export const isOwnerProfileIncomplete = (user) => !isOwnerProfileComplete(user);
+
+export const getOwnerHomePath = (user) => {
+  if (isOwnerProfileIncomplete(user)) {
+    return "/complete-owner-profile";
+  }
+  return "/ownerhomepage";
+};
+
 export const getHomePathByRole = (role) => {
   const normalizedRole = normalizeRole(role);
 

@@ -25,10 +25,16 @@ import {
   getStoredUser,
   normalizeRole
 } from "../utils/auth";
+import {
+  loadAdopterJourneyState,
+  summarizeAdoptionRequests,
+  STRONG_MATCH_THRESHOLD
+} from "../utils/adopterJourney";
 
 function AdopterHomePage() {
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [journey, setJourney] = useState(null);
 
   const slides = [
     animalSlide1,
@@ -87,6 +93,12 @@ function AdopterHomePage() {
       })
       .catch(() => {});
 
+    loadAdopterJourneyState(uid).then((state) => {
+      if (!cancelled) {
+        setJourney(state);
+      }
+    });
+
     return () => {
       cancelled = true;
     };
@@ -94,6 +106,10 @@ function AdopterHomePage() {
 
   const goToAdoptionRequest = () => {
     navigate("/adoption-request");
+  };
+
+  const goToMyMatches = () => {
+    navigate("/my-adoption-requests");
   };
 
   const goToSavedAnimals = () => {
@@ -104,9 +120,84 @@ function AdopterHomePage() {
     navigate("/adopter-messages");
   };
 
-  const goToMatches = ()  => {
-    navigate("/matches");
-    
+  const submittedRequests = (journey?.requests || []).filter(
+    (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
+  );
+  const { hasSubmitted, hasDraft } = summarizeAdoptionRequests(journey?.requests || []);
+
+  const requestSummaryValue = () => {
+    if (!journey) {
+      return "…";
+    }
+    if (journey.noRequest) {
+      return "Not started";
+    }
+    if (journey.draftOnly) {
+      return "Draft";
+    }
+    if (hasSubmitted) {
+      return `${submittedRequests.length} submitted`;
+    }
+    return "In progress";
+  };
+
+  const compatibleSummaryValue = () => {
+    if (!journey || journey.noRequest || journey.draftOnly) {
+      return "Locked";
+    }
+    if (!hasSubmitted) {
+      return "Locked";
+    }
+    const n = journey.strongMatches?.length ?? 0;
+    return n > 0 ? `${n} matches` : "No matches yet";
+  };
+
+  const savedSummaryValue = () => {
+    if (!journey || !hasSubmitted) {
+      return "Locked";
+    }
+    const n = journey.savedEntries?.length ?? journey.savedAnimals?.length ?? 0;
+    return n > 0 ? `${n} saved` : "None yet";
+  };
+
+  const handleRequestCardClick = () => {
+    if (!journey || journey.noRequest) {
+      goToAdoptionRequest();
+      return;
+    }
+    if (hasDraft && !hasSubmitted) {
+      goToAdoptionRequest();
+      return;
+    }
+    goToMyMatches();
+  };
+
+  const handleCompatibleCardClick = () => {
+    if (!hasSubmitted) {
+      goToAdoptionRequest();
+      return;
+    }
+    if (submittedRequests.length === 1) {
+      navigate(
+        `/compatible-animals?requestId=${encodeURIComponent(String(submittedRequests[0].id))}`
+      );
+      return;
+    }
+    navigate("/compatible-animals");
+  };
+
+  const handleSavedCardClick = () => {
+    if (!hasSubmitted) {
+      goToAdoptionRequest();
+      return;
+    }
+    if (submittedRequests.length === 1) {
+      navigate(
+        `/saved-animals?requestId=${encodeURIComponent(String(submittedRequests[0].id))}`
+      );
+      return;
+    }
+    navigate("/saved-animals");
   };
 
   return (
@@ -144,9 +235,9 @@ function AdopterHomePage() {
               <button
                 type="button"
                 className="adopter-secondary-btn"
-                onClick={goToMatches}
+                onClick={goToMyMatches}
               >
-                View Compatible Animals
+                View my matches
               </button>
             </div>
           </div>
@@ -181,32 +272,60 @@ function AdopterHomePage() {
         </section>
 
         <section className="adopter-summary-grid">
-          <div className="adopter-summary-card">
+          <button
+            type="button"
+            className="adopter-summary-card adopter-summary-card-btn"
+            onClick={handleRequestCardClick}
+          >
             <div className="adopter-summary-head">
               <span className="adopter-summary-label">Adoption Request</span>
               <span className="adopter-summary-mini-dot"></span>
             </div>
-            <p className="adopter-summary-value">Not Started</p>
-            <span className="adopter-summary-note">Required before matching begins</span>
-          </div>
+            <p className="adopter-summary-value">{requestSummaryValue()}</p>
+            <span className="adopter-summary-note">
+              {hasSubmitted
+                ? "Tap to pick a request and view matches"
+                : "Required before matching begins"}
+            </span>
+          </button>
 
-          <div className="adopter-summary-card">
+          <button
+            type="button"
+            className="adopter-summary-card adopter-summary-card-btn"
+            onClick={handleCompatibleCardClick}
+          >
             <div className="adopter-summary-head">
               <span className="adopter-summary-label">Compatible Animals</span>
               <span className="adopter-summary-mini-dot"></span>
             </div>
-            <p className="adopter-summary-value">Locked</p>
-            <span className="adopter-summary-note">Available after request completion</span>
-          </div>
+            <p className="adopter-summary-value">{compatibleSummaryValue()}</p>
+            <span className="adopter-summary-note">
+              {hasSubmitted
+                ? submittedRequests.length > 1
+                  ? "Pick a request, then view matches"
+                  : "View strong matches for your request"
+                : "Available after request submission"}
+            </span>
+          </button>
 
-          <div className="adopter-summary-card">
+          <button
+            type="button"
+            className="adopter-summary-card adopter-summary-card-btn"
+            onClick={handleSavedCardClick}
+          >
             <div className="adopter-summary-head">
               <span className="adopter-summary-label">Saved Animals</span>
               <span className="adopter-summary-mini-dot"></span>
             </div>
-            <p className="adopter-summary-value">Pending</p>
-            <span className="adopter-summary-note">Starts once matching is active</span>
-          </div>
+            <p className="adopter-summary-value">{savedSummaryValue()}</p>
+            <span className="adopter-summary-note">
+              {hasSubmitted
+                ? submittedRequests.length > 1
+                  ? "Pick a request, then view saved animals"
+                  : "Saved animals for your request"
+                : "Unlocks after you submit a request"}
+            </span>
+          </button>
         </section>
 
         <section className="adopter-panel-grid">
@@ -280,15 +399,15 @@ function AdopterHomePage() {
             <button
               type="button"
               className="adopter-action-sub-link"
-              onClick={() => navigate("/my-adoption-requests")}
+              onClick={goToMyMatches}
             >
-              View my requests
+              View my matches
             </button>
           </div>
 
           <div className="adopter-action-card">
             <h3>Saved animals</h3>
-            <p>Access saved animals after compatible matches are unlocked.</p>
+            <p>Saved listings are organised under each submitted request.</p>
             <button type="button" onClick={goToSavedAnimals}>
               View Saved Animals
             </button>

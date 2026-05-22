@@ -13,6 +13,12 @@ import {
   fetchInquiryThread,
   sendInquiryMessage
 } from "../utils/platformApi";
+import {
+  adopterComposeBlockedReason,
+  canAdopterComposeInThread,
+  isInquiryRejected,
+  normalizeInquiryStatus
+} from "../utils/inquiryStatus";
 import { usePopup } from "../components/PopupProvider";
 
 function GatePanel({ badge, title, body, primaryLabel, onPrimary }) {
@@ -97,6 +103,14 @@ function AdopterMessagesPage() {
   const handleSend = async () => {
     const text = draft.trim();
     if (!text || !selectedId) {
+      return;
+    }
+    const blocked = adopterComposeBlockedReason(thread);
+    if (blocked) {
+      showPopup({ type: "warning", title: "Cannot send", message: blocked });
+      return;
+    }
+    if (!canAdopterComposeInThread(thread)) {
       return;
     }
     try {
@@ -230,7 +244,15 @@ function AdopterMessagesPage() {
                 onClick={() => setSelectedId(inq.id)}
               >
                 <strong>{inq.animalName}</strong>
-                <span>{inq.status}</span>
+                <span
+                  className={
+                    isInquiryRejected(inq.status) ? "adopter-inquiry-item-status-rejected" : ""
+                  }
+                >
+                  {normalizeInquiryStatus(inq.status) === "REJECTED"
+                    ? "Declined"
+                    : inq.status}
+                </span>
               </button>
             ))}
           </aside>
@@ -251,11 +273,7 @@ function AdopterMessagesPage() {
                   </div>
                 ))}
               </div>
-              {thread.status === "REJECTED" ? (
-                <p className="adopter-inquiry-wait">
-                  This inquiry was declined. The conversation is closed.
-                </p>
-              ) : (
+              {canAdopterComposeInThread(thread) ? (
                 <div className="adopter-inquiry-compose">
                   <textarea
                     value={draft}
@@ -267,13 +285,17 @@ function AdopterMessagesPage() {
                   <button type="button" className="messages-primary-btn" onClick={handleSend}>
                     Send
                   </button>
-                  {thread.status === "PENDING" && (
+                  {normalizeInquiryStatus(thread.status) === "PENDING" && (
                     <p className="adopter-inquiry-hint">
-                      Your messages are saved. The owner can read your adoption profile and
-                      reply before approving this request.
+                      Your message request is with the owner. They can read your adoption
+                      profile and approve before you can send more messages here.
                     </p>
                   )}
                 </div>
+              ) : (
+                <p className="adopter-inquiry-wait" role="status">
+                  {adopterComposeBlockedReason(thread)}
+                </p>
               )}
             </section>
           )}

@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { usePopup } from "../components/PopupProvider";
 import {
   broadcastStoredUserRefresh,
@@ -62,7 +61,7 @@ const GENDER_OPTIONS = [
 
 function AccountProfilePage() {
   const navigate = useNavigate();
-  const { showPopup } = usePopup();
+  const { showPopup, showConfirm } = usePopup();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [firstName, setFirstName] = useState("");
@@ -82,8 +81,6 @@ function AccountProfilePage() {
   const [userId, setUserId] = useState(null);
   const [role, setRole] = useState(null);
   const [hasDraftAdoptionRequest, setHasDraftAdoptionRequest] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
 
   const isAdopter = normalizeRole(role) === "ADOPTER";
   const isProtectedAdmin =
@@ -415,65 +412,48 @@ function AccountProfilePage() {
     }
   };
 
-  const handleConfirmDeleteAccount = async () => {
+  const promptDeleteAccount = () => {
     if (!userId) {
       return;
     }
-    setDeleteBusy(true);
-    const apiBaseUrl = getApiBaseUrl();
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/auth/delete-account`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId })
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        showPopup({
-          type: "error",
-          title: "Could not delete account",
-          message: data.error || "Account could not be deleted."
+    showConfirm({
+      type: "critical",
+      title: "Delete your account?",
+      message:
+        "Are you sure? This will permanently delete your account, profile, listings, adoption requests, saved animals, and activity logs. This cannot be undone.",
+      confirmLabel: "Yes, delete everything",
+      cancelLabel: "Cancel",
+      confirmDanger: true,
+      onConfirm: async () => {
+        const apiBaseUrl = getApiBaseUrl();
+        const response = await fetch(`${apiBaseUrl}/api/auth/delete-account`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId })
         });
-        return;
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          showPopup({
+            type: "error",
+            title: "Could not delete account",
+            message: data.error || "Account could not be deleted."
+          });
+          throw new Error(data.error || "Account could not be deleted.");
+        }
+        localStorage.removeItem("paviaUser");
+        broadcastStoredUserRefresh();
+        showPopup({
+          type: "success",
+          title: "Account deleted",
+          message: "Your account and related data have been permanently removed."
+        });
+        navigate("/login", { replace: true });
       }
-      localStorage.removeItem("paviaUser");
-      broadcastStoredUserRefresh();
-      setDeleteDialogOpen(false);
-      showPopup({
-        type: "success",
-        title: "Account deleted",
-        message: "Your account and related data have been permanently removed."
-      });
-      navigate("/login", { replace: true });
-    } catch (err) {
-      console.error(err);
-      showPopup({
-        type: "error",
-        title: "Connection error",
-        message: "Could not reach the server."
-      });
-    } finally {
-      setDeleteBusy(false);
-    }
+    });
   };
 
   return (
     <div className="account-page">
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        title="Delete your account?"
-        description="Are you sure? This will permanently delete your account, profile, listings, adoption requests, saved animals, and activity logs. This cannot be undone."
-        confirmLabel="Yes, delete everything"
-        cancelLabel="Cancel"
-        confirmDanger
-        busy={deleteBusy}
-        onCancel={() => {
-          if (!deleteBusy) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-        onConfirm={handleConfirmDeleteAccount}
-      />
       <Navbar />
       <main className="account-main">
         <div className="account-card">
@@ -739,7 +719,7 @@ function AccountProfilePage() {
             <button
               type="button"
               className="account-delete-account-btn"
-              onClick={() => setDeleteDialogOpen(true)}
+              onClick={promptDeleteAccount}
               disabled={loading || saving}
             >
               Delete account

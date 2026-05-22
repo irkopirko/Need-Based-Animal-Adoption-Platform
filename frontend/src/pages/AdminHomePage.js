@@ -14,7 +14,7 @@ import {
 
 function AdminHomePage() {
   const navigate = useNavigate();
-  const { showPopup } = usePopup();
+  const { showPopup, showConfirm } = usePopup();
   const user = getStoredUser();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +63,16 @@ function AdminHomePage() {
   };
 
   const handleDelete = async (report) => {
-    if (!window.confirm(`Permanently delete listing ${report.listingCode || report.animalId}?`)) {
+    const code = report.listingCode || report.animalId;
+    const ok = await showConfirm({
+      type: "critical",
+      title: "Delete this listing?",
+      message: `Permanently delete listing ${code}? The owner will be notified by email.`,
+      confirmLabel: "Yes, delete",
+      cancelLabel: "Cancel",
+      confirmDanger: true
+    });
+    if (!ok) {
       return;
     }
     try {

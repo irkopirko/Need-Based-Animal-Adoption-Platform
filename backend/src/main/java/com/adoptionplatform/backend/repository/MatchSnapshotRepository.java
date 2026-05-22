@@ -24,4 +24,6 @@ public interface MatchSnapshotRepository extends JpaRepository<MatchSnapshot, Lo
     );
 
     void deleteByAdopterUserIdAndAdoptionRequestId(Long adopterUserId, Long adoptionRequestId);
+
+    void deleteByAnimalId(Long animalId);
 }

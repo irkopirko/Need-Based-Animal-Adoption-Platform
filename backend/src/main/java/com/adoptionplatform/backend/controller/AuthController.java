@@ -10,6 +10,7 @@ import com.adoptionplatform.backend.dto.UserProfileDto;
 import com.adoptionplatform.backend.dto.ResendVerificationRequest;
 import com.adoptionplatform.backend.dto.ResetPasswordRequest;
 import com.adoptionplatform.backend.dto.Verify2FARequest;
+import com.adoptionplatform.backend.config.DatabaseConnectionInfo;
 import com.adoptionplatform.backend.service.AuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,9 +29,22 @@ public class AuthController {
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
+    private final DatabaseConnectionInfo databaseConnectionInfo;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, DatabaseConnectionInfo databaseConnectionInfo) {
         this.authService = authService;
+        this.databaseConnectionInfo = databaseConnectionInfo;
+    }
+
+    @GetMapping("/server-info")
+    public ResponseEntity<Map<String, String>> serverInfo() {
+        String kind = databaseConnectionInfo.getKind();
+        String hint = "railway".equals(kind)
+                ? "Connected to production database."
+                : "local".equals(kind)
+                ? "Connected to local database — production accounts are not available."
+                : "Database connection unknown.";
+        return ResponseEntity.ok(Map.of("database", kind, "hint", hint));
     }
 
     @PostMapping("/register")

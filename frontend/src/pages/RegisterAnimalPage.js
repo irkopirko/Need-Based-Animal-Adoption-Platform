@@ -4,11 +4,12 @@ import "./AdoptionRequestPage.css";
 import "./RegisterAnimalPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { usePopup } from "../components/PopupProvider";
 import { getApiBaseUrl, getStoredUser, getResolvedUserId, normalizeRole } from "../utils/auth";
 import { resolveMediaUrl } from "../utils/adopterJourney";
 import { normalizeAnimalFromApi, ownerListingImageUrls } from "../utils/ownerJourney";
+import { archiveOwnerListing } from "../utils/platformApi";
+import { capitalizeDescription, capitalizeWords } from "../utils/textFormat";
 
 const TOTAL_STEPS = 3;
 
@@ -83,11 +84,14 @@ function mapApiAnimalToForm(animal) {
     housingRaw.toLowerCase().includes("shelter") || housingRaw === "Shelter"
       ? "Shelter"
       : "Home";
+  const genderU = String(animal.gender || "").toUpperCase();
+  const gender = genderU === "FEMALE" ? "Female" : genderU === "MALE" ? "Male" : "";
   return {
     name: animal.name || "",
     breed: animal.breed || "",
     description: animal.description || "",
     animalType,
+    gender,
     energyLevel: energyApiToLabel(animal.energyLevel),
     ageRange,
     size: animalType === "Dog" ? size : "",
@@ -117,15 +121,13 @@ function RegisterAnimalPage() {
     editParam != null && editParam !== "" ? Number(editParam) : null;
   const isEditMode = Number.isFinite(editAnimalId) && editAnimalId > 0;
 
-  const { showPopup } = usePopup();
+  const { showPopup, showConfirm } = usePopup();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState({});
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [loadedAnimal, setLoadedAnimal] = useState(null);
   const [existingImageUrls, setExistingImageUrls] = useState([]);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -133,6 +135,7 @@ function RegisterAnimalPage() {
     breed: "",
     description: "",
     animalType: "",
+    gender: "",
     energyLevel: "",
     ageRange: "",
     size: "",
@@ -321,6 +324,7 @@ function RegisterAnimalPage() {
     }
     if (s === 2) {
       if (!formData.animalType) e.animalType = true;
+      if (!formData.gender) e.gender = true;
       if (!formData.energyLevel) e.energyLevel = true;
       if (!formData.ageRange) e.ageRange = true;
       if (selectedAnimalType === "Dog" && !formData.size) e.size = true;
@@ -410,6 +414,9 @@ function RegisterAnimalPage() {
     const groomingNeed = groomingLabelToNeed(formData.grooming);
     const size =
       selectedAnimalType === "Dog" ? sizeLabelToCode(formData.size) : "MEDIUM";
+    const formattedName = capitalizeWords(formData.name);
+    const formattedBreed = capitalizeWords(formData.breed);
+    const formattedDescription = capitalizeDescription(formData.description);
     const apiBaseUrl = getApiBaseUrl();
 
     try {
@@ -445,9 +452,10 @@ function RegisterAnimalPage() {
         }
 
         const putBody = {
-          name: formData.name.trim(),
+          name: formattedName,
           animalType: formData.animalType.toUpperCase(),
-          breed: formData.breed.trim(),
+          gender: formData.gender.toUpperCase(),
+          breed: formattedBreed,
           ageGroup,
           size,
           energyLevel: energyLabelToApi(formData.energyLevel),
@@ -455,7 +463,7 @@ function RegisterAnimalPage() {
           specialNeeds: formData.specialNeeds.toUpperCase(),
           goodWithChildren: formData.goodWithChildren.toUpperCase(),
           goodWithPets: formData.goodWithPets.toUpperCase(),
-          description: formData.description.trim(),
+          description: formattedDescription,
           housingLocation: formData.housingLocation === "Shelter" ? "Shelter" : "Home",
           listingStatus: loadedAnimal.listingStatus || "Active",
           compatibilityScore: loadedAnimal.compatibilityScore ?? null,
@@ -496,9 +504,10 @@ function RegisterAnimalPage() {
       }
 
       const payload = {
-        name: formData.name.trim(),
+        name: formattedName,
         animalType: formData.animalType.toUpperCase(),
-        breed: formData.breed.trim(),
+        gender: formData.gender.toUpperCase(),
+        breed: formattedBreed,
         ageGroup,
         size,
         energyLevel: energyLabelToApi(formData.energyLevel),
@@ -506,7 +515,7 @@ function RegisterAnimalPage() {
         specialNeeds: formData.specialNeeds.toUpperCase(),
         goodWithChildren: formData.goodWithChildren.toUpperCase(),
         goodWithPets: formData.goodWithPets.toUpperCase(),
-        description: formData.description.trim(),
+        description: formattedDescription,
         housingLocation: formData.housingLocation,
         ownerId
       };
@@ -542,29 +551,11 @@ function RegisterAnimalPage() {
 
       showPopup({
         type: "success",
-        title: "Listing published",
-        message: "The animal profile was saved successfully."
+        title: "Successfully created",
+        message:
+          "Your animal was listed successfully. A confirmation email with the listing ID and name was sent to your account. Taking you to My animal listings…"
       });
-
-      setStep(1);
-      setFormData({
-        name: "",
-        breed: "",
-        description: "",
-        animalType: "",
-        energyLevel: "",
-        ageRange: "",
-        size: "",
-        grooming: "",
-        specialNeeds: "",
-        goodWithChildren: "",
-        goodWithPets: "",
-        housingLocation: ""
-      });
-      setImages([]);
-      imagePreviews.forEach((url) => URL.revokeObjectURL(url));
-      setImagePreviews([]);
-      setErrors({});
+      navigate("/owner-listings", { replace: true });
     } catch (error) {
       console.error(error);
       showPopup({
@@ -581,129 +572,87 @@ function RegisterAnimalPage() {
     if (!ownerId || !isEditMode || !editAnimalId) {
       return;
     }
+    const ok = await showConfirm({
+      type: "warning",
+      title: "Archive this listing?",
+      message:
+        "The listing will be hidden from compatibility matching. You can restore it later from Archived listings.",
+      confirmLabel: "Archive",
+      cancelLabel: "Cancel"
+    });
+    if (!ok) {
+      return;
+    }
     setArchiveBusy(true);
-    const apiBaseUrl = getApiBaseUrl();
     try {
-      const refRes = await fetch(`${apiBaseUrl}/api/animals/${editAnimalId}`);
-      if (!refRes.ok) {
-        showPopup({
-          type: "error",
-          title: "Could not archive",
-          message: "Listing could not be reloaded from the server."
-        });
-        return;
-      }
-      const fresh = normalizeAnimalFromApi(await refRes.json());
-      if (Number(fresh.ownerId) !== Number(ownerId)) {
-        showPopup({
-          type: "error",
-          title: "Access denied",
-          message: "You can only archive your own listings."
-        });
-        return;
-      }
-      const imgs = ownerListingImageUrls(fresh);
-      const putBody = {
-        name: fresh.name,
-        animalType: fresh.animalType,
-        breed: fresh.breed,
-        ageGroup: fresh.ageGroup,
-        size: fresh.size || "MEDIUM",
-        energyLevel: fresh.energyLevel,
-        groomingNeed: fresh.groomingNeed,
-        specialNeeds: fresh.specialNeeds,
-        goodWithChildren: fresh.goodWithChildren,
-        goodWithPets: fresh.goodWithPets,
-        description: fresh.description,
-        housingLocation: fresh.housingLocation,
-        listingStatus: "Archived",
-        compatibilityScore: fresh.compatibilityScore ?? null,
-        images: imgs
-      };
-      const putRes = await fetch(
-        `${apiBaseUrl}/api/animals/${editAnimalId}?viewerId=${encodeURIComponent(ownerId)}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(putBody)
-        }
-      );
-      const putJson = await putRes.json().catch(() => ({}));
-      if (!putRes.ok) {
-        showPopup({
-          type: "error",
-          title: "Could not archive",
-          message: putJson.error || "Try again."
-        });
-        return;
-      }
-      setLoadedAnimal(normalizeAnimalFromApi(putJson));
+      const updated = await archiveOwnerListing(editAnimalId, ownerId);
+      setLoadedAnimal(normalizeAnimalFromApi(updated));
       showPopup({
         type: "success",
         title: "Listing archived",
-        message: "Adopters will see it as archived."
+        message:
+          "The listing is archived and hidden from matching. A confirmation email was sent to your account."
       });
       navigate(`/animal/${editAnimalId}`);
     } catch (err) {
       console.error(err);
       showPopup({
         type: "error",
-        title: "Connection error",
-        message: "Could not reach the server."
+        title: "Could not archive",
+        message: err?.message || "Could not reach the server."
       });
     } finally {
       setArchiveBusy(false);
     }
   };
 
-  const confirmDeleteListing = async () => {
+  const promptDeleteListing = () => {
     const user = getStoredUser();
     const ownerId = getResolvedUserId(user);
     if (!ownerId || !isEditMode || !editAnimalId) {
       return;
     }
-    setDeleteBusy(true);
-    const apiBaseUrl = getApiBaseUrl();
-    try {
-      const res = await fetch(
-        `${apiBaseUrl}/api/animals/${editAnimalId}?viewerId=${encodeURIComponent(ownerId)}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok) {
-        const text = await res.text();
-        let msg = "The listing was not removed.";
-        try {
-          const errBody = JSON.parse(text);
-          if (errBody && typeof errBody.error === "string") {
-            msg = errBody.error;
+    showConfirm({
+      type: "critical",
+      title: "Are you sure?",
+      message:
+        "This will permanently delete this listing from Pavia. You will not be able to undo this.",
+      confirmLabel: "Yes, delete",
+      cancelLabel: "No",
+      confirmDanger: true,
+      onConfirm: async () => {
+        const apiBaseUrl = getApiBaseUrl();
+        const res = await fetch(
+          `${apiBaseUrl}/api/animals/${editAnimalId}?viewerId=${encodeURIComponent(ownerId)}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = "The listing was not removed.";
+          try {
+            const errBody = JSON.parse(text);
+            if (errBody && typeof errBody.error === "string") {
+              msg = errBody.error;
+            }
+          } catch {
+            /* empty body */
           }
-        } catch {
-          /* empty body */
+          showPopup({
+            type: "error",
+            title: "Could not delete",
+            message: msg
+          });
+          throw new Error(msg);
         }
         showPopup({
-          type: "error",
-          title: "Could not delete",
-          message: msg
+          type: "success",
+          title: "Listing deleted",
+          message:
+            "The listing was removed successfully. A confirmation email was sent to your account."
         });
-        return;
+        navigate("/owner-listings");
       }
-      setDeleteDialogOpen(false);
-      showPopup({
-        type: "success",
-        title: "Listing removed",
-        message: "The animal has been deleted from the platform."
-      });
-      navigate("/owner-listings");
-    } catch (err) {
-      console.error(err);
-      showPopup({
-        type: "error",
-        title: "Connection error",
-        message: "Could not reach the server."
-      });
-    } finally {
-      setDeleteBusy(false);
-    }
+    });
   };
 
   const getStepClass = (n) => {
@@ -862,6 +811,15 @@ function RegisterAnimalPage() {
                       );
                     })}
                   </div>
+                </div>
+
+                <div
+                  className={`adoption-request-group adoption-request-full ${
+                    errors.gender ? "error-group" : ""
+                  }`}
+                >
+                  <RequiredLabel>Gender</RequiredLabel>
+                  <RadioCheckRow name="gender" options={["Male", "Female"]} />
                 </div>
 
                 <div
@@ -1099,7 +1057,9 @@ function RegisterAnimalPage() {
                   className="adoption-back-btn"
                   onClick={handleArchiveListing}
                   disabled={
-                    archiveBusy || String(loadedAnimal.listingStatus).toLowerCase() === "archived"
+                    archiveBusy ||
+                    String(loadedAnimal.listingStatus || "").toUpperCase() === "ARCHIVED" ||
+                    String(loadedAnimal.listingStatus || "").toUpperCase() === "ADOPTED"
                   }
                 >
                   {archiveBusy ? "Archiving…" : "Archive listing"}
@@ -1107,8 +1067,7 @@ function RegisterAnimalPage() {
                 <button
                   type="button"
                   className="register-animal-delete-btn"
-                  onClick={() => setDeleteDialogOpen(true)}
-                  disabled={deleteBusy}
+                  onClick={promptDeleteListing}
                 >
                   Delete listing
                 </button>
@@ -1121,22 +1080,6 @@ function RegisterAnimalPage() {
       <div className="required-field-note">
         <span className="required-star">*</span> indicates required fields
       </div>
-
-      <ConfirmDialog
-        open={deleteDialogOpen}
-        title="Are you sure?"
-        description="This will permanently delete this listing. You will not be able to undo this."
-        confirmLabel="Yes"
-        cancelLabel="No"
-        confirmDanger
-        busy={deleteBusy}
-        onConfirm={confirmDeleteListing}
-        onCancel={() => {
-          if (!deleteBusy) {
-            setDeleteDialogOpen(false);
-          }
-        }}
-      />
 
       <Footer />
     </div>

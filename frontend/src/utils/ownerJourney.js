@@ -5,6 +5,10 @@ import {
   STRONG_MATCH_THRESHOLD
 } from "./adopterJourney";
 import { fetchOwnerInquiries } from "./platformApi";
+import {
+  filterInquiriesForOpenDashboardListings,
+  filterOpenDashboardListings
+} from "./listingDisplay";
 
 const INQUIRIES_KEY = "paviaOwnerInquiries";
 const THREADS_KEY = "paviaOwnerMessageThreads";
@@ -128,6 +132,29 @@ export async function fetchOwnerListings(ownerId) {
   return raw.map(normalizeAnimalFromApi);
 }
 
+export function normalizeListingStatusKey(status) {
+  const s = String(status || "ACTIVE").trim().toUpperCase();
+  if (s.startsWith("ARCHIV")) {
+    return "ARCHIVED";
+  }
+  return s;
+}
+
+/** Counts for owner dashboard and navbar (archived / adopted listings). */
+export function countOwnerListingStatuses(listings) {
+  let archived = 0;
+  let adopted = 0;
+  for (const item of listings || []) {
+    const key = normalizeListingStatusKey(item?.listingStatus);
+    if (key === "ARCHIVED") {
+      archived += 1;
+    } else if (key === "ADOPTED") {
+      adopted += 1;
+    }
+  }
+  return { archived, adopted };
+}
+
 export function filterListingsForOwner(animals, ownerId) {
   const oid = Number(ownerId);
   return (animals || []).filter((a) => Number(a.ownerId) === oid);
@@ -136,6 +163,67 @@ export function filterListingsForOwner(animals, ownerId) {
 export function ownerListingsInStrongMatches(listings, strongMatches) {
   const ids = new Set((strongMatches || []).map((a) => Number(a.id)));
   return (listings || []).filter((l) => ids.has(Number(l.id)));
+}
+
+/** Listings that already received at least one adopter message request. */
+export function listingsWithInquiries(listings, inquiries) {
+  const ids = new Set(
+    (inquiries || []).map((i) => Number(i.animalId)).filter(Number.isFinite)
+  );
+  return (listings || []).filter((l) => ids.has(Number(l.id)));
+}
+
+export function mergeOwnerListingsById(...groups) {
+  const map = new Map();
+  for (const group of groups) {
+    for (const listing of group || []) {
+      if (listing?.id != null) {
+        map.set(Number(listing.id), listing);
+      }
+    }
+  }
+  return [...map.values()];
+}
+
+/**
+ * Strong matches for an owner's listings via persisted match snapshots (≥ threshold).
+ */
+export async function fetchOwnerStrongMatchListings(ownerId, listings) {
+  const oid = Number(ownerId);
+  if (!Number.isFinite(oid) || !Array.isArray(listings) || listings.length === 0) {
+    return [];
+  }
+  const api = getApiBaseUrl();
+  const matchedById = new Map();
+
+  await Promise.all(
+    listings.map(async (listing) => {
+      const aid = Number(listing.id);
+      if (!Number.isFinite(aid)) {
+        return;
+      }
+      try {
+        const res = await fetch(
+          apiUrl(api, `/api/adoptions/animals/${aid}/matches?ownerId=${oid}`)
+        );
+        if (!res.ok) {
+          return;
+        }
+        const data = await res.json();
+        const rows = Array.isArray(data) ? data : [];
+        const hasStrong = rows.some(
+          (s) => Number(s.matchPercentage) >= STRONG_MATCH_THRESHOLD
+        );
+        if (hasStrong) {
+          matchedById.set(aid, listing);
+        }
+      } catch {
+        /* per-listing failure is non-fatal */
+      }
+    })
+  );
+
+  return [...matchedById.values()];
 }
 
 export function readOwnerInquiries(ownerId) {
@@ -190,7 +278,7 @@ export function resolveOwnerScenario(state) {
   if (!state.hasListings) {
     return "NO_LISTINGS";
   }
-  if (!state.hasStrongMatchOnListings) {
+  if (!state.hasStrongMatchOnListings && !state.hasInquiries) {
     return "LISTINGS_NO_STRONG_MATCH";
   }
   if (!state.hasInquiries) {
@@ -204,9 +292,8 @@ export function resolveOwnerScenario(state) {
 
 export async function loadOwnerEngagementState(ownerId) {
   const animals = await fetchAllAnimals();
-  const listings = filterListingsForOwner(animals, ownerId);
-  const strongMatches = await fetchStrongMatchAnimals();
-  const matchedListings = ownerListingsInStrongMatches(listings, strongMatches);
+  const allListings = filterListingsForOwner(animals, ownerId);
+  const listings = filterOpenDashboardListings(allListings);
   let inquiries = [];
   try {
     const fromApi = await fetchOwnerInquiries(ownerId);
@@ -214,18 +301,39 @@ export async function loadOwnerEngagementState(ownerId) {
   } catch {
     inquiries = [];
   }
-  const hasAnyMessages = inquiries.some(
+  const openInquiries = filterInquiriesForOpenDashboardListings(inquiries, allListings);
+
+  const fromInquiries = listingsWithInquiries(listings, openInquiries);
+  let fromSnapshots = [];
+  try {
+    fromSnapshots = await fetchOwnerStrongMatchListings(ownerId, listings);
+  } catch {
+    fromSnapshots = [];
+  }
+
+  let matchedListings = mergeOwnerListingsById(fromInquiries, fromSnapshots);
+  matchedListings = filterOpenDashboardListings(matchedListings);
+  let strongMatches = [];
+
+  if (matchedListings.length === 0) {
+    strongMatches = await fetchStrongMatchAnimals();
+    matchedListings = ownerListingsInStrongMatches(listings, strongMatches);
+  }
+
+  const hasAnyMessages = openInquiries.some(
     (inq) => Array.isArray(inq.messages) && inq.messages.length > 0
   );
 
   return {
     listings,
+    allListings,
     strongMatches,
     matchedListings,
-    inquiries,
+    inquiries: openInquiries,
     hasListings: listings.length > 0,
-    hasStrongMatchOnListings: matchedListings.length > 0,
-    hasInquiries: inquiries.length > 0,
+    hasStrongMatchOnListings:
+      matchedListings.length > 0 || openInquiries.length > 0,
+    hasInquiries: openInquiries.length > 0,
     hasAnyMessages
   };
 }

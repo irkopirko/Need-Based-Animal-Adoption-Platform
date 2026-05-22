@@ -4,7 +4,7 @@ import "./OwnerManageRequestsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getApiBaseUrl, getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
-import OwnerAdoptionProfilePanel from "../components/OwnerAdoptionProfilePanel";
+import OwnerInquiryThreadPanel from "../components/OwnerInquiryThreadPanel";
 import {
   normalizeAnimalFromApi,
   fetchInquiriesForAnimal,
@@ -79,25 +79,12 @@ function AnimalOwnerRequestsPage() {
     load();
   }, [aid, loadInquiries]);
 
-  const selected = useMemo(
-    () => inquiries.find((i) => i.id === selectedId),
-    [inquiries, selectedId]
-  );
-
-  const threadMessages = useMemo(() => {
-    if (!selected?.messages) {
-      return [];
+  const reloadInquiries = useCallback(async () => {
+    if (ownerId == null) {
+      return;
     }
-    return selected.messages;
-  }, [selected]);
-
-  const goToMessages = (inquiryId) => {
-    if (inquiryId) {
-      navigate(`/owner-messages?inquiry=${encodeURIComponent(inquiryId)}`);
-    } else {
-      navigate("/owner-messages");
-    }
-  };
+    await loadInquiries(ownerId);
+  }, [ownerId, loadInquiries]);
 
   if (loading) {
     return (
@@ -211,79 +198,12 @@ function AnimalOwnerRequestsPage() {
             )}
           </div>
 
-          <div className="owner-request-detail-panel">
-            {selected ? (
-              <>
-                <div className="owner-request-detail-head">
-                  <div>
-                    <h2>{selected.adopterName}</h2>
-                    <p>Interested in {animal.name}</p>
-                  </div>
-                  <span className="owner-request-detail-badge">{selected.status}</span>
-                </div>
-
-                {threadMessages.length === 0 && (
-                  <div className="owner-request-get-contact-panel">
-                    <strong>Message this adopter</strong>
-                    <p>
-                      Open Messages to send an introduction or answer questions. Message history
-                      is stored for both you and the adopter.
-                    </p>
-                    <button
-                      type="button"
-                      className="owner-request-get-contact-btn"
-                      onClick={() => goToMessages(selected.id)}
-                    >
-                      Message user
-                    </button>
-                  </div>
-                )}
-
-                <OwnerAdoptionProfilePanel
-                  inquiryId={selected.id}
-                  ownerId={ownerId}
-                  adopterName={selected.adopterName}
-                />
-
-                <div className="owner-request-detail-grid">
-                  <div className="owner-request-detail-card owner-request-detail-card-wide">
-                    <h3>Message request</h3>
-                    <p>{selected.initialMessage}</p>
-                  </div>
-                  <div className="owner-request-detail-card">
-                    <h3>Thread</h3>
-                    <p>
-                      {threadMessages.length
-                        ? `${threadMessages.length} message(s).`
-                        : "No messages yet."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="owner-request-action-strip">
-                  <button
-                    type="button"
-                    className="owner-request-message-btn"
-                    onClick={() => goToMessages(selected.id)}
-                  >
-                    Message user
-                  </button>
-                  <button
-                    type="button"
-                    className="owner-request-accept-btn"
-                    onClick={() => navigate(`/animal/${animal.id}`)}
-                  >
-                    View listing
-                  </button>
-                </div>
-              </>
-            ) : (
-              <p className="owner-request-detail-empty">
-                {inquiries.length === 0
-                  ? "When someone reaches out, select them from the list."
-                  : "Select an inquiry."}
-              </p>
-            )}
+          <div className="owner-request-detail-panel owner-request-detail-panel-thread">
+            <OwnerInquiryThreadPanel
+              inquiryId={selectedId}
+              ownerId={ownerId}
+              onUpdated={reloadInquiries}
+            />
           </div>
         </section>
       </main>

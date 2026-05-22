@@ -59,7 +59,7 @@
 .adopter-requests-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
   padding: 18px 20px;
@@ -69,11 +69,56 @@
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.05);
 }
 
-.adopter-requests-row strong {
-  display: block;
+.adopter-requests-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.adopter-requests-row-head strong {
   font-size: 16px;
   color: #141414;
-  margin-bottom: 6px;
+}
+
+.adopter-requests-detail {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #444;
+}
+
+.adopter-requests-notes {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.45;
+}
+
+.adopter-requests-notes span {
+  font-weight: 700;
+  color: #333;
+}
+
+.adopter-requests-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 180px;
+}
+
+.adopter-requests-btn-secondary {
+  background: #fff;
+  color: #1f8f46;
+  border: 1px solid #b8dfc4;
+}
+
+.adopter-requests-empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .adopter-requests-phase {

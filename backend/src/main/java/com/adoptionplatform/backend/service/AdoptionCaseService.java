@@ -165,10 +165,33 @@ public class AdoptionCaseService {
         String animalName = animal != null ? animal.getName() : "your listing";
         notifyAdopter(adoptionCase.getAdopterUserId(), "Adoption completed",
                 "Congratulations! The adoption of " + animalName + " (" + listingCode + ") is marked complete.");
-        notifyOwner(ownerId, "Adoption marked complete",
-                "You marked " + animalName + " (" + listingCode + ") as adopted.");
+        notifyOwnerListingAdopted(ownerId, animalName, listingCode, adoptionCase.getAnimalId());
 
         return toView(adoptionCase);
+    }
+
+    private void notifyOwnerListingAdopted(
+            Long ownerUserId,
+            String animalName,
+            String listingCode,
+            Long listingId
+    ) {
+        userRepository.findById(ownerUserId).ifPresent(owner -> {
+            String email = owner.getEmail();
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            try {
+                emailService.sendOwnerListingAdoptedThankYouNotice(
+                        email.trim(),
+                        animalName,
+                        listingCode,
+                        listingId
+                );
+            } catch (RuntimeException ex) {
+                // Adoption completion succeeds even if email delivery fails.
+            }
+        });
     }
 
     @Transactional

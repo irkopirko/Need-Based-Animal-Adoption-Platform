@@ -62,6 +62,9 @@ public class Animal {
     private Double compatibilityScore;
     private String housingLocation;
 
+    /** MALE or FEMALE */
+    private String gender;
+
     @JsonIgnore
     @Fetch(FetchMode.SUBSELECT)
     @OneToMany(mappedBy = "animal", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
@@ -189,6 +192,14 @@ public class Animal {
 
     public void setHousingLocation(String housingLocation) {
         this.housingLocation = housingLocation;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 
     public void setId(Long id) {

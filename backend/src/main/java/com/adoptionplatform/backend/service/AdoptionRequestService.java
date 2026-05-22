@@ -61,6 +61,7 @@ public class AdoptionRequestService {
                 "Cat - Kitten / Young", "Cat - Adult", "Cat - Senior"
         ));
         request.setPreferredSizes(defaultList(dto.getPreferredSizes(), "Dog - Small", "Dog - Medium", "Dog - Large"));
+        request.setPreferredGenders(defaultList(dto.getPreferredGenders(), "Male", "Female"));
         request.setGroomingTolerance(defaultList(dto.getGroomingTolerance(),
                 "Dog - Low Grooming", "Dog - Medium Grooming", "Dog - High Grooming",
                 "Cat - Low Grooming", "Cat - Medium Grooming", "Cat - High Grooming"

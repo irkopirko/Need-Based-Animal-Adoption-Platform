@@ -2,21 +2,37 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #f7f7f5;
+  background: #f5f7f4;
   color: #171717;
 }
 
 .owner-listings-main {
   flex: 1;
   width: 100%;
-  max-width: 960px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 36px 20px 64px;
   box-sizing: border-box;
 }
 
 .owner-listings-hero {
-  margin-bottom: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.owner-listings-hero-text {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.owner-listings-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .owner-listings-tag {
@@ -25,22 +41,49 @@
   font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #0ea5a4;
+  color: #0d9488;
 }
 
 .owner-listings-hero h1 {
   margin: 0 0 10px;
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 900;
   letter-spacing: -0.5px;
 }
 
 .owner-listings-lead {
   margin: 0;
-  max-width: 640px;
+  max-width: 560px;
   font-size: 15px;
   line-height: 1.65;
   color: #555;
+}
+
+.owner-listings-tabs {
+  display: inline-flex;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 4px;
+  background: #ffffff;
+  border: 1px solid #e4ebe4;
+  border-radius: 999px;
+}
+
+.owner-listings-tabs button {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  color: #4b5563;
+  font-family: inherit;
+}
+
+.owner-listings-tabs button.is-active {
+  background: #111827;
+  color: #ffffff;
 }
 
 .owner-listings-loading {
@@ -53,7 +96,7 @@
   background: #ffffff;
   border: 1px solid #e8e8e2;
   border-radius: 18px;
-  padding: 32px 24px;
+  padding: 40px 28px;
   text-align: center;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.05);
 }
@@ -64,39 +107,49 @@
   font-size: 15px;
 }
 
-.owner-listings-primary-btn {
-  border: none;
+.owner-listings-primary-btn,
+.owner-listings-secondary-btn {
   border-radius: 12px;
-  padding: 12px 22px;
+  padding: 11px 20px;
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
-  background: #28c95a;
-  color: #ffffff;
   font-family: inherit;
+  border: none;
+}
+
+.owner-listings-primary-btn {
+  background: #22c55e;
+  color: #ffffff;
 }
 
 .owner-listings-primary-btn:hover {
   filter: brightness(1.05);
 }
 
+.owner-listings-secondary-btn {
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
+.owner-listings-secondary-btn:hover {
+  border-color: #9ca3af;
+}
+
 .owner-listings-stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-/* Wide (x), short (y) row card — theme-aligned */
 .owner-listing-card {
-  position: relative;
   display: flex;
   flex-direction: row;
-  align-items: stretch;
-  min-height: 132px;
-  max-height: 148px;
+  align-items: flex-start;
   background: #ffffff;
   border: 1px solid #e4ebe4;
-  border-radius: 16px;
+  border-radius: 18px;
   box-shadow: 0 10px 28px rgba(24, 31, 28, 0.06);
   cursor: pointer;
   overflow: hidden;
@@ -107,66 +160,44 @@
 }
 
 .owner-listing-card:hover {
-  border-color: #cfe8d8;
+  border-color: #b8e0c8;
   box-shadow: 0 14px 36px rgba(24, 31, 28, 0.1);
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .owner-listing-card:focus {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(43, 216, 93, 0.35);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.35);
+}
+
+.owner-listing-card-archived {
+  opacity: 0.88;
+  background: #fafafa;
 }
 
 .owner-listing-carousel {
   position: relative;
-  flex: 0 0 38%;
-  max-width: 320px;
-  min-width: 160px;
-  background: linear-gradient(145deg, #f4fff7 0%, #eef6f2 100%);
-}
-
-.owner-listing-carousel-img {
-  width: 100%;
-  height: 100%;
-  min-height: 132px;
-  object-fit: cover;
-  display: block;
-}
-
-.owner-listing-carousel-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 132px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #8a9a8e;
+  flex: 0 0 220px;
+  width: 220px;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .owner-listing-nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   color: #1a1a1a;
-  font-size: 22px;
-  line-height: 1;
+  font-size: 20px;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   z-index: 2;
-}
-
-.owner-listing-nav:hover {
-  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .owner-listing-nav-prev {
@@ -191,9 +222,18 @@
   z-index: 2;
 }
 
+.owner-listing-body {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px 18px;
+}
+
 .owner-listing-main {
   flex: 1;
-  padding: 14px 18px 28px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -201,9 +241,18 @@
   min-width: 0;
 }
 
+.owner-listing-code {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6b7280;
+  letter-spacing: 0.03em;
+}
+
 .owner-listing-name {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 900;
   color: #141414;
   line-height: 1.2;
@@ -221,49 +270,78 @@
   color: #6b6b6b;
 }
 
-.owner-listing-status {
-  align-self: flex-start;
-  margin-top: 6px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #148a3a;
-  background: #e9f9ef;
-  padding: 4px 10px;
-  border-radius: 999px;
+.owner-listing-card-adopted {
+  border-color: #bfdbfe;
+}
+
+.owner-listing-side {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
 }
 
 .owner-listing-date {
-  position: absolute;
-  right: 12px;
-  bottom: 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #8a8a82;
-  pointer-events: none;
+  white-space: nowrap;
 }
 
-@media (max-width: 640px) {
+.owner-listing-archive-btn,
+.owner-listing-view-btn {
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.owner-listing-archive-btn {
+  border: 1px solid #d1d5db;
+  background: #fafafa;
+  color: #374151;
+}
+
+.owner-listing-archive-btn:hover {
+  background: #f3f4f6;
+}
+
+.owner-listing-view-btn {
+  border: none;
+  background: #111827;
+  color: #ffffff;
+}
+
+.owner-listing-view-btn:hover {
+  background: #1f2937;
+}
+
+@media (max-width: 720px) {
   .owner-listing-card {
     flex-direction: column;
-    max-height: none;
-    min-height: 0;
   }
 
   .owner-listing-carousel {
     flex: none;
     width: 100%;
-    max-width: none;
+    aspect-ratio: 3 / 4;
   }
 
-  .owner-listing-carousel-img,
-  .owner-listing-carousel-placeholder {
-    min-height: 160px;
+  .owner-listing-body {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .owner-listing-main {
-    padding-bottom: 36px;
+  .owner-listing-side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-start;
   }
 }
 

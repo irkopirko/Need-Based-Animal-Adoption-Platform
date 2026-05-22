@@ -58,6 +58,10 @@ public class AdoptionRequest {
     @Column(length = 1000)
     private String preferredSizes;
 
+    /** Comma-separated e.g. Male, Female — empty means both on save */
+    @Column(name = "preferred_genders", length = 64)
+    private String preferredGenders;
+
     @Column(length = 1000)
     private String groomingTolerance;
 
@@ -145,6 +149,9 @@ public class AdoptionRequest {
 
     public String getPreferredSizes() { return preferredSizes; }
     public void setPreferredSizes(String preferredSizes) { this.preferredSizes = preferredSizes; }
+
+    public String getPreferredGenders() { return preferredGenders; }
+    public void setPreferredGenders(String preferredGenders) { this.preferredGenders = preferredGenders; }
 
     public String getGroomingTolerance() { return groomingTolerance; }
     public void setGroomingTolerance(String groomingTolerance) { this.groomingTolerance = groomingTolerance; }

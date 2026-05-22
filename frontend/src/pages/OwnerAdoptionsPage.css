@@ -27,14 +27,44 @@
 }
 
 .owner-adoptions-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 72px 1fr auto;
   align-items: center;
   gap: 1rem;
   background: #fff;
   border: 1px solid #e8e8e2;
   border-radius: 14px;
   padding: 1rem 1.25rem;
+}
+
+.owner-adoptions-thumb,
+.owner-adoptions-thumb-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid #e0ebe3;
+}
+
+.owner-adoptions-thumb-placeholder {
+  display: block;
+  background: linear-gradient(145deg, #e8f2ea 0%, #dcefe0 100%);
+}
+
+.owner-adoptions-row-body p {
+  margin: 4px 0 0;
+  color: #646b64;
+  font-size: 13px;
+}
+
+.owner-adoptions-hint {
+  font-size: 12px !important;
+  color: #7b827b !important;
+}
+
+.owner-adoptions-empty {
+  color: #646b64;
+  line-height: 1.6;
 }
 
 .owner-adoptions-status {

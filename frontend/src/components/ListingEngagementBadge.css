@@ -1,0 +1,45 @@
+/* Tones mirror PopupProvider.css (.app-popup-success / -info / -warning) */
+
+.listing-engagement-badge {
+  align-self: flex-start;
+  margin-top: 8px;
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  border-left-width: 4px;
+  line-height: 1.3;
+  cursor: default;
+}
+
+/* PopupProvider tones: .app-popup-success / -info / -warning */
+.listing-engagement-badge--success {
+  border-color: #3ecf6a;
+  border-left-color: #24b454;
+  background: #e9ffef;
+  color: #17211a;
+}
+
+.listing-engagement-badge--info {
+  border-color: #4ea9ea;
+  border-left-color: #2e8fd4;
+  background: #e8f5ff;
+  color: #17211a;
+}
+
+.listing-engagement-badge--warning {
+  border-color: #efb83a;
+  border-left-color: #e3a51f;
+  background: #fff7e3;
+  color: #17211a;
+}
+
+.listing-engagement-badge--neutral {
+  border-color: #dfe9e1;
+  border-left-color: #9ca3af;
+  background: #f3f4f6;
+  color: #3e4a41;
+}

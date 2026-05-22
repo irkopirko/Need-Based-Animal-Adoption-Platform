@@ -1,23 +1,46 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "./SavedAnimalsPage.css";
+import "./AdopterMyRequestsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
+import SaveHeartButton from "../components/SaveHeartButton";
 import { usePopup } from "../components/PopupProvider";
+import { unsaveAnimalForUser } from "../utils/platformApi";
 import { getStoredUser, normalizeRole, getApiBaseUrl, getResolvedUserId } from "../utils/auth";
 import {
-  loadAdopterJourneyState,
+  fetchSavedAnimalEntries,
+  fetchStrongMatchAnimals,
+  fetchUserAdoptionRequests,
+  formatAdoptionRequestSummary,
   mergeSavedWithCompatibility,
+  summarizeAdoptionRequests,
   STRONG_MATCH_THRESHOLD
 } from "../utils/adopterJourney";
 
+function formatPhase(phase) {
+  const p = String(phase || "").toUpperCase();
+  return p === "SUBMITTED" ? "Submitted" : "Draft";
+}
+
+function countSavedForRequest(entries, requestId) {
+  const rid = Number(requestId);
+  return entries.filter(
+    (entry) => entry.adoptionRequestId === rid || entry.adoptionRequestId == null
+  ).length;
+}
+
 function SavedAnimalsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterRequestId = searchParams.get("requestId");
   const { showPopup } = usePopup();
 
   const [loading, setLoading] = useState(true);
   const [scenario, setScenario] = useState("LOADING");
-  const [savedRows, setSavedRows] = useState([]);
+  const [submittedRequests, setSubmittedRequests] = useState([]);
+  const [savedEntries, setSavedEntries] = useState([]);
+  const [requestGroup, setRequestGroup] = useState(null);
   const [userId, setUserId] = useState(null);
 
   const refresh = useCallback(async () => {
@@ -27,47 +50,117 @@ function SavedAnimalsPage() {
     if (uid == null || role !== "ADOPTER") {
       setUserId(null);
       setScenario("NOT_ADOPTER");
-      setSavedRows([]);
+      setSubmittedRequests([]);
+      setSavedEntries([]);
+      setRequestGroup(null);
       setLoading(false);
       return;
     }
     setUserId(uid);
     setLoading(true);
+
     try {
-      const state = await loadAdopterJourneyState(uid);
-      const merged = mergeSavedWithCompatibility(
-        state.savedAnimals,
-        state.strongMatches,
-        state.apiBaseUrl
+      const apiBaseUrl = getApiBaseUrl();
+      const requests = await fetchUserAdoptionRequests(uid);
+      const { hasSubmitted, hasDraft } = summarizeAdoptionRequests(requests);
+      const submitted = requests.filter(
+        (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
       );
-      const eligible = merged.filter(
-        (a) => a.compatibility >= STRONG_MATCH_THRESHOLD
+      setSubmittedRequests(submitted);
+
+      if (!hasSubmitted && !hasDraft && requests.length === 0) {
+        setScenario("NO_REQUEST");
+        setRequestGroup(null);
+        setLoading(false);
+        return;
+      }
+      if (!hasSubmitted) {
+        setScenario("DRAFT_ONLY");
+        setRequestGroup(null);
+        setLoading(false);
+        return;
+      }
+      if (submitted.length === 0) {
+        setScenario("NO_REQUEST");
+        setRequestGroup(null);
+        setLoading(false);
+        return;
+      }
+
+      const entries = await fetchSavedAnimalEntries(uid);
+      setSavedEntries(entries);
+
+      const ridParam =
+        filterRequestId != null && /^\d+$/.test(String(filterRequestId).trim())
+          ? Number(filterRequestId)
+          : null;
+
+      if (submitted.length === 1 && ridParam == null) {
+        navigate(`/saved-animals?requestId=${encodeURIComponent(String(submitted[0].id))}`, {
+          replace: true
+        });
+        return;
+      }
+
+      if (ridParam == null) {
+        setScenario("PICK_REQUEST");
+        setRequestGroup(null);
+        setLoading(false);
+        return;
+      }
+
+      const selectedRequest = submitted.find((r) => Number(r.id) === ridParam);
+      if (!selectedRequest) {
+        setScenario("PICK_REQUEST");
+        setRequestGroup(null);
+        setLoading(false);
+        return;
+      }
+
+      const matches = await fetchStrongMatchAnimals(uid, ridParam);
+      const matchIds = new Set((matches || []).map((a) => Number(a.id)));
+      const savedForRequest = entries.filter((e) => {
+        if (e.adoptionRequestId === ridParam) {
+          return true;
+        }
+        if (e.adoptionRequestId == null && submitted.length === 1) {
+          return true;
+        }
+        if (e.adoptionRequestId == null && matchIds.has(Number(e.animalId))) {
+          return true;
+        }
+        return false;
+      });
+      const merged = mergeSavedWithCompatibility(
+        savedForRequest.map((e) => e.animal),
+        matches,
+        apiBaseUrl
       );
 
-      if (state.noRequest) {
-        setScenario("NO_REQUEST");
-        setSavedRows([]);
-      } else if (state.draftOnly) {
-        setScenario("DRAFT_ONLY");
-        setSavedRows([]);
-      } else if (state.submitted && state.strongMatches.length === 0) {
-        setScenario("SUBMITTED_NO_MATCHES");
-        setSavedRows([]);
-      } else if (state.submitted && state.strongMatches.length > 0) {
-        setScenario("READY");
-        setSavedRows(eligible);
+      if (merged.length === 0) {
+        const anyMatches = await fetchStrongMatchAnimals(uid, ridParam);
+        setScenario(anyMatches.length === 0 ? "SUBMITTED_NO_MATCHES" : "READY_EMPTY");
+        setRequestGroup({
+          requestId: ridParam,
+          request: selectedRequest,
+          animals: []
+        });
       } else {
-        setScenario("NO_REQUEST");
-        setSavedRows([]);
+        setScenario("READY");
+        setRequestGroup({
+          requestId: ridParam,
+          request: selectedRequest,
+          animals: merged
+        });
       }
     } catch (e) {
       console.error(e);
       setScenario("NO_REQUEST");
-      setSavedRows([]);
+      setRequestGroup(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [filterRequestId, navigate]);
 
   useEffect(() => {
     refresh();
@@ -77,7 +170,10 @@ function SavedAnimalsPage() {
   const [sortBy, setSortBy] = useState("Compatibility");
 
   const visibleAnimals = useMemo(() => {
-    let result = [...savedRows];
+    if (!requestGroup) {
+      return [];
+    }
+    let result = [...requestGroup.animals];
     if (typeFilter !== "All") {
       result = result.filter((animal) => animal.type === typeFilter);
     }
@@ -88,48 +184,59 @@ function SavedAnimalsPage() {
       result.sort((a, b) => a.name.localeCompare(b.name));
     }
     return result;
-  }, [savedRows, sortBy, typeFilter]);
+  }, [requestGroup, typeFilter, sortBy]);
 
-  const handleRemove = async (id) => {
+  const handleUnsave = async (animalId, e) => {
+    e?.stopPropagation?.();
+    e?.preventDefault?.();
     if (!userId) {
       return;
     }
     try {
-      const api = getApiBaseUrl();
-      const res = await fetch(
-        `${api}/api/saved?userId=${userId}&animalId=${id}`,
-        { method: "DELETE" }
+      await unsaveAnimalForUser(userId, Number(animalId));
+      setRequestGroup((prev) =>
+        prev
+          ? {
+              ...prev,
+              animals: prev.animals.filter((a) => Number(a.id) !== Number(animalId))
+            }
+          : null
       );
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(t || "Remove failed");
-      }
-      setSavedRows((prev) => prev.filter((animal) => animal.id !== id));
+      setSavedEntries((prev) =>
+        prev.filter((entry) => Number(entry.animalId) !== Number(animalId))
+      );
       showPopup({
-        type: "warning",
+        type: "info",
         title: "Removed",
-        message: "Animal removed from saved list."
+        message: "Animal removed from your saved list."
       });
     } catch (err) {
       console.error(err);
       showPopup({
         type: "error",
         title: "Could not remove",
-        message: "Please try again."
+        message: err?.message || "Please try again."
       });
     }
   };
 
   const goToAnimalDetail = (id) => {
-    navigate(`/animal/${id}`);
+    const base = `/animal/${id}`;
+    if (requestGroup?.requestId) {
+      navigate(`${base}?requestId=${encodeURIComponent(String(requestGroup.requestId))}`);
+      return;
+    }
+    navigate(base);
   };
 
-  const goToAdoptionRequest = () => {
-    navigate("/adoption-request");
+  const goToAdoptionRequest = () => navigate("/adoption-request");
+
+  const selectRequest = (id) => {
+    setSearchParams({ requestId: String(id) });
   };
 
-  const goToCompatibleAnimals = () => {
-    navigate("/compatible-animals");
+  const clearRequestFilter = () => {
+    navigate("/saved-animals");
   };
 
   if (loading) {
@@ -190,33 +297,83 @@ function SavedAnimalsPage() {
         <section className="saved-animals-hero">
           <div className="saved-animals-hero-left">
             <p className="saved-animals-tag">Saved Animals</p>
-            <h1>Keep track of animals you want to revisit later.</h1>
+            <h1>
+              {scenario === "PICK_REQUEST"
+                ? "Choose an adoption request"
+                : "Saved listings for your request"}
+            </h1>
             <p>
-              After you submit your adoption request, only animals with a
-              compatibility score of {STRONG_MATCH_THRESHOLD}% or higher
-              (inclusive) count as strong matches. Save those from your compatible
-              list and manage them here.
+              {scenario === "PICK_REQUEST"
+                ? "Select which submitted adoption request you want to review saved animals for."
+                : "Animals you saved for this adoption request. Compatibility % is shown when available."}
             </p>
-          </div>
-
-          <div className="saved-animals-hero-right">
-            <div className="saved-animals-hero-card">
-              <span className="saved-animals-hero-badge">Adopter Space</span>
-              <h3>Three steps to this page</h3>
-              <p>
-                Submit your request, unlock animals with scores of at least{" "}
-                {STRONG_MATCH_THRESHOLD}% (inclusive), then save the ones you love
-                from the compatible list.
+            {requestGroup?.requestId && (
+              <p className="saved-animals-filter-note">
+                Showing request #{requestGroup.requestId}.{" "}
+                {submittedRequests.length > 1 && (
+                  <button
+                    type="button"
+                    className="saved-animals-link-btn"
+                    onClick={clearRequestFilter}
+                  >
+                    Choose another request
+                  </button>
+                )}
               </p>
-            </div>
+            )}
           </div>
         </section>
+
+        {scenario === "PICK_REQUEST" && (
+          <section className="saved-animals-picker-wrap">
+            <ul className="adopter-requests-list">
+              {submittedRequests.map((r) => {
+                const savedCount = countSavedForRequest(savedEntries, r.id);
+                const phaseKey = String(r.requestPhase || "draft").toLowerCase();
+                return (
+                  <li key={r.id} className="adopter-requests-row">
+                    <div className="adopter-requests-row-body">
+                      <div className="adopter-requests-row-head">
+                        <strong>Request #{r.id}</strong>
+                        <span
+                          className={`adopter-requests-phase adopter-requests-phase-${phaseKey === "submitted" ? "submitted" : "draft"}`}
+                        >
+                          {formatPhase(r.requestPhase)}
+                        </span>
+                      </div>
+                      <p className="adopter-requests-meta">
+                        {r.requestTime ? new Date(r.requestTime).toLocaleString() : "—"}
+                      </p>
+                      <p className="adopter-requests-detail">
+                        {formatAdoptionRequestSummary(r)}
+                      </p>
+                      <p className="saved-animals-picker-count">
+                        {savedCount > 0
+                          ? `${savedCount} saved animal${savedCount === 1 ? "" : "s"}`
+                          : "No saved animals yet"}
+                      </p>
+                    </div>
+                    <div className="adopter-requests-actions">
+                      <button
+                        type="button"
+                        className="adopter-requests-btn"
+                        onClick={() => selectRequest(r.id)}
+                      >
+                        Open saved animals
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {scenario === "NO_REQUEST" &&
           gateCard(
             "Get started",
             "Create an adoption request first",
-            `You have not started an adoption request yet. Saved animals appear after you submit a request and the platform finds animals with a compatibility score of ${STRONG_MATCH_THRESHOLD}% or higher (inclusive).`,
+            `Submit a request before saving compatible animals (≥ ${STRONG_MATCH_THRESHOLD}%).`,
             <>
               <button
                 type="button"
@@ -232,7 +389,7 @@ function SavedAnimalsPage() {
           gateCard(
             "Draft in progress",
             "Finish and submit your request",
-            "You have a draft adoption request. Submit it so we can calculate compatibility. Until then, saved animals stay locked.",
+            "Saved animals are organised per submitted request.",
             <>
               <button
                 type="button"
@@ -248,68 +405,97 @@ function SavedAnimalsPage() {
           gateCard(
             "No strong matches yet",
             `No animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher`,
-            `Your request is in, but right now there are no animals with a compatibility score of ${STRONG_MATCH_THRESHOLD}% or higher (inclusive). Check again later or adjust your preferences on the adoption form if needed.`,
+            "Check again later or browse compatible animals for this request.",
             <>
-              <button
-                type="button"
-                className="saved-animals-primary-btn"
-                onClick={goToCompatibleAnimals}
-              >
-                View compatible animals
-              </button>
-            </>
-          )}
-
-        {scenario === "READY" && visibleAnimals.length === 0 && (
-          <>
-            {gateCard(
-              "No saved animals yet",
-              "You have matches — save some from the list",
-              `Animals at ${STRONG_MATCH_THRESHOLD}% compatibility or higher are ready for you. Open compatible animals and tap save on any profile; they will show up here with filters and sorting.`,
-              <>
+              {requestGroup?.requestId && (
                 <button
                   type="button"
                   className="saved-animals-primary-btn"
-                  onClick={goToCompatibleAnimals}
+                  onClick={() =>
+                    navigate(
+                      `/compatible-animals?requestId=${encodeURIComponent(String(requestGroup.requestId))}`
+                    )
+                  }
                 >
-                  Browse compatible animals
+                  View compatible animals
                 </button>
-              </>
-            )}
-          </>
-        )}
+              )}
+            </>
+          )}
 
-        {scenario === "READY" && visibleAnimals.length > 0 && (
+        {(scenario === "READY_EMPTY" ||
+          (scenario === "READY" && visibleAnimals.length === 0)) &&
+          gateCard(
+            "No saved animals yet",
+            "Save from your compatible list",
+            "Open compatible animals for this request and tap the heart to save.",
+            <>
+              {requestGroup?.requestId && (
+                <button
+                  type="button"
+                  className="saved-animals-primary-btn"
+                  onClick={() =>
+                    navigate(
+                      `/compatible-animals?requestId=${encodeURIComponent(String(requestGroup.requestId))}`
+                    )
+                  }
+                >
+                  View compatible animals
+                </button>
+              )}
+              {submittedRequests.length > 1 && (
+                <button
+                  type="button"
+                  className="saved-animals-secondary-btn"
+                  onClick={clearRequestFilter}
+                >
+                  Choose another request
+                </button>
+              )}
+            </>
+          )}
+
+        {scenario === "READY" && visibleAnimals.length > 0 && requestGroup && (
           <>
+            <header className="saved-animals-request-header saved-animals-request-header-inline">
+              <div>
+                <h2>Request #{requestGroup.requestId}</h2>
+                <p>{formatAdoptionRequestSummary(requestGroup.request)}</p>
+              </div>
+              <button
+                type="button"
+                className="saved-animals-link-btn"
+                onClick={() =>
+                  navigate(
+                    `/compatible-animals?requestId=${encodeURIComponent(String(requestGroup.requestId))}`
+                  )
+                }
+              >
+                View compatible animals
+              </button>
+            </header>
+
             <section className="saved-animals-toolbar">
               <div className="saved-animals-toolbar-left">
                 <label>
                   Type
-                  <select
-                    value={typeFilter}
-                    onChange={(e) => setTypeFilter(e.target.value)}
-                  >
+                  <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
                     <option value="All">All</option>
                     <option value="Dog">Dog</option>
                     <option value="Cat">Cat</option>
                     <option value="Rabbit">Rabbit</option>
                   </select>
                 </label>
-
                 <label>
                   Sort By
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                  >
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
                     <option value="Compatibility">Compatibility</option>
                     <option value="Name">Name</option>
                   </select>
                 </label>
               </div>
-
               <div className="saved-animals-toolbar-right">
-                <span>{visibleAnimals.length} saved (≥{STRONG_MATCH_THRESHOLD}%)</span>
+                <span>{visibleAnimals.length} saved</span>
               </div>
             </section>
 
@@ -324,32 +510,30 @@ function SavedAnimalsPage() {
                         className="saved-animal-image"
                       />
                     ) : (
-                      <div
-                        className="saved-animal-image-placeholder"
-                        aria-hidden="true"
-                      />
+                      <div className="saved-animal-image-placeholder" aria-hidden />
                     )}
-                    <span className="saved-animal-badge">
-                      {animal.compatibility}% compatibility
+                    <SaveHeartButton
+                      className="saved-animal-save-heart"
+                      saved
+                      onClick={(e) => handleUnsave(animal.id, e)}
+                    />
+                    <span
+                      className={`saved-animal-badge ${
+                        animal.compatibility >= STRONG_MATCH_THRESHOLD
+                          ? ""
+                          : "saved-animal-badge-muted"
+                      }`}
+                    >
+                      {animal.compatibility > 0
+                        ? `${animal.compatibility}% compatibility`
+                        : "Saved"}
                     </span>
                   </div>
-
                   <div className="saved-animal-content">
-                    <div className="saved-animal-top">
-                      <div>
-                        <h3>{animal.name}</h3>
-                        <p>
-                          {animal.type} · {animal.breed}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="saved-animal-meta">
-                      <span>{animal.age}</span>
-                      <span>{animal.size}</span>
-                      <span>{animal.energy} Energy</span>
-                    </div>
-
+                    <h3>{animal.name}</h3>
+                    <p>
+                      {animal.type} · {animal.breed}
+                    </p>
                     <div className="saved-animal-actions">
                       <button
                         type="button"
@@ -357,14 +541,6 @@ function SavedAnimalsPage() {
                         onClick={() => goToAnimalDetail(animal.id)}
                       >
                         View Details
-                      </button>
-
-                      <button
-                        type="button"
-                        className="saved-animal-secondary-btn"
-                        onClick={() => handleRemove(animal.id)}
-                      >
-                        Remove
                       </button>
                     </div>
                   </div>

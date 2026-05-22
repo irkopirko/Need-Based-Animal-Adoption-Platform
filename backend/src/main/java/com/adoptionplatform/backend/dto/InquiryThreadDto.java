@@ -9,6 +9,7 @@ public class InquiryThreadDto {
     private Long id;
     private Long animalId;
     private String animalName;
+    private String animalImageUrl;
     private String listingCode;
     private Long adopterUserId;
     private String adopterName;
@@ -45,6 +46,14 @@ public class InquiryThreadDto {
 
     public void setAnimalName(String animalName) {
         this.animalName = animalName;
+    }
+
+    public String getAnimalImageUrl() {
+        return animalImageUrl;
+    }
+
+    public void setAnimalImageUrl(String animalImageUrl) {
+        this.animalImageUrl = animalImageUrl;
     }
 
     public String getListingCode() {

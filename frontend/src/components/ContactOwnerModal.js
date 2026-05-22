@@ -32,7 +32,7 @@ function ContactOwnerModal({ open, onClose, animal, adopterUserId }) {
       });
       showPopup({
         type: "success",
-        title: "Message sent",
+        title: "Messaging request sent",
         message:
           "Your message request was sent. The owner can review your adoption profile and reply before approving the conversation."
       });

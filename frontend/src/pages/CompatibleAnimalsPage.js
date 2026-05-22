@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import "./CompatibleAnimalsPage.css";
+import "./AdopterMyRequestsPage.css";
 import Navbar from "../components/Navbar";
 import SaveHeartButton from "../components/SaveHeartButton";
 import ContactOwnerModal from "../components/ContactOwnerModal";
 import ReportListingModal from "../components/ReportListingModal";
+import ListingReportButton from "../components/ListingReportButton";
 import Footer from "../components/Footer";
 import { usePopup } from "../components/PopupProvider";
 import { getStoredUser, getApiBaseUrl, getResolvedUserId } from "../utils/auth";
 import {
   fetchUserAdoptionRequests,
+  formatAdoptionRequestSummary,
   summarizeAdoptionRequests,
   STRONG_MATCH_THRESHOLD,
   resolveAnimalImageUrl,
@@ -20,6 +23,7 @@ import {
   saveAnimalForUser,
   unsaveAnimalForUser
 } from "../utils/platformApi";
+import { formatAnimalGenderLabel } from "../utils/listingDisplay";
 
 function CompatibleAnimalsPage() {
   const navigate = useNavigate();
@@ -37,6 +41,8 @@ function CompatibleAnimalsPage() {
   const [contactAnimal, setContactAnimal] = useState(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportAnimalId, setReportAnimalId] = useState(null);
+  const [submittedRequests, setSubmittedRequests] = useState([]);
+  const [needsRequestPick, setNeedsRequestPick] = useState(false);
 
   const user = getStoredUser();
   const adopterUid = getResolvedUserId(user);
@@ -52,19 +58,25 @@ function CompatibleAnimalsPage() {
         localStorage.getItem("adoptionRequestCompleted") === "true";
 
       const resolvedUid = getResolvedUserId(user);
+      let submitted = [];
       if (resolvedUid != null) {
         const requests = await fetchUserAdoptionRequests(resolvedUid);
         const { hasSubmitted } = summarizeAdoptionRequests(requests);
         allowed = hasSubmitted || allowed;
+        submitted = requests.filter(
+          (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
+        );
       }
 
       if (cancelled) {
         return;
       }
       setHasAdoptionRequest(allowed);
+      setSubmittedRequests(submitted);
 
       if (!allowed) {
         setAnimals([]);
+        setNeedsRequestPick(false);
         setLoading(false);
         return;
       }
@@ -75,6 +87,23 @@ function CompatibleAnimalsPage() {
         requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
           ? Number(requestIdFromUrl)
           : null;
+
+      if (submitted.length === 1 && ridNum == null) {
+        navigate(
+          `/compatible-animals?requestId=${encodeURIComponent(String(submitted[0].id))}`,
+          { replace: true }
+        );
+        return;
+      }
+
+      if (submitted.length > 1 && ridNum == null) {
+        setAnimals([]);
+        setNeedsRequestPick(true);
+        setLoading(false);
+        return;
+      }
+
+      setNeedsRequestPick(false);
 
       try {
         const fromMatch = await fetchStrongMatchAnimals(uid, ridNum);
@@ -177,7 +206,11 @@ function CompatibleAnimalsPage() {
           message: "Animal removed from your saved list."
         });
       } else {
-        await saveAnimalForUser(uid, idNum);
+        const rid =
+          requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
+            ? Number(requestIdFromUrl)
+            : null;
+        await saveAnimalForUser(uid, idNum, rid);
         setSavedIds([...savedIds, idNum]);
         showPopup({
           type: "success",
@@ -194,8 +227,17 @@ function CompatibleAnimalsPage() {
     }
   };
 
-  const goToAnimalDetail = (animalId) => {
-    navigate(`/animal/${animalId}`);
+  const buildAnimalDetailPath = (animalId) => {
+    const base = `/animal/${animalId}`;
+    if (requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())) {
+      return `${base}?requestId=${encodeURIComponent(String(requestIdFromUrl).trim())}`;
+    }
+    return base;
+  };
+
+  const goToAnimalDetail = (animalId, e) => {
+    e?.stopPropagation?.();
+    navigate(buildAnimalDetailPath(animalId));
   };
 
   const goToRequestForm = () => {
@@ -203,7 +245,17 @@ function CompatibleAnimalsPage() {
   };
 
   const goToSavedAnimals = () => {
+    if (requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())) {
+      navigate(
+        `/saved-animals?requestId=${encodeURIComponent(String(requestIdFromUrl).trim())}`
+      );
+      return;
+    }
     navigate("/saved-animals");
+  };
+
+  const selectRequestForMatches = (id) => {
+    navigate(`/compatible-animals?requestId=${encodeURIComponent(String(id))}`);
   };
 
   if (loading) {
@@ -214,6 +266,61 @@ function CompatibleAnimalsPage() {
           <div className="compatible-loading-card">
             <h1>Loading compatible animals...</h1>
           </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (needsRequestPick) {
+    return (
+      <div className="compatible-page">
+        <Navbar />
+        <main className="compatible-main">
+          <section className="compatible-hero compatible-hero-compact">
+            <div className="compatible-hero-left">
+              <p className="compatible-hero-tag">Compatible Animals</p>
+              <h1 className="compatible-hero-title">Choose an adoption request</h1>
+              <p className="compatible-hero-text">
+                Strong matches are calculated per submitted request. Select which request
+                you want to browse compatible animals for.
+              </p>
+            </div>
+          </section>
+          <ul className="adopter-requests-list">
+            {submittedRequests.map((r) => {
+              const phaseKey = String(r.requestPhase || "draft").toLowerCase();
+              return (
+                <li key={r.id} className="adopter-requests-row">
+                  <div className="adopter-requests-row-body">
+                    <div className="adopter-requests-row-head">
+                      <strong>Request #{r.id}</strong>
+                      <span
+                        className={`adopter-requests-phase adopter-requests-phase-${phaseKey === "submitted" ? "submitted" : "draft"}`}
+                      >
+                        Submitted
+                      </span>
+                    </div>
+                    <p className="adopter-requests-meta">
+                      {r.requestTime ? new Date(r.requestTime).toLocaleString() : "—"}
+                    </p>
+                    <p className="adopter-requests-detail">
+                      {formatAdoptionRequestSummary(r)}
+                    </p>
+                  </div>
+                  <div className="adopter-requests-actions">
+                    <button
+                      type="button"
+                      className="adopter-requests-btn"
+                      onClick={() => selectRequestForMatches(r.id)}
+                    >
+                      View compatible animals
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </main>
         <Footer />
       </div>
@@ -293,8 +400,14 @@ function CompatibleAnimalsPage() {
               <p className="compatible-request-scope-note">
                 Showing strong matches (≥ {STRONG_MATCH_THRESHOLD}%) for{" "}
                 <strong>request #{String(requestIdFromUrl).trim()}</strong>.{" "}
-                <button type="button" className="compatible-request-scope-link" onClick={() => navigate("/compatible-animals")}>
-                  Use latest submitted request instead
+                <button
+                  type="button"
+                  className="compatible-request-scope-link"
+                  onClick={() => navigate("/compatible-animals")}
+                >
+                  {submittedRequests.length > 1
+                    ? "Choose another request"
+                    : "Clear request filter"}
                 </button>
               </p>
             )}
@@ -400,7 +513,19 @@ function CompatibleAnimalsPage() {
 
         <section className="compatible-grid">
           {filteredAnimals.map((animal) => (
-            <article key={animal.id} className="compatible-card">
+            <article
+              key={animal.id}
+              className="compatible-card compatible-card-clickable"
+              onClick={() => navigate(buildAnimalDetailPath(animal.id))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  navigate(buildAnimalDetailPath(animal.id));
+                }
+              }}
+              role="link"
+              tabIndex={0}
+            >
               <div className="compatible-card-image-wrap">
                 <img
                   src={animal.images?.[0]}
@@ -408,8 +533,14 @@ function CompatibleAnimalsPage() {
                   className="compatible-card-image"
                 />
                 <SaveHeartButton
+                  className="compatible-card-save-heart"
                   saved={savedIds.includes(Number(animal.id))}
                   onClick={(e) => handleSave(animal.id, e)}
+                />
+                <ListingReportButton
+                  variant="overlay"
+                  className="compatible-card-report-btn"
+                  onClick={() => setReportAnimalId(Number(animal.id))}
                 />
                 <span className="compatible-score-pill">
                   {animal.compatibilityScore || 0}% compatibility
@@ -427,6 +558,9 @@ function CompatibleAnimalsPage() {
                 </div>
 
                 <div className="compatible-card-meta">
+                  {formatAnimalGenderLabel(animal.gender) ? (
+                    <span>{formatAnimalGenderLabel(animal.gender)}</span>
+                  ) : null}
                   <span>{animal.ageGroup}</span>
                   <span>{animal.size}</span>
                   <span>{animal.energyLevel}</span>
@@ -440,9 +574,9 @@ function CompatibleAnimalsPage() {
                   <button
                     type="button"
                     className="compatible-dark-btn"
-                    onClick={() => goToAnimalDetail(animal.id)}
+                    onClick={(e) => goToAnimalDetail(animal.id, e)}
                   >
-                    View Profile
+                    View animal profile
                   </button>
 
                   {hasAdoptionRequest && animal.ownerId != null && (

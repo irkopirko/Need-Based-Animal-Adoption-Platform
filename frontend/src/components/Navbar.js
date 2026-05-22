@@ -1,18 +1,29 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Navbar.css";
 import {
   getHomePathByRole,
+  getOwnerHomePath,
+  getResolvedUserId,
   getStoredUser,
+  isOwnerProfileIncomplete,
   getUserInitials,
   normalizeRole,
   PAVIA_USER_UPDATED_EVENT
 } from "../utils/auth";
+import {
+  countOwnerListingStatuses,
+  fetchOwnerListings
+} from "../utils/ownerJourney";
 
 function Navbar() {
   const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
   const [user, setUser] = useState(null);
+  const [ownerListingCounts, setOwnerListingCounts] = useState({
+    archived: 0,
+    adopted: 0
+  });
   const menuRef = useRef(null);
 
   useEffect(() => {
@@ -25,9 +36,41 @@ function Navbar() {
   const isLoggedIn = !!user;
   const normalizedRole = normalizeRole(user?.role);
 
+  const refreshOwnerListingCounts = useCallback(() => {
+    if (normalizedRole !== "OWNER") {
+      return;
+    }
+    const uid = getResolvedUserId(user);
+    if (uid == null) {
+      return;
+    }
+    fetchOwnerListings(uid)
+      .then((list) => setOwnerListingCounts(countOwnerListingStatuses(list)))
+      .catch(() => setOwnerListingCounts({ archived: 0, adopted: 0 }));
+  }, [normalizedRole, user]);
+
+  useEffect(() => {
+    if (normalizedRole !== "OWNER") {
+      setOwnerListingCounts({ archived: 0, adopted: 0 });
+      return;
+    }
+    refreshOwnerListingCounts();
+  }, [normalizedRole, refreshOwnerListingCounts]);
+
+  useEffect(() => {
+    if (!showMenu || normalizedRole !== "OWNER") {
+      return;
+    }
+    refreshOwnerListingCounts();
+  }, [showMenu, normalizedRole, refreshOwnerListingCounts]);
+
   const goHome = () => {
     const activeUser = getStoredUser();
     setUser(activeUser);
+    if (normalizeRole(activeUser?.role) === "OWNER") {
+      navigate(getOwnerHomePath(activeUser));
+      return;
+    }
     navigate(getHomePathByRole(activeUser?.role));
   };
 
@@ -35,9 +78,10 @@ function Navbar() {
   const goLogin = () => navigate("/login");
   const goToAbout = () => navigate("/about");
   const goGuestAdopt = () => navigate("/adopt");
-  const goAdopterAdoptHub = () => navigate("/adoption-request");
-  const goAdopterMyRequests = () => navigate("/my-adoption-requests");
+  const goAdoptionRequest = () => navigate("/adoption-request");
+  const goCompatibleAnimals = () => navigate("/compatible-animals");
   const goOwnerManageRequests = () => navigate("/owner-requests");
+  const goOwnerMessages = () => navigate("/owner-messages");
 
   const handleLogout = () => {
     localStorage.removeItem("paviaUser");
@@ -61,16 +105,25 @@ function Navbar() {
 
     if (normalizedRole === "OWNER") {
       const items = [];
-      if (user.ownerProfileCompleted === false) {
+      if (isOwnerProfileIncomplete(user)) {
         items.push({ label: "Complete profile", path: "/complete-owner-profile" });
       }
       items.push(
         { label: "Dashboard", path: "/ownerhomepage" },
         { label: "Listed animals", path: "/owner-listings" },
         { label: "Register an animal", path: "/register-animal" },
-        { label: "Adoption requests", path: "/owner-requests" },
-        { label: "Adoption pipeline", path: "/owner-adoptions" },
-        { label: "Inquiries", path: "/owner-messages" }
+        { label: "Manage requests", path: "/owner-requests" },
+        { label: "Messages", path: "/owner-messages" },
+        {
+          label: "Archived listings",
+          path: "/owner-listings?tab=archived",
+          count: ownerListingCounts.archived
+        },
+        {
+          label: "Adopted animals",
+          path: "/owner-listings?tab=adopted",
+          count: ownerListingCounts.adopted
+        }
       );
       return items;
     }
@@ -83,10 +136,11 @@ function Navbar() {
       { label: "Home", path: "/adopterhomepage" },
       { label: "Adoption request", path: "/adoption-request" },
       { label: "My adoption requests", path: "/my-adoption-requests" },
-      { label: "Matching animals", path: "/matches" },
+      { label: "Compatible animals", path: "/compatible-animals" },
       { label: "Saved animals", path: "/saved-animals" },
       { label: "My adoptions", path: "/my-adoptions" },
-      { label: "Messages", path: "/adopter-messages" }
+      { label: "Messages", path: "/adopter-messages" },
+      { label: "Edit profile", path: "/account" }
     );
     return adopterItems;
   };
@@ -115,70 +169,47 @@ function Navbar() {
       </div>
 
       <nav className="navbar-links">
-        <button
-          type="button"
-          className="navbar-link-btn"
-          onClick={goToAbout}
-        >
+        <button type="button" className="navbar-link-btn" onClick={goToAbout}>
           About Us
         </button>
 
         {!isLoggedIn && (
-          <button
-            type="button"
-            className="navbar-link-btn"
-            onClick={goGuestAdopt}
-          >
+          <button type="button" className="navbar-link-btn" onClick={goGuestAdopt}>
             Adopt
           </button>
         )}
 
         {isLoggedIn && normalizedRole === "ADOPTER" && (
-          <div className="navbar-adopter-adopt-group">
-            <button
-              type="button"
-              className="navbar-link-btn"
-              onClick={goAdopterAdoptHub}
-            >
+          <>
+            <button type="button" className="navbar-link-btn" onClick={goAdoptionRequest}>
               Adopt
             </button>
-            <button
-              type="button"
-              className="navbar-adopter-requests-link"
-              onClick={goAdopterMyRequests}
-            >
-              View my requests
+            <button type="button" className="navbar-link-btn" onClick={goCompatibleAnimals}>
+              View Matches
             </button>
-          </div>
+          </>
         )}
 
         {isLoggedIn && normalizedRole === "OWNER" && (
-          <button
-            type="button"
-            className="navbar-link-btn"
-            onClick={goOwnerManageRequests}
-          >
-            Manage Requests
-          </button>
+          <>
+            <button type="button" className="navbar-link-btn" onClick={goOwnerMessages}>
+              Messages
+            </button>
+            <button type="button" className="navbar-link-btn" onClick={goOwnerManageRequests}>
+              Manage requests
+            </button>
+          </>
         )}
       </nav>
 
       <div className="navbar-actions">
         {!isLoggedIn ? (
           <>
-            <button
-              type="button"
-              className="navbar-login-btn"
-              onClick={goLogin}
-            >
+            <button type="button" className="navbar-login-btn" onClick={goLogin}>
               Log In
             </button>
 
-            <button
-              type="button"
-              className="navbar-start-btn"
-              onClick={goRegister}
-            >
+            <button type="button" className="navbar-start-btn" onClick={goRegister}>
               Get Started
             </button>
           </>
@@ -231,7 +262,15 @@ function Navbar() {
                     onClick={() => closeMenuAndNavigate(item.path)}
                   >
                     <span className="nav-profile-item-icon" aria-hidden />
-                    <span>{item.label}</span>
+                    <span className="nav-profile-item-label">{item.label}</span>
+                    {item.count != null && (
+                      <span
+                        className="nav-profile-item-count"
+                        aria-label={`${item.count} ${item.label.toLowerCase()}`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
                   </button>
                 ))}
 
@@ -239,20 +278,11 @@ function Navbar() {
 
                 <button
                   type="button"
-                  className="nav-profile-item"
-                  onClick={() => closeMenuAndNavigate("/account")}
-                >
-                  <span className="nav-profile-item-icon nav-profile-item-icon-account" aria-hidden />
-                  <span>Edit profile</span>
-                </button>
-
-                <button
-                  type="button"
                   className="nav-profile-item nav-profile-item-logout"
                   onClick={handleLogout}
                 >
-                  <span className="nav-profile-item-icon nav-profile-item-icon-logout"></span>
-                  <span>Log Out</span>
+                  <span className="nav-profile-item-icon nav-profile-item-icon-logout" />
+                  <span>Logout</span>
                 </button>
               </div>
             )}

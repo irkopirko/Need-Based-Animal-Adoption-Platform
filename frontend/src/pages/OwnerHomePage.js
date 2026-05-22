@@ -1,300 +1,357 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import "./OwnerListingsPage.css";
+import "./OwnerHomePage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { usePopup } from "../components/PopupProvider";
-import { getApiBaseUrl, getStoredUser, getResolvedUserId, normalizeRole } from "../utils/auth";
+import ownerHomeHeroImage from "../images/ownerHomeHeroImage.jpg";
 import {
+  broadcastStoredUserRefresh,
+  getApiBaseUrl,
+  getResolvedUserId,
+  getStoredUser,
+  isOwnerProfileIncomplete,
+  normalizeRole
+} from "../utils/auth";
+import {
+  filterInquiriesForOpenDashboardListings,
+  filterOpenDashboardListings
+} from "../utils/listingDisplay";
+import {
+  countOwnerListingStatuses,
   fetchOwnerListings,
+  loadOwnerEngagementState,
   ownerListingImageUrls,
   resolveOwnerListingImageUrl
 } from "../utils/ownerJourney";
-import {
-  archiveOwnerListing,
-  formatListingCode,
-  unarchiveOwnerListing
-} from "../utils/platformApi";
 
-function formatListedDate(value) {
-  if (value == null || value === "") {
-    return "—";
-  }
-  let d;
-  if (Array.isArray(value) && value.length >= 3) {
-    const [y, mo = 1, day = 1] = value;
-    d = new Date(Number(y), Number(mo) - 1, Number(day));
-  } else if (typeof value === "string") {
-    d = new Date(value);
-  } else {
-    return "—";
-  }
-  if (Number.isNaN(d.getTime())) {
-    return "—";
-  }
-  return d.toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric"
-  });
+const ICON_CLASSES = [
+  "owner-animal-icon-green",
+  "owner-animal-icon-mint",
+  "owner-animal-icon-cream"
+];
+
+function titleCase(value) {
+  if (!value) return "";
+  const text = String(value).toLowerCase().replace(/_/g, " ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function titleCase(s) {
-  if (!s) return "";
-  const t = String(s).toLowerCase().replace(/_/g, " ");
-  return t.charAt(0).toUpperCase() + t.slice(1);
+function statusPillClass(status) {
+  const normalized = String(status || "ACTIVE").toUpperCase();
+  if (normalized === "ACTIVE") return "owner-status-pill owner-status-active";
+  return "owner-status-pill owner-status-draft";
 }
 
-function OwnerListingCard({ animal, apiBaseUrl, onOpenDetail, onArchiveToggle, viewerId }) {
-  const imgs = ownerListingImageUrls(animal);
-  const [idx, setIdx] = useState(0);
-  const n = imgs.length;
-  const safeIdx = n === 0 ? 0 : idx % n;
-  const url =
-    n > 0 ? resolveOwnerListingImageUrl(imgs[safeIdx], apiBaseUrl) : null;
-
-  const goPrev = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (n <= 1) return;
-    setIdx((i) => (i - 1 + n) % n);
-  };
-
-  const goNext = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (n <= 1) return;
-    setIdx((i) => (i + 1) % n);
-  };
-
-  const openDetail = () => {
-    onOpenDetail(animal.id);
-  };
-
-  const onKeyDown = (e) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      openDetail();
-    }
-  };
-
-  return (
-    <article
-      className="owner-listing-card"
-      role="button"
-      tabIndex={0}
-      onClick={openDetail}
-      onKeyDown={onKeyDown}
-      aria-label={`Open profile for ${animal.name || "animal"}`}
-    >
-      <div className="owner-listing-carousel">
-        {url ? (
-          <img src={url} alt="" className="owner-listing-carousel-img" />
-        ) : (
-          <div className="owner-listing-carousel-placeholder" aria-hidden>
-            No photo
-          </div>
-        )}
-        {n > 1 && (
-          <>
-            <button
-              type="button"
-              className="owner-listing-nav owner-listing-nav-prev"
-              onClick={goPrev}
-              aria-label="Previous photo"
-            >
-              ‹
-            </button>
-            <button
-              type="button"
-              className="owner-listing-nav owner-listing-nav-next"
-              onClick={goNext}
-              aria-label="Next photo"
-            >
-              ›
-            </button>
-            <span className="owner-listing-dots" aria-hidden>
-              {safeIdx + 1} / {n}
-            </span>
-          </>
-        )}
-      </div>
-
-      <div className="owner-listing-main">
-        <p className="owner-listing-code">{formatListingCode(animal)}</p>
-        <h2 className="owner-listing-name">{animal.name || "Unnamed"}</h2>
-        <p className="owner-listing-line">
-          {titleCase(animal.animalType)} · {animal.breed || "—"}
-        </p>
-        <p className="owner-listing-line owner-listing-line-muted">
-          {titleCase(animal.energyLevel)} energy · {titleCase(animal.ageGroup)} ·{" "}
-          {titleCase(animal.size)}
-        </p>
-        {animal.listingStatus && (
-          <span className="owner-listing-status">{String(animal.listingStatus)}</span>
-        )}
-        <div className="owner-listing-card-actions">
-          <button
-            type="button"
-            className="owner-listing-archive-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onArchiveToggle(animal);
-            }}
-          >
-            {String(animal.listingStatus || "").toUpperCase() === "ARCHIVED"
-              ? "Restore from archive"
-              : "Archive listing"}
-          </button>
-        </div>
-      </div>
-
-      <time className="owner-listing-date" dateTime={animal.registerTime ? String(animal.registerTime) : undefined}>
-        {formatListedDate(animal.registerTime)}
-      </time>
-    </article>
-  );
+function inquiryTagClass(status) {
+  const normalized = String(status || "PENDING").toUpperCase();
+  if (normalized === "PENDING") return "owner-request-tag";
+  if (normalized === "ACCEPTED") return "owner-request-tag owner-request-tag-accepted";
+  return "owner-request-tag owner-request-tag-muted";
 }
 
-function OwnerListingsPage() {
+function OwnerHomePage() {
   const navigate = useNavigate();
-  const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
-  const [animals, setAnimals] = useState([]);
-  const [tab, setTab] = useState("active");
+  const [listings, setListings] = useState([]);
+  const [inquiries, setInquiries] = useState([]);
   const apiBaseUrl = getApiBaseUrl();
 
-  const load = useCallback(async () => {
-    const user = getStoredUser();
-    const uid = getResolvedUserId(user);
-    if (!uid || normalizeRole(user?.role) !== "OWNER") {
-      navigate("/", { replace: true });
-      return;
-    }
-    setLoading(true);
-    try {
-      const list = await fetchOwnerListings(uid);
-      setAnimals(list);
-    } catch (e) {
-      console.error(e);
-      showPopup({
-        type: "error",
-        title: "Could not load",
-        message: e?.message || "Listings could not be loaded."
-      });
-      setAnimals([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [navigate, showPopup]);
-
   useEffect(() => {
-    load();
-  }, [load]);
-
-  const goRegister = () => navigate("/register-animal");
-  const openAnimal = (id) => navigate(`/animal/${id}`);
-
-  const activeListings = animals.filter(
-    (a) => String(a.listingStatus || "").toUpperCase() !== "ARCHIVED"
-  );
-  const archivedListings = animals.filter(
-    (a) => String(a.listingStatus || "").toUpperCase() === "ARCHIVED"
-  );
-  const visible = tab === "archived" ? archivedListings : activeListings;
-
-  const handleArchiveToggle = async (animal) => {
-    const uid = getResolvedUserId(getStoredUser());
-    if (uid == null) {
-      return;
+    const stored = getStoredUser();
+    const uid = getResolvedUserId(stored);
+    if (!uid || normalizeRole(stored?.role) !== "OWNER") {
+      navigate("/", { replace: true });
+      return undefined;
     }
-    const isArchived =
-      String(animal.listingStatus || "").toUpperCase() === "ARCHIVED";
-    try {
-      if (isArchived) {
-        await unarchiveOwnerListing(animal.id, uid);
-        showPopup({
-          type: "success",
-          title: "Restored",
-          message: "Listing is active again and visible for matching."
-        });
-      } else {
-        await archiveOwnerListing(animal.id, uid);
-        showPopup({
-          type: "success",
-          title: "Archived",
-          message: "Listing hidden from compatibility matching."
-        });
-      }
-      load();
-    } catch (e) {
-      showPopup({
-        type: "error",
-        title: "Failed",
-        message: e.message || "Could not update listing."
+
+    let cancelled = false;
+
+    fetch(`${apiBaseUrl}/api/auth/profile/${uid}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((profile) => {
+        if (cancelled || !profile) {
+          return;
+        }
+        const prev = getStoredUser() || {};
+        localStorage.setItem(
+          "paviaUser",
+          JSON.stringify({
+            ...prev,
+            ownerProfileCompleted: profile.ownerProfileCompleted,
+            ownerListingType: profile.ownerListingType || ""
+          })
+        );
+        broadcastStoredUserRefresh();
+        if (!profile.ownerProfileCompleted) {
+          navigate("/complete-owner-profile", { replace: true });
+        }
+      })
+      .catch(() => {});
+
+    Promise.all([fetchOwnerListings(uid), loadOwnerEngagementState(uid)])
+      .then(([ownerListings, engagement]) => {
+        if (cancelled) {
+          return;
+        }
+        setListings(ownerListings);
+        setInquiries(engagement?.inquiries || []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setListings([]);
+          setInquiries([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
       });
-    }
-  };
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, navigate]);
+
+  const activeListings = useMemo(
+    () => filterOpenDashboardListings(listings),
+    [listings]
+  );
+
+  const openInquiries = useMemo(
+    () => filterInquiriesForOpenDashboardListings(inquiries, listings),
+    [inquiries, listings]
+  );
+
+  const adoptedCount = useMemo(
+    () => countOwnerListingStatuses(listings).adopted,
+    [listings]
+  );
+
+  const previewListings = useMemo(() => activeListings.slice(0, 3), [activeListings]);
+
+  const previewInquiries = useMemo(() => {
+    return [...openInquiries]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3);
+  }, [openInquiries]);
+
+  const pendingCount = useMemo(
+    () =>
+      openInquiries.filter(
+        (item) => String(item.status || "").toUpperCase() === "PENDING"
+      ).length,
+    [openInquiries]
+  );
+
+  const completedCount = useMemo(
+    () =>
+      openInquiries.filter(
+        (item) => String(item.status || "").toUpperCase() === "ACCEPTED"
+      ).length,
+    [openInquiries]
+  );
+
+  if (isOwnerProfileIncomplete(getStoredUser())) {
+    return null;
+  }
 
   return (
-    <div className="owner-listings-page">
+    <div className="owner-page">
       <Navbar />
 
-      <main className="owner-listings-main">
-        <header className="owner-listings-hero">
-          <p className="owner-listings-tag">Your listings</p>
-          <h1>Listed animals</h1>
-          <p className="owner-listings-lead">
-            Wide cards show each listing at a glance. Use the arrows on a photo to browse images
-            before opening the full profile.
-          </p>
-        </header>
+      <main className="owner-main">
+        <section
+          className="owner-hero"
+          style={{ backgroundImage: `url(${ownerHomeHeroImage})` }}
+        >
+          <div className="owner-hero-overlay">
+            <p className="owner-hero-tag">Owner Dashboard</p>
 
-        <div className="owner-listings-tabs">
-          <button
-            type="button"
-            className={tab === "active" ? "is-active" : ""}
-            onClick={() => setTab("active")}
-          >
-            Active ({activeListings.length})
-          </button>
-          <button
-            type="button"
-            className={tab === "archived" ? "is-active" : ""}
-            onClick={() => setTab("archived")}
-          >
-            Archive ({archivedListings.length})
-          </button>
-        </div>
+            <h1 className="owner-hero-title">
+              Manage your animals,
+              <br />
+              review adoption requests,
+              <br />
+              and guide better matches.
+            </h1>
 
-        {loading ? (
-          <p className="owner-listings-loading">Loading your animals…</p>
-        ) : visible.length === 0 ? (
-          <section className="owner-listings-empty">
-            <p>
-              {tab === "archived"
-                ? "No archived listings."
-                : "You have not published any active animals yet."}
+            <p className="owner-hero-text">
+              Use your dashboard to register new animals, monitor listing status,
+              and review incoming adoption requests through a cleaner and more
+              organized owner experience.
             </p>
-            {tab === "active" && (
-              <button type="button" className="owner-listings-primary-btn" onClick={goRegister}>
-                Register an animal
+
+            <div className="owner-hero-buttons">
+              <button
+                type="button"
+                className="owner-primary-btn"
+                onClick={() => navigate("/register-animal")}
+              >
+                Register New Animal
               </button>
-            )}
-          </section>
-        ) : (
-          <div className="owner-listings-stack">
-            {visible.map((a) => (
-              <OwnerListingCard
-                key={a.id}
-                animal={a}
-                apiBaseUrl={apiBaseUrl}
-                onOpenDetail={openAnimal}
-                onArchiveToggle={handleArchiveToggle}
-              />
-            ))}
+
+              <button
+                type="button"
+                className="owner-secondary-btn"
+                onClick={() => navigate("/owner-requests")}
+              >
+                Manage Requests
+              </button>
+            </div>
           </div>
-        )}
+        </section>
+
+        <section className="owner-summary-grid" aria-label="Overview">
+          <div className="owner-summary-card">
+            <div className="owner-summary-head">
+              <span className="owner-summary-label">Active Listings</span>
+              <span className="owner-summary-mini-dot" />
+            </div>
+            <p className="owner-summary-value">{loading ? "—" : activeListings.length}</p>
+            <span className="owner-summary-note">Animals currently visible</span>
+          </div>
+
+          <div className="owner-summary-card">
+            <div className="owner-summary-head">
+              <span className="owner-summary-label">Pending Requests</span>
+              <span className="owner-summary-mini-dot" />
+            </div>
+            <p className="owner-summary-value">{loading ? "—" : pendingCount}</p>
+            <span className="owner-summary-note">Waiting for owner review</span>
+          </div>
+
+          <div className="owner-summary-card">
+            <div className="owner-summary-head">
+              <span className="owner-summary-label">Accepted Inquiries</span>
+              <span className="owner-summary-mini-dot" />
+            </div>
+            <p className="owner-summary-value">{loading ? "—" : completedCount}</p>
+            <span className="owner-summary-note">Successfully accepted</span>
+          </div>
+
+          <button
+            type="button"
+            className="owner-summary-card owner-summary-card-link owner-summary-card-adopted"
+            onClick={() => navigate("/owner-listings?tab=adopted")}
+          >
+            <div className="owner-summary-head">
+              <span className="owner-summary-label">Found their forever home</span>
+              <span className="owner-summary-mini-dot owner-summary-dot-adopted" />
+            </div>
+            <p className="owner-summary-value">{loading ? "—" : adoptedCount}</p>
+            <span className="owner-summary-note">Adopted listings · View all</span>
+          </button>
+        </section>
+
+        <section className="owner-panel-grid">
+          <div className="owner-panel-card owner-panel-card-green">
+            <div className="owner-panel-top">
+              <div>
+                <h2>My Animal Listings</h2>
+                <p>
+                  Review the animal profiles you created and keep their status up
+                  to date through a structured listing panel.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="owner-panel-link"
+                onClick={() => navigate("/owner-listings")}
+              >
+                See All
+              </button>
+            </div>
+
+            <div className="owner-list-table">
+              <div className="owner-list-row owner-list-header">
+                <span>Animal</span>
+                <span>Status</span>
+              </div>
+
+              {loading ? (
+                <p className="owner-panel-empty">Loading listings…</p>
+              ) : previewListings.length === 0 ? (
+                <p className="owner-panel-empty">
+                  No active listings yet. Register your first animal to get started.
+                </p>
+              ) : (
+                previewListings.map((animal, index) => {
+                  const imageUrl = ownerListingImageUrls(animal)[0];
+                  const resolvedImage = imageUrl
+                    ? resolveOwnerListingImageUrl(imageUrl, apiBaseUrl)
+                    : null;
+
+                  return (
+                    <div className="owner-list-row" key={animal.id}>
+                      <div className="owner-animal-meta">
+                        {resolvedImage ? (
+                          <img
+                            src={resolvedImage}
+                            alt=""
+                            className="owner-animal-thumb"
+                          />
+                        ) : (
+                          <div
+                            className={`owner-animal-icon ${ICON_CLASSES[index % ICON_CLASSES.length]}`}
+                          />
+                        )}
+                        <div>
+                          <strong>{animal.name || "Unnamed"}</strong>
+                          <p>{animal.breed || titleCase(animal.animalType) || "—"}</p>
+                        </div>
+                      </div>
+                      <span className={statusPillClass(animal.listingStatus)}>
+                        {titleCase(animal.listingStatus || "ACTIVE")}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <div className="owner-panel-card owner-panel-card-mint">
+            <div className="owner-panel-top">
+              <div>
+                <h2>Incoming Adoption Requests</h2>
+                <p>
+                  Review adopter interest and continue the process through a
+                  more organized request view.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="owner-panel-link"
+                onClick={() => navigate("/owner-requests")}
+              >
+                Open Panel
+              </button>
+            </div>
+
+            <div className="owner-request-list">
+              {loading ? (
+                <p className="owner-panel-empty">Loading requests…</p>
+              ) : previewInquiries.length === 0 ? (
+                <p className="owner-panel-empty">No adoption requests yet.</p>
+              ) : (
+                previewInquiries.map((inquiry) => (
+                  <div className="owner-request-item" key={inquiry.id}>
+                    <div>
+                      <strong>Request #{inquiry.id}</strong>
+                      <p>For {inquiry.animalName || "your listing"}</p>
+                    </div>
+                    <span className={inquiryTagClass(inquiry.status)}>
+                      {titleCase(inquiry.status || "PENDING")}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
       </main>
 
       <Footer />
@@ -302,4 +359,4 @@ function OwnerListingsPage() {
   );
 }
 
-export default OwnerListingsPage;
+export default OwnerHomePage;

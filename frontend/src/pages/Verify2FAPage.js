@@ -153,6 +153,7 @@ function Verify2FAPage() {
         resolvedRole !== "ADOPTER" || data.adopterProfileCompleted === "true";
       const ownerProfileCompleted =
         resolvedRole !== "OWNER" || data.ownerProfileCompleted === "true";
+      const ownerProfileCompletedBool = ownerProfileCompleted;
 
       localStorage.setItem(
         "paviaUser",
@@ -162,7 +163,7 @@ function Verify2FAPage() {
           userId: Number(data.userId),
           fullName: (data.fullName && String(data.fullName).trim()) || "",
           adopterProfileCompleted,
-          ownerProfileCompleted,
+          ownerProfileCompleted: ownerProfileCompletedBool,
           ownerListingType:
             resolvedRole === "OWNER" ? data.ownerListingType || "" : ""
         })
@@ -178,7 +179,7 @@ function Verify2FAPage() {
         navigate("/adminhomepage", { replace: true });
       } else if (resolvedRole === "ADOPTER" && !adopterProfileCompleted) {
         navigate("/complete-adopter-profile", { replace: true });
-      } else if (resolvedRole === "OWNER" && !ownerProfileCompleted) {
+      } else if (resolvedRole === "OWNER" && !ownerProfileCompletedBool) {
         navigate("/complete-owner-profile", { replace: true });
       } else {
         navigate(getHomePathByRole(resolvedRole), { replace: true });

@@ -12,6 +12,7 @@ public class AnimalRequest {
     private String specialNeeds;
     private String description;
     private String housingLocation;     //home or shelter
+    private String gender;
     private Long ownerId;
 
     public AnimalRequest() {
@@ -117,5 +118,13 @@ public class AnimalRequest {
 
     public void setHousingLocation(String housingLocation) {
         this.housingLocation = housingLocation;
+    }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
     }
 }

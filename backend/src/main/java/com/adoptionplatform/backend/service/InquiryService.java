@@ -39,6 +39,7 @@ public class InquiryService {
     private final MatchSnapshotService matchSnapshotService;
     private final AdoptionCaseService adoptionCaseService;
     private final AdoptionCaseRepository adoptionCaseRepository;
+    private final EmailService emailService;
 
     public InquiryService(
             ListingInquiryRepository inquiryRepository,
@@ -48,7 +49,8 @@ public class InquiryService {
             AdoptionRequestRepository adoptionRequestRepository,
             MatchSnapshotService matchSnapshotService,
             AdoptionCaseService adoptionCaseService,
-            AdoptionCaseRepository adoptionCaseRepository
+            AdoptionCaseRepository adoptionCaseRepository,
+            EmailService emailService
     ) {
         this.inquiryRepository = inquiryRepository;
         this.messageRepository = messageRepository;
@@ -58,6 +60,7 @@ public class InquiryService {
         this.matchSnapshotService = matchSnapshotService;
         this.adoptionCaseService = adoptionCaseService;
         this.adoptionCaseRepository = adoptionCaseRepository;
+        this.emailService = emailService;
     }
 
     @Transactional
@@ -106,6 +109,11 @@ public class InquiryService {
         Optional<ListingInquiry> existing = inquiryRepository.findByAnimalIdAndAdopterUserId(
                 request.getAnimalId(), request.getAdopterUserId());
         if (existing.isPresent()) {
+            ListingInquiry prior = existing.get();
+            if ("REJECTED".equalsIgnoreCase(String.valueOf(prior.getStatus()))) {
+                throw new IllegalArgumentException(
+                        "Your message request for this listing was declined. You cannot send a new request.");
+            }
             throw new IllegalArgumentException("You already contacted the owner for this listing");
         }
 
@@ -132,7 +140,39 @@ public class InquiryService {
         first.setCreatedAt(now);
         messageRepository.save(first);
 
+        notifyOwnerNewMessageRequest(ownerId, animal, adopter, message);
+
         return toThreadDto(saved, true);
+    }
+
+    private void notifyOwnerNewMessageRequest(
+            Long ownerUserId,
+            Animal animal,
+            User adopter,
+            String messagePreview
+    ) {
+        userRepository.findById(ownerUserId).ifPresent(owner -> {
+            String email = owner.getEmail();
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            String adopterName = adopter.getFullName();
+            if (adopterName == null || adopterName.isBlank()) {
+                adopterName = adopter.getEmail() != null ? adopter.getEmail() : "An adopter";
+            }
+            try {
+                emailService.sendOwnerNewMessageRequestNotice(
+                        email.trim(),
+                        adopterName,
+                        animal.getName(),
+                        ListingCodeUtil.format(animal.getId()),
+                        animal.getId(),
+                        messagePreview
+                );
+            } catch (RuntimeException ex) {
+                // Inquiry is saved even if email delivery fails.
+            }
+        });
     }
 
     @Transactional(readOnly = true)
@@ -192,11 +232,25 @@ public class InquiryService {
                 .orElseThrow(() -> new IllegalArgumentException("Inquiry not found"));
         assertParticipant(inquiry, request.getUserId());
 
+        String role = resolveSenderRole(inquiry, request.getUserId(), request.getSenderRole());
+
         if ("REJECTED".equalsIgnoreCase(inquiry.getStatus())) {
+            if ("ADOPTER".equals(role)) {
+                throw new IllegalArgumentException(
+                        "This message request was declined. You cannot send more messages.");
+            }
             throw new IllegalArgumentException("This inquiry was closed and no further messages can be sent");
         }
 
-        String role = resolveSenderRole(inquiry, request.getUserId(), request.getSenderRole());
+        if ("PENDING".equalsIgnoreCase(inquiry.getStatus()) && "ADOPTER".equals(role)) {
+            long adopterMsgCount = messageRepository.findByInquiryIdOrderByCreatedAtAsc(inquiryId).stream()
+                    .filter(m -> "ADOPTER".equalsIgnoreCase(m.getSenderRole()))
+                    .count();
+            if (adopterMsgCount >= 1) {
+                throw new IllegalArgumentException(
+                        "Your message request is pending. The owner must accept before you can send more messages.");
+            }
+        }
 
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Europe/Istanbul"));
         InquiryMessage msg = new InquiryMessage();
@@ -278,7 +332,13 @@ public class InquiryService {
 
         adoptionCaseRepository.findByInquiryId(inquiry.getId()).ifPresent(c -> dto.setAdoptionCaseId(c.getId()));
 
-        animalRepository.findById(inquiry.getAnimalId()).ifPresent(a -> dto.setAnimalName(a.getName()));
+        animalRepository.findById(inquiry.getAnimalId()).ifPresent(a -> {
+            dto.setAnimalName(a.getName());
+            List<String> imgs = a.getImages();
+            if (imgs != null && !imgs.isEmpty()) {
+                dto.setAnimalImageUrl(imgs.get(0));
+            }
+        });
         userRepository.findById(inquiry.getAdopterUserId()).ifPresent(u -> {
             dto.setAdopterName(u.getFullName());
             dto.setAdopterEmail(u.getEmail());

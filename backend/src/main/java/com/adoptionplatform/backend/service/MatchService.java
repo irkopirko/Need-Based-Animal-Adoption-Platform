@@ -167,6 +167,10 @@ public class MatchService {
         earned += size.earned;
         applicable += size.maxWeight;
 
+        CategoryOutcome gender = genderCategory(request, animal, reasons);
+        earned += gender.earned;
+        applicable += gender.maxWeight;
+
         CategoryOutcome energy = energyCategory(request, animal, reasons);
         earned += energy.earned;
         applicable += energy.maxWeight;
@@ -457,6 +461,34 @@ public class MatchService {
         }
 
         return new CategoryOutcome(4, max);
+    }
+
+    private CategoryOutcome genderCategory(
+            AdoptionRequest request,
+            Animal animal,
+            List<String> reasons
+    ) {
+        String animalGender = safe(animal.getGender());
+        if (animalGender.isEmpty()) {
+            return CategoryOutcome.skip();
+        }
+        String prefs = request.getPreferredGenders();
+        if (!hasText(prefs)) {
+            reasons.add("Gender preference is open to any.");
+            return new CategoryOutcome(8, 8);
+        }
+        double max = 8;
+        boolean wantsMale = contains(prefs, "MALE") || contains(prefs, "Male");
+        boolean wantsFemale = contains(prefs, "FEMALE") || contains(prefs, "Female");
+        if (wantsMale && wantsFemale) {
+            reasons.add("Gender preference includes this animal.");
+            return new CategoryOutcome(max, max);
+        }
+        if (contains(prefs, animalGender) || contains(prefs, title(animalGender))) {
+            reasons.add("Gender matches the adopter's preference.");
+            return new CategoryOutcome(max, max);
+        }
+        return new CategoryOutcome(0, max);
     }
 
     private CategoryOutcome groomingCategory(

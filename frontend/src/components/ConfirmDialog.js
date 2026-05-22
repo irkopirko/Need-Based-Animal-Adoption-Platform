@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from "react";
-import "./ConfirmDialog.css";
+import { useEffect, useRef } from "react";
+import { usePopup } from "./PopupProvider";
 
 /**
- * Accessible confirm modal (s eparate from toast popups).
+ * @deprecated Use {@link usePopup} `showConfirm()` — same PopupProvider styling.
  */
 export function ConfirmDialog({
   open,
@@ -15,77 +15,56 @@ export function ConfirmDialog({
   confirmDanger = false,
   busy = false
 }) {
-  const panelRef = useRef(null);
-  const cancelBtnRef = useRef(null);
+  const { showConfirm, closeConfirm } = usePopup();
+  const openedRef = useRef(false);
 
   useEffect(() => {
     if (!open) {
+      openedRef.current = false;
       return undefined;
     }
-    const onKey = (e) => {
-      if (e.key === "Escape") {
-        onCancel();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    const t = window.setTimeout(() => cancelBtnRef.current?.focus(), 0);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.clearTimeout(t);
-    };
-  }, [open, onCancel]);
+    if (openedRef.current) {
+      return undefined;
+    }
+    openedRef.current = true;
 
-  if (!open) {
-    return null;
-  }
-
-  return (
-    <div
-      className="confirm-dialog-backdrop"
-      role="presentation"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) {
-          onCancel();
+    showConfirm({
+      type: confirmDanger ? "critical" : "warning",
+      title,
+      message: description,
+      confirmLabel,
+      cancelLabel,
+      confirmDanger,
+      onConfirm: async () => {
+        if (onConfirm) {
+          await onConfirm();
         }
-      }}
-    >
-      <div
-        ref={panelRef}
-        className="confirm-dialog-panel"
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-        aria-describedby="confirm-dialog-desc"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <h2 id="confirm-dialog-title" className="confirm-dialog-title">
-          {title}
-        </h2>
-        <p id="confirm-dialog-desc" className="confirm-dialog-desc">
-          {description}
-        </p>
-        <div className="confirm-dialog-actions">
-          <button
-            ref={cancelBtnRef}
-            type="button"
-            className="confirm-dialog-btn confirm-dialog-btn-secondary"
-            onClick={onCancel}
-            disabled={busy}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="button"
-            className={`confirm-dialog-btn confirm-dialog-btn-primary ${
-              confirmDanger ? "confirm-dialog-btn-danger" : ""
-            }`}
-            onClick={onConfirm}
-            disabled={busy}
-          >
-            {busy ? "Please wait…" : confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+      }
+    }).then((ok) => {
+      if (!ok) {
+        onCancel?.();
+      }
+    });
+
+    return () => {
+      if (busy) {
+        return;
+      }
+      closeConfirm();
+    };
+  }, [
+    open,
+    title,
+    description,
+    confirmLabel,
+    cancelLabel,
+    confirmDanger,
+    onConfirm,
+    onCancel,
+    showConfirm,
+    closeConfirm,
+    busy
+  ]);
+
+  return null;
 }

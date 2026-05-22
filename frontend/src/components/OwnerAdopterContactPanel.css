@@ -1,0 +1,64 @@
+.owner-adopter-contact-panel {
+  margin-bottom: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid #e4ebe2;
+  background: #fbfbf9;
+}
+
+.owner-adopter-contact-head h3 {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.owner-adopter-contact-sub {
+  margin: 0 0 12px;
+  color: #646b64;
+  font-size: 13px;
+}
+
+.owner-adopter-contact-muted,
+.owner-adopter-contact-error {
+  margin: 0;
+  font-size: 14px;
+}
+
+.owner-adopter-contact-error {
+  color: #b42318;
+}
+
+.owner-adopter-contact-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.owner-adopter-contact-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.owner-adopter-contact-row dt {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7b827b;
+}
+
+.owner-adopter-contact-row dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #171717;
+}
+
+@media (max-width: 640px) {
+  .owner-adopter-contact-grid {
+    grid-template-columns: 1fr;
+  }
+}

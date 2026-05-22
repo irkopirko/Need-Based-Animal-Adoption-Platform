@@ -6,23 +6,17 @@ import Footer from "../components/Footer";
 import { getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
 import {
   loadOwnerEngagementState,
+  normalizeAnimalFromApi,
   resolveOwnerScenario,
   formatInquiryDate,
   getInquiryPreviewFromMessages,
   PAVIA_OWNER_ENGAGEMENT_UPDATED,
-  STRONG_MATCH_THRESHOLD
+  STRONG_MATCH_THRESHOLD,
+  resolveOwnerListingImageUrl
 } from "../utils/ownerJourney";
-import {
-  acceptInquiry,
-  completeAdoptionCase,
-  fetchAdoptionCaseByInquiry,
-  fetchInquiryThread,
-  rejectInquiry,
-  reserveAdoptionCase,
-  sendInquiryMessage
-} from "../utils/platformApi";
-import { usePopup } from "../components/PopupProvider";
-import OwnerAdoptionProfilePanel from "../components/OwnerAdoptionProfilePanel";
+import { getApiBaseUrl } from "../utils/auth";
+import OwnerListingPicker from "../components/OwnerListingPicker";
+import OwnerInquiryThreadPanel from "../components/OwnerInquiryThreadPanel";
 
 function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onSecondary }) {
   return (
@@ -55,18 +49,27 @@ function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onS
 function OwnerMessagesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
   const [scenario, setScenario] = useState("NO_LISTINGS");
   const [inquiries, setInquiries] = useState([]);
+  const [listings, setListings] = useState([]);
+  const [matchedListings, setMatchedListings] = useState([]);
+  const [selectedListingId, setSelectedListingId] = useState(null);
   const [selectedChatId, setSelectedChatId] = useState(null);
-  const [thread, setThread] = useState(null);
-  const [draft, setDraft] = useState("");
-  const [actionBusy, setActionBusy] = useState(false);
-  const [adoptionCase, setAdoptionCase] = useState(null);
+  const [focusedAnimal, setFocusedAnimal] = useState(null);
+  const [focusedAnimalError, setFocusedAnimalError] = useState(false);
 
   const user = getStoredUser();
   const ownerId = getResolvedUserId(user);
+  const apiBase = getApiBaseUrl();
+
+  const focusedAnimalId = useMemo(() => {
+    const raw = searchParams.get("animalId");
+    if (raw == null || !/^\d+$/.test(String(raw).trim())) {
+      return null;
+    }
+    return Number(raw);
+  }, [searchParams]);
 
   const refresh = useCallback(async () => {
     if (ownerId == null || normalizeRole(user?.role) !== "OWNER") {
@@ -87,18 +90,37 @@ function OwnerMessagesPage() {
       setScenario(scen);
       const list = Array.isArray(data.inquiries) ? data.inquiries : [];
       setInquiries(list);
+      setListings(data.listings || []);
+      setMatchedListings(
+        data.matchedListings?.length ? data.matchedListings : data.listings || []
+      );
 
-      if (scen === "INQUIRY_NO_MESSAGES" || scen === "FULL") {
+      if (focusedAnimalId != null) {
+        setSelectedListingId(focusedAnimalId);
+      }
+
+      if (scen === "INQUIRY_NO_MESSAGES" || scen === "FULL" || focusedAnimalId != null) {
         const sorted = [...list].sort(
           (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
         );
+        const scoped =
+          focusedAnimalId != null
+            ? sorted.filter((i) => Number(i.animalId) === focusedAnimalId)
+            : sorted;
         const fromUrl = searchParams.get("inquiry");
         const pick =
-          sorted.find((i) => String(i.id) === String(fromUrl)) || sorted[0] || null;
+          scoped.find((i) => String(i.id) === String(fromUrl)) || scoped[0] || null;
         setSelectedChatId(pick?.id ?? null);
+        if (focusedAnimalId != null) {
+          setSelectedListingId(focusedAnimalId);
+        } else if (pick?.animalId != null) {
+          setSelectedListingId(Number(pick.animalId));
+        }
       } else {
         setSelectedChatId(null);
-        setThread(null);
+        if (focusedAnimalId == null) {
+          setSelectedListingId(null);
+        }
       }
     } catch (e) {
       console.error(e);
@@ -107,7 +129,51 @@ function OwnerMessagesPage() {
     } finally {
       setLoading(false);
     }
-  }, [ownerId, user?.role, searchParams]);
+  }, [ownerId, user?.role, searchParams, focusedAnimalId]);
+
+  useEffect(() => {
+    if (focusedAnimalId == null || ownerId == null) {
+      setFocusedAnimal(null);
+      setFocusedAnimalError(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/animals/${focusedAnimalId}`);
+        if (!res.ok) {
+          if (!cancelled) {
+            setFocusedAnimal(null);
+            setFocusedAnimalError(true);
+          }
+          return;
+        }
+        const data = normalizeAnimalFromApi(await res.json());
+        if (Number(data.ownerId) !== Number(ownerId)) {
+          if (!cancelled) {
+            setFocusedAnimal(null);
+            setFocusedAnimalError(true);
+          }
+          return;
+        }
+        if (!cancelled) {
+          setFocusedAnimal(data);
+          setFocusedAnimalError(false);
+          setSelectedListingId(focusedAnimalId);
+        }
+      } catch {
+        if (!cancelled) {
+          setFocusedAnimal(null);
+          setFocusedAnimalError(true);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedAnimalId, ownerId, apiBase]);
 
   useEffect(() => {
     refresh();
@@ -116,167 +182,48 @@ function OwnerMessagesPage() {
     return () => window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, fn);
   }, [refresh]);
 
+  const filteredInquiries = useMemo(() => {
+    let list = [...inquiries];
+    if (selectedListingId != null) {
+      list = list.filter((i) => Number(i.animalId) === selectedListingId);
+    }
+    return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [inquiries, selectedListingId]);
+
   useEffect(() => {
-    if (!selectedChatId || ownerId == null) {
-      setThread(null);
+    if (filteredInquiries.length === 0) {
+      setSelectedChatId(null);
       return;
     }
-    fetchInquiryThread(selectedChatId, ownerId)
-      .then(setThread)
-      .catch(() => setThread(null));
-    fetchAdoptionCaseByInquiry(selectedChatId, ownerId)
-      .then(setAdoptionCase)
-      .catch(() => setAdoptionCase(null));
-  }, [selectedChatId, ownerId]);
+    if (!filteredInquiries.some((i) => i.id === selectedChatId)) {
+      setSelectedChatId(filteredInquiries[0]?.id ?? null);
+    }
+  }, [filteredInquiries, selectedChatId]);
 
   const conversations = useMemo(
     () =>
-      [...inquiries]
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .map((inq) => ({
-          id: inq.id,
-          adopterName: inq.adopterName,
-          animalName: inq.animalName,
-          preview: getInquiryPreviewFromMessages(inq),
-          time: formatInquiryDate(inq.createdAt),
-          status: inq.status
-        })),
-    [inquiries]
+      filteredInquiries.map((inq) => ({
+        id: inq.id,
+        adopterName: inq.adopterName,
+        animalName: inq.animalName,
+        animalId: inq.animalId,
+        listingCode: inq.listingCode,
+        animalImageUrl: inq.animalImageUrl
+          ? resolveOwnerListingImageUrl(inq.animalImageUrl, apiBase)
+          : "",
+        preview: inq.initialMessage || getInquiryPreviewFromMessages(inq),
+        time: formatInquiryDate(inq.createdAt),
+        status: inq.status
+      })),
+    [filteredInquiries, apiBase]
   );
 
-  const handleSend = async () => {
-    const text = draft.trim();
-    if (!text || !selectedChatId || ownerId == null) {
-      return;
-    }
-    if (thread?.status === "REJECTED") {
-      showPopup({
-        type: "warning",
-        title: "Thread closed",
-        message: "This inquiry was rejected. No further messages can be sent."
-      });
-      return;
-    }
-    try {
-      await sendInquiryMessage(selectedChatId, {
-        userId: ownerId,
-        senderRole: "OWNER",
-        body: text
-      });
-      setDraft("");
-      const updated = await fetchInquiryThread(selectedChatId, ownerId);
-      setThread(updated);
-      refresh();
-    } catch (e) {
-      showPopup({ type: "error", title: "Send failed", message: e.message });
-    }
-  };
+  const pickerListings =
+    matchedListings.length > 0 ? matchedListings : listings;
 
-  const handleAccept = async () => {
-    if (!selectedChatId || ownerId == null) {
-      return;
-    }
-    setActionBusy(true);
-    try {
-      await acceptInquiry(selectedChatId, ownerId);
-      const updated = await fetchInquiryThread(selectedChatId, ownerId);
-      setThread(updated);
-      await reloadCase();
-      refresh();
-      showPopup({
-        type: "success",
-        title: "Inquiry accepted",
-        message: "The message request is approved. You can continue the conversation."
-      });
-    } catch (e) {
-      showPopup({ type: "error", title: "Could not accept", message: e.message });
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const reloadCase = async () => {
-    if (!selectedChatId || ownerId == null) {
-      return;
-    }
-    try {
-      const c = await fetchAdoptionCaseByInquiry(selectedChatId, ownerId);
-      setAdoptionCase(c);
-    } catch {
-      setAdoptionCase(null);
-    }
-  };
-
-  const handleReserve = async () => {
-    const caseId = adoptionCase?.id || thread?.adoptionCaseId;
-    if (!caseId || ownerId == null) {
-      return;
-    }
-    setActionBusy(true);
-    try {
-      await reserveAdoptionCase(caseId, ownerId);
-      await reloadCase();
-      refresh();
-      showPopup({
-        type: "success",
-        title: "Listing reserved",
-        message: "This animal is reserved for the adopter. Other pending cases were cancelled."
-      });
-    } catch (e) {
-      showPopup({ type: "error", title: "Reserve failed", message: e.message });
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const handleCompleteAdoption = async () => {
-    const caseId = adoptionCase?.id || thread?.adoptionCaseId;
-    if (!caseId || ownerId == null) {
-      return;
-    }
-    if (!window.confirm("Mark this adoption as completed? The listing will be closed.")) {
-      return;
-    }
-    setActionBusy(true);
-    try {
-      await completeAdoptionCase(caseId, ownerId);
-      await reloadCase();
-      const updated = await fetchInquiryThread(selectedChatId, ownerId);
-      setThread(updated);
-      refresh();
-      showPopup({
-        type: "success",
-        title: "Adoption completed",
-        message: "The listing is marked as adopted. Both parties were notified by email."
-      });
-    } catch (e) {
-      showPopup({ type: "error", title: "Could not complete", message: e.message });
-    } finally {
-      setActionBusy(false);
-    }
-  };
-
-  const handleReject = async () => {
-    if (!selectedChatId || ownerId == null) {
-      return;
-    }
-    setActionBusy(true);
-    try {
-      await rejectInquiry(selectedChatId, ownerId);
-      const updated = await fetchInquiryThread(selectedChatId, ownerId);
-      setThread(updated);
-      refresh();
-      showPopup({
-        type: "info",
-        title: "Inquiry rejected",
-        message: "The thread is closed. No new messages can be sent."
-      });
-    } catch (e) {
-      showPopup({ type: "error", title: "Could not reject", message: e.message });
-    } finally {
-      setActionBusy(false);
-    }
-  };
+  const animalFocusMode = focusedAnimalId != null && focusedAnimal != null;
+  const animalFocusEmpty =
+    animalFocusMode && conversations.length === 0 && !loading;
 
   if (loading) {
     return (
@@ -290,11 +237,25 @@ function OwnerMessagesPage() {
     );
   }
 
-  if (scenario === "NOT_OWNER") {
+  if (focusedAnimalId != null && (focusedAnimalError || !focusedAnimal)) {
+    return (
+      <Gate
+        badge="Unavailable"
+        title="Messages for this listing"
+        body="You can only view messages for your own listings."
+        primaryLabel="My listings"
+        onPrimary={() => navigate("/owner-listings")}
+        secondaryLabel="Owner home"
+        onSecondary={() => navigate("/ownerhomepage")}
+      />
+    );
+  }
+
+  if (!animalFocusMode && scenario === "NOT_OWNER") {
     return (
       <Gate
         badge="Owners only"
-        title="Owner messages"
+        title="Messages"
         body="Sign in with an owner or shelter account to use this inbox."
         primaryLabel="Sign in"
         onPrimary={() => navigate("/login")}
@@ -302,7 +263,7 @@ function OwnerMessagesPage() {
     );
   }
 
-  if (scenario === "NO_LISTINGS") {
+  if (!animalFocusMode && scenario === "NO_LISTINGS") {
     return (
       <Gate
         badge="No listings"
@@ -316,7 +277,7 @@ function OwnerMessagesPage() {
     );
   }
 
-  if (scenario === "LISTINGS_NO_STRONG_MATCH") {
+  if (!animalFocusMode && scenario === "LISTINGS_NO_STRONG_MATCH") {
     return (
       <Gate
         badge="No strong matches on your listings"
@@ -330,7 +291,7 @@ function OwnerMessagesPage() {
     );
   }
 
-  if (scenario === "STRONG_MATCH_NO_INQUIRY") {
+  if (!animalFocusMode && scenario === "STRONG_MATCH_NO_INQUIRY") {
     return (
       <Gate
         badge="No inquiries yet"
@@ -344,18 +305,6 @@ function OwnerMessagesPage() {
     );
   }
 
-  const canCompose = thread && thread.status !== "REJECTED";
-  const showPendingActions = thread?.status === "PENDING";
-  const caseStatus = adoptionCase?.status || "";
-  const canReserve =
-    adoptionCase &&
-    (caseStatus === "ACCEPTED" || caseStatus === "PROPOSED") &&
-    thread?.status === "ACCEPTED";
-  const canComplete =
-    adoptionCase &&
-    (caseStatus === "ACCEPTED" || caseStatus === "RESERVED") &&
-    thread?.status === "ACCEPTED";
-
   return (
     <div className="owner-messages-page">
       <Navbar />
@@ -363,156 +312,124 @@ function OwnerMessagesPage() {
       <main className="owner-messages-main">
         <section className="owner-messages-hero">
           <div className="owner-messages-hero-left">
-            <p className="owner-messages-tag">Owner Messages</p>
-            <h1>Connect with adopters</h1>
-            <p>
-              Conversations are saved in the database for the adoption process. Reply
-              when an adopter contacts you about a strong match (≥ {STRONG_MATCH_THRESHOLD}%).
-            </p>
+            <p className="owner-messages-tag">Messages</p>
+            {animalFocusMode ? (
+              <>
+                <h1>Messages for {focusedAnimal.name || "this listing"}</h1>
+                <p>
+                  Conversations from adopters who contacted you about this animal. When someone
+                  sends a message request from your listing page, it appears here.
+                </p>
+                <button
+                  type="button"
+                  className="owner-secondary-outline-btn owner-messages-back-listing-btn"
+                  onClick={() => navigate(`/animal/${focusedAnimalId}`)}
+                >
+                  Back to listing
+                </button>
+              </>
+            ) : (
+              <>
+                <h1>Inbox — adopter message requests</h1>
+                <p>
+                  Choose a matching listing (≥ {STRONG_MATCH_THRESHOLD}% compatibility), open a
+                  request, review the adoption profile, approve if you want to chat, and reply here.
+                </p>
+              </>
+            )}
           </div>
         </section>
 
-        <section className="owner-messages-layout owner-messages-layout-main">
+        <section
+          className={`owner-messages-layout ${
+            animalFocusMode
+              ? "owner-messages-layout-duo"
+              : "owner-messages-layout-triple"
+          }`}
+        >
+          {!animalFocusMode && (
+            <div className="owner-listings-filter-panel">
+              <h2>Matching listings</h2>
+              <p>Animals adopters contacted you about</p>
+              <OwnerListingPicker
+                listings={pickerListings}
+                inquiries={inquiries}
+                selectedListingId={selectedListingId}
+                onSelectListing={setSelectedListingId}
+              />
+            </div>
+          )}
+
           <div className="owner-conversation-panel">
-            <h2>Conversations</h2>
+            <h2>Message requests</h2>
+            <p className="owner-conversation-panel-hint">
+              {animalFocusMode
+                ? focusedAnimal.name || "This listing"
+                : selectedListingId == null
+                  ? "All listings"
+                  : conversations[0]?.animalName || "This listing"}
+            </p>
             <div className="owner-conversation-list">
-              {conversations.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`owner-conversation-card ${
-                    selectedChatId === c.id ? "owner-conversation-card-active" : ""
-                  }`}
-                  onClick={() => setSelectedChatId(c.id)}
-                >
-                  <div className="owner-conversation-content">
-                    <h3>{c.adopterName}</h3>
-                    <p>Regarding {c.animalName}</p>
-                    <span className="owner-conversation-preview">{c.preview}</span>
-                    <span className="owner-conversation-status-pill">{c.status}</span>
-                  </div>
-                  <span className="owner-conversation-time">{c.time}</span>
-                </button>
-              ))}
+              {conversations.length === 0 ? (
+                <div className="owner-messages-animal-empty" role="status">
+                  <p className="owner-messages-animal-empty-title">No message requests yet</p>
+                  <p className="owner-messages-animal-empty-body">
+                    {animalFocusMode
+                      ? `This listing has not received any adopter message requests yet. When a strong match uses Message owner on ${focusedAnimal.name || "this animal"}'s profile, the conversation will show up here.`
+                      : "No requests for this listing yet."}
+                  </p>
+                </div>
+              ) : (
+                conversations.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`owner-conversation-card ${
+                      selectedChatId === c.id ? "owner-conversation-card-active" : ""
+                    }`}
+                    onClick={() => setSelectedChatId(c.id)}
+                  >
+                    {c.animalImageUrl ? (
+                      <img
+                        src={c.animalImageUrl}
+                        alt=""
+                        className="owner-conversation-thumb"
+                      />
+                    ) : (
+                      <span
+                        className="owner-conversation-avatar-placeholder"
+                        aria-hidden
+                      />
+                    )}
+                    <div className="owner-conversation-content">
+                      {c.listingCode && (
+                        <p className="owner-conversation-listing-id">{c.listingCode}</p>
+                      )}
+                      <h3>{c.adopterName}</h3>
+                      <p className="owner-conversation-adopter-line">
+                        About {c.animalName}
+                      </p>
+                      <span className="owner-conversation-preview">{c.preview}</span>
+                      <span className="owner-conversation-status-pill">{c.status}</span>
+                    </div>
+                    <span className="owner-conversation-time">{c.time}</span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
           <div className="owner-chat-panel">
-            {thread ? (
-              <>
-                <div className="owner-chat-header">
-                  <div>
-                    <h2>{thread.adopterName}</h2>
-                    <p className="owner-chat-sub">
-                      {thread.animalName} · {thread.listingCode}
-                    </p>
-                  </div>
-                  <span className="owner-chat-badge">{thread.status}</span>
-                </div>
-
-                <OwnerAdoptionProfilePanel
-                  inquiryId={selectedChatId}
-                  ownerId={ownerId}
-                  adopterName={thread.adopterName}
-                />
-
-                {thread.matchPercentageAtContact != null && (
-                  <p className="owner-inquiry-match-pill">
-                    Match at contact: {Math.round(thread.matchPercentageAtContact)}%
-                  </p>
-                )}
-
-                {showPendingActions && (
-                  <div className="owner-inquiry-decision-block">
-                    <p className="owner-inquiry-decision-hint">
-                      You can read the adoption profile above and reply below before approving.
-                    </p>
-                    <div className="owner-inquiry-decision-btns">
-                      <button
-                        type="button"
-                        className="owner-request-accept-btn"
-                        disabled={actionBusy}
-                        onClick={handleAccept}
-                      >
-                        Approve message request
-                      </button>
-                      <button
-                        type="button"
-                        className="owner-secondary-outline-btn"
-                        disabled={actionBusy}
-                        onClick={handleReject}
-                      >
-                        Decline
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {(canReserve || canComplete) && (
-                  <div className="owner-inquiry-lifecycle-btns">
-                    {canReserve && (
-                      <button
-                        type="button"
-                        className="owner-secondary-outline-btn"
-                        disabled={actionBusy}
-                        onClick={handleReserve}
-                      >
-                        Reserve for adopter
-                      </button>
-                    )}
-                    {canComplete && (
-                      <button
-                        type="button"
-                        className="owner-request-accept-btn"
-                        disabled={actionBusy}
-                        onClick={handleCompleteAdoption}
-                      >
-                        Mark adoption complete
-                      </button>
-                    )}
-                    {adoptionCase?.status && (
-                      <span className="owner-adoption-case-status">Case: {adoptionCase.status}</span>
-                    )}
-                  </div>
-                )}
-
-                <div className="owner-inquiry-thread">
-                  {(thread.messages || []).map((m) => (
-                    <div
-                      key={m.id}
-                      className={`owner-inquiry-msg owner-inquiry-msg-${m.senderRole?.toLowerCase()}`}
-                    >
-                      <p>{m.body}</p>
-                      <time>
-                        {m.createdAt ? new Date(m.createdAt).toLocaleString() : ""}
-                      </time>
-                    </div>
-                  ))}
-                </div>
-
-                {canCompose ? (
-                  <div className="owner-inquiry-compose">
-                    <textarea
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      rows={3}
-                      placeholder="Write your message…"
-                      maxLength={1000}
-                    />
-                    <button
-                      type="button"
-                      className="owner-chat-send-btn"
-                      onClick={handleSend}
-                    >
-                      Send
-                    </button>
-                  </div>
-                ) : (
-                  <p className="owner-chat-closed-note">This thread is closed.</p>
-                )}
-              </>
+            {animalFocusEmpty ? (
+              <p className="owner-chat-empty-select owner-messages-animal-empty-thread">
+                Select a message request when one arrives for this listing.
+              </p>
             ) : (
-              <p className="owner-chat-empty-select">Select a conversation.</p>
+              <OwnerInquiryThreadPanel
+                inquiryId={selectedChatId}
+                ownerId={ownerId}
+                onUpdated={refresh}
+              />
             )}
           </div>
         </section>

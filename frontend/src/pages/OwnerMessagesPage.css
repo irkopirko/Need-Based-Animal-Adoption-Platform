@@ -69,6 +69,12 @@
   border: 1px solid #e4ebe2;
 }
 
+.owner-conversation-panel-hint {
+  margin: -4px 0 12px;
+  color: #646b64;
+  font-size: 13px;
+}
+
 .owner-conversation-list {
   display: grid;
   gap: 12px;
@@ -95,12 +101,50 @@
   background: #eef9f0;
 }
 
+.owner-conversation-thumb {
+  width: 70px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid #e0ebe3;
+}
+
 .owner-conversation-avatar-placeholder {
   width: 70px;
   height: 90px;
   border-radius: 12px;
   background: linear-gradient(145deg, #e8f2ea 0%, #dcefe0 55%, #e2ebe4 100%);
   border: 1px solid #e0ebe3;
+}
+
+.owner-conversation-listing-id {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0ea5a4;
+}
+
+.owner-conversation-adopter-line {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #777;
+}
+
+.owner-inquiry-owner-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.owner-tool-inline {
+  margin: 0;
+  display: inline-block;
+}
+
+.owner-inquiry-decision-btns-block {
+  margin-left: 0;
+  margin-bottom: 12px;
 }
 
 .owner-conversation-content h3 {
@@ -320,6 +364,66 @@
   padding: 48px 20px;
   text-align: center;
   color: #5f665f;
+}
+
+.owner-messages-layout-triple {
+  grid-template-columns: 240px 340px minmax(0, 1fr);
+}
+
+.owner-messages-layout-duo {
+  grid-template-columns: 340px minmax(0, 1fr);
+}
+
+.owner-messages-back-listing-btn {
+  margin-top: 16px;
+}
+
+.owner-messages-animal-empty {
+  padding: 20px 16px;
+  border-radius: 14px;
+  background: #f8faf8;
+  border: 1px dashed #d4e8da;
+  text-align: center;
+}
+
+.owner-messages-animal-empty-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #1a2e22;
+}
+
+.owner-messages-animal-empty-body {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #5f665f;
+}
+
+.owner-messages-animal-empty-thread {
+  padding: 24px 16px;
+  text-align: center;
+  line-height: 1.55;
+}
+
+.owner-listings-filter-panel {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 18px;
+  border: 1px solid #e4ebe2;
+}
+
+.owner-listings-filter-panel h2 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.owner-listings-filter-panel > p {
+  margin: 0 0 14px;
+  color: #646b64;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .owner-messages-layout-main {

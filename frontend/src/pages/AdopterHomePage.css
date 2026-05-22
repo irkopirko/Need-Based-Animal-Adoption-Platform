@@ -27,6 +27,19 @@
   box-sizing: border-box;
 }
 
+.adopter-summary-card-btn {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.adopter-summary-card-btn:hover {
+  border-color: #b8d4bc;
+  box-shadow: 0 12px 28px rgba(16, 24, 16, 0.08);
+}
+
 .adopter-hero-left {
   background: linear-gradient(180deg, #ffffff 0%, #fbfcfa 100%);
   border: 1px solid #e6ece4;

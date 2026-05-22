@@ -1,3 +1,39 @@
+.saved-animals-picker-wrap {
+  max-width: 720px;
+}
+
+.saved-animals-picker-count {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #15803d;
+}
+
+.saved-animals-secondary-btn {
+  border-radius: 12px;
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  background: #ffffff;
+  color: #171717;
+  border: 1px solid #d1d5db;
+  font-family: inherit;
+}
+
+.saved-animals-secondary-btn:hover {
+  border-color: #9ca3af;
+}
+
+.saved-animals-request-header-inline {
+  margin-bottom: 20px;
+}
+
+.saved-animal-badge-muted {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
 .saved-animals-loading-msg {
   padding: 48px 24px;
   text-align: center;
@@ -245,10 +281,19 @@
   background: linear-gradient(145deg, #e8f2ea 0%, #dcefe0 55%, #e2ebe4 100%);
 }
 
+.saved-animal-image-wrap .saved-animal-save-heart {
+  top: 14px;
+  left: 14px;
+  right: auto;
+}
+
 .saved-animal-badge {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  bottom: 14px;
+  left: 14px;
+  right: auto;
+  top: auto;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.92);
   color: #1f8f46;
   border: 1px solid #dcefe0;
@@ -325,6 +370,51 @@
   border: 1px solid #d8ded6;
   background: #ffffff;
   color: #616861;
+}
+
+.saved-animals-request-section {
+  margin-bottom: 36px;
+}
+
+.saved-animals-request-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6ece4;
+}
+
+.saved-animals-request-header h2 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.saved-animals-request-header p {
+  margin: 0;
+  font-size: 14px;
+  color: #555;
+}
+
+.saved-animals-link-btn,
+.saved-animals-filter-note button {
+  border: none;
+  background: none;
+  color: #1f8f46;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  font-size: inherit;
+  text-decoration: underline;
+}
+
+.saved-animals-filter-note {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #555;
 }
 
 @media (max-width: 980px) {

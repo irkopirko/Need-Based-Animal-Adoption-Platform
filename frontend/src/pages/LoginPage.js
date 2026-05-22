@@ -28,7 +28,8 @@ function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (email.trim() === "" || password.trim() === "") {
+    const trimmedEmail = email.trim();
+    if (trimmedEmail === "" || password.trim() === "") {
       showPopup({
         type: "warning",
         title: "Missing Fields",
@@ -37,10 +38,12 @@ function LoginPage() {
       return;
     }
 
-    if (!isValidEmail(email)) {
-      const invalidEmailMessage =
-        "Invalid email format. Please check your email address.";
-      showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
+    if (!isValidEmail(trimmedEmail)) {
+      showPopup({
+        type: "warning",
+        title: "Invalid Email",
+        message: "Invalid email format. Please check your email address."
+      });
       return;
     }
 
@@ -52,7 +55,7 @@ function LoginPage() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          email,
+          email: trimmedEmail,
           password
         })
       });
@@ -60,16 +63,30 @@ function LoginPage() {
       const data = await response.json();
 
       if (data.error === "Invalid email format" || data.error === "Invalid email domain") {
-        const invalidEmailMessage =
-          "Invalid email format. Please check your email address.";
-        showPopup({ type: "warning", title: "Invalid Email", message: invalidEmailMessage });
+        showPopup({
+          type: "warning",
+          title: "Invalid Email",
+          message: "Invalid email format. Please check your email address."
+        });
         return;
       }
 
       if (data.error === "User not found") {
-        const userNotFoundMessage =
-          "Account not found. Please create an account first.";
-        showPopup({ type: "error", title: "Account Not Found", message: userNotFoundMessage });
+        let message =
+          "No account exists for this email. Please check the spelling or sign up first.";
+        try {
+          const infoRes = await fetch(`${apiBaseUrl}/api/auth/server-info`);
+          if (infoRes.ok) {
+            const info = await infoRes.json();
+            if (info.database === "local") {
+              message =
+                "The backend is using a local database. Restart BackendApplication and confirm the console shows \"Railway MySQL connection OK\", then try again.";
+            }
+          }
+        } catch {
+          /* keep default message */
+        }
+        showPopup({ type: "error", title: "Account Not Found", message });
         return;
       }
 
@@ -80,8 +97,17 @@ function LoginPage() {
           message: "Please verify your email before logging in."
         });
         navigate("/verify-email", {
-          state: { email: email.trim() },
+          state: { email: trimmedEmail, mode: "register" },
           replace: true
+        });
+        return;
+      }
+
+      if (data.error === "Wrong password") {
+        showPopup({
+          type: "error",
+          title: "Wrong Password",
+          message: "Incorrect password. Please try again or reset your password."
         });
         return;
       }
@@ -90,13 +116,13 @@ function LoginPage() {
         showPopup({
           type: "error",
           title: "Login Failed",
-          message: data.error || "User not found or password is incorrect."
+          message: data.error || "Login failed. Please check your email and password."
         });
         return;
       }
 
       navigate("/verify-email", {
-        state: { email: email.trim(), mode: "login" },
+        state: { email: trimmedEmail, mode: "login" },
         replace: true
       });
     } catch (error) {
@@ -104,7 +130,7 @@ function LoginPage() {
       showPopup({
         type: "error",
         title: "Connection Error",
-        message: "Could not connect to backend."
+        message: "Could not connect to the backend. Make sure it is running on port 8080."
       });
     }
   };

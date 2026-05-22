@@ -22,6 +22,7 @@ public class AdoptionLifecycleSchemaMigration implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         try {
             ensureInquiryColumns();
+            ensureGenderColumns();
             ensureTable(
                     "adoption_cases",
                     """
@@ -86,6 +87,11 @@ public class AdoptionLifecycleSchemaMigration implements ApplicationRunner {
     private void ensureInquiryColumns() {
         ensureColumn("listing_inquiries", "adoption_request_id", "BIGINT NULL");
         ensureColumn("listing_inquiries", "match_percentage_at_contact", "DOUBLE NULL");
+    }
+
+    private void ensureGenderColumns() {
+        ensureColumn("animals", "gender", "VARCHAR(16) NULL");
+        ensureColumn("adoption_requests", "preferred_genders", "VARCHAR(64) NULL");
     }
 
     private void ensureColumn(String table, String column, String definition) {

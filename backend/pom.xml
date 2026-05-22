@@ -85,6 +85,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <SPRING_DATASOURCE_URL>jdbc:mysql://monorail.proxy.rlwy.net:29128/railway?useSSL=true&amp;requireSSL=true&amp;serverTimezone=Europe/Istanbul</SPRING_DATASOURCE_URL>
+                        <SPRING_DATASOURCE_USERNAME>root</SPRING_DATASOURCE_USERNAME>
+                        <SPRING_DATASOURCE_PASSWORD>BdnElCroOfUEQvHnRnBxDUIWVMWhVDLg</SPRING_DATASOURCE_PASSWORD>
+                    </environmentVariables>
+                </configuration>
             </plugin>
         </plugins>
     </build>

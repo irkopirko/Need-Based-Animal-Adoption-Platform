@@ -6,6 +6,25 @@ import { getApiBaseUrl } from "./auth";
  */
 export const STRONG_MATCH_THRESHOLD = 75;
 
+/** Display label for type filters (DOG → Dog, etc.). */
+export function normalizeAnimalTypeLabel(animalType) {
+  const u = String(animalType || "").toUpperCase();
+  if (u === "DOG") {
+    return "Dog";
+  }
+  if (u === "CAT") {
+    return "Cat";
+  }
+  if (u === "RABBIT") {
+    return "Rabbit";
+  }
+  if (!animalType) {
+    return "";
+  }
+  const lower = String(animalType).toLowerCase().replace(/_/g, " ");
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
 export async function fetchUserAdoptionRequests(userId) {
   if (!userId) {
     return [];
@@ -141,7 +160,8 @@ export async function fetchStrongMatchAnimals(userId, requestId = null) {
   }
 }
 
-export async function fetchSavedAnimalsForUser(userId) {
+/** @returns {Promise<Array<{ animalId: number, adoptionRequestId: number|null, savedAt: string|null, animal: object }>>} */
+export async function fetchSavedAnimalEntries(userId) {
   if (!userId) {
     return [];
   }
@@ -152,10 +172,41 @@ export async function fetchSavedAnimalsForUser(userId) {
       return [];
     }
     const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    if (!Array.isArray(data)) {
+      return [];
+    }
+    return data.map((row) => ({
+      animalId: Number(row.animalId ?? row.animal?.id),
+      adoptionRequestId:
+        row.adoptionRequestId != null ? Number(row.adoptionRequestId) : null,
+      savedAt: row.savedAt ?? null,
+      animal: row.animal ?? row
+    }));
   } catch {
     return [];
   }
+}
+
+export async function fetchSavedAnimalsForUser(userId) {
+  const entries = await fetchSavedAnimalEntries(userId);
+  return entries.map((e) => e.animal).filter(Boolean);
+}
+
+export function formatAdoptionRequestSummary(request) {
+  if (!request) {
+    return "";
+  }
+  const parts = [];
+  if (request.preferredAnimalTypes) {
+    parts.push(`Types: ${request.preferredAnimalTypes}`);
+  }
+  if (request.livingSpace) {
+    parts.push(`Home: ${request.livingSpace}`);
+  }
+  if (request.activityLevel) {
+    parts.push(`Activity: ${request.activityLevel}`);
+  }
+  return parts.join(" · ") || "Submitted adoption request";
 }
 
 /**
@@ -274,8 +325,10 @@ export async function loadAdopterJourneyState(userId) {
   }
 
   let savedAnimals = [];
+  let savedEntries = [];
   if (submitted) {
-    savedAnimals = await fetchSavedAnimalsForUser(userId);
+    savedEntries = await fetchSavedAnimalEntries(userId);
+    savedAnimals = savedEntries.map((e) => e.animal).filter(Boolean);
   }
 
   return {
@@ -284,6 +337,8 @@ export async function loadAdopterJourneyState(userId) {
     noRequest,
     strongMatches,
     savedAnimals,
+    savedEntries,
+    requests,
     apiBaseUrl
   };
 }
@@ -302,7 +357,7 @@ export function mergeSavedWithCompatibility(savedAnimals, strongMatches, apiBase
     return {
       id: animal.id,
       name: animal.name,
-      type: animal.animalType || "",
+      type: normalizeAnimalTypeLabel(animal.animalType),
       breed: animal.breed || "",
       age: animal.ageGroup || "",
       size: animal.size || "",

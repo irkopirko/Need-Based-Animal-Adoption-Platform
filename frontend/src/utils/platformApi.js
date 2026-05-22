@@ -64,12 +64,22 @@ export async function resolveReport(reportId, adminEmail) {
   return parseJson(res);
 }
 
-export async function saveAnimalForUser(userId, animalId) {
-  const res = await fetch(
-    apiUrl(`/api/saved?userId=${userId}&animalId=${animalId}`),
-    { method: "POST" }
-  );
-  return parseJson(res);
+export async function saveAnimalForUser(userId, animalId, adoptionRequestId = null) {
+  const params = new URLSearchParams();
+  params.set("userId", String(userId));
+  params.set("animalId", String(animalId));
+  if (adoptionRequestId != null && Number(adoptionRequestId) > 0) {
+    params.set("adoptionRequestId", String(adoptionRequestId));
+  }
+  const res = await fetch(apiUrl(`/api/saved?${params.toString()}`), { method: "POST" });
+  if (res.ok) {
+    return res.text();
+  }
+  const body = await res.text();
+  if (res.status === 400 && body.includes("Already saved")) {
+    return body;
+  }
+  throw new Error(body || `Save failed (${res.status})`);
 }
 
 export async function unsaveAnimalForUser(userId, animalId) {
@@ -77,13 +87,31 @@ export async function unsaveAnimalForUser(userId, animalId) {
     apiUrl(`/api/saved?userId=${userId}&animalId=${animalId}`),
     { method: "DELETE" }
   );
-  return parseJson(res);
+  if (res.ok) {
+    return res.text();
+  }
+  const body = await res.text();
+  if (res.status === 400 && body.includes("Not saved")) {
+    return body;
+  }
+  throw new Error(body || `Remove failed (${res.status})`);
 }
 
 export async function fetchSavedAnimalIds(userId) {
+  if (!userId) {
+    return [];
+  }
   const res = await fetch(apiUrl(`/api/saved/${userId}`));
-  const animals = await parseJson(res);
-  return (Array.isArray(animals) ? animals : []).map((a) => Number(a.id));
+  if (!res.ok) {
+    return [];
+  }
+  const data = await res.json().catch(() => []);
+  if (!Array.isArray(data)) {
+    return [];
+  }
+  return data
+    .map((row) => Number(row.animalId ?? row.animal?.id ?? row.id))
+    .filter((id) => Number.isFinite(id) && id > 0);
 }
 
 export async function createListingInquiry({ adopterUserId, animalId, message }) {
@@ -102,6 +130,11 @@ export async function fetchOwnerInquiries(ownerId) {
 
 export async function fetchAdopterInquiries(adopterId) {
   const res = await fetch(apiUrl(`/api/inquiries/adopter/${adopterId}`));
+  return parseJson(res);
+}
+
+export async function fetchAdopterProfile(adopterUserId) {
+  const res = await fetch(apiUrl(`/api/auth/profile/${adopterUserId}`));
   return parseJson(res);
 }
 
@@ -198,6 +231,28 @@ export async function unarchiveOwnerListing(animalId, viewerId) {
     { method: "POST" }
   );
   return parseJson(res);
+}
+
+export async function deleteOwnerListing(animalId, viewerId) {
+  const res = await fetch(
+    apiUrl(`/api/animals/${animalId}?viewerId=${viewerId}`),
+    { method: "DELETE" }
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = "The listing could not be deleted.";
+    try {
+      const body = JSON.parse(text);
+      if (body && typeof body.error === "string") {
+        msg = body.error;
+      }
+    } catch {
+      if (text && text.trim()) {
+        msg = text.trim().slice(0, 200);
+      }
+    }
+    throw new Error(msg);
+  }
 }
 
 export function formatListingCode(animal) {

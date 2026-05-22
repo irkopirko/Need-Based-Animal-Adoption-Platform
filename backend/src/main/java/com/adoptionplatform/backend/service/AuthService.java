@@ -112,7 +112,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> existingUser = userRepository.findByEmail(email);
+        Optional<User> existingUser = resolveUserByEmail(email);
         if (existingUser.isPresent()) {
             response.put("error", "Email is already registered");
             return response;
@@ -188,14 +188,13 @@ public class AuthService {
             return response;
         }
 
-        if (!hasResolvableDomain(email)) {
-            response.put("error", "Invalid email domain");
-            return response;
-        }
-
-        Optional<User> userOptional = userRepository.findByEmail(email);
+        Optional<User> userOptional = resolveUserByEmail(email);
 
         if (userOptional.isEmpty()) {
+            if (pendingRegistrations.containsKey(email)) {
+                response.put("error", "Please verify your email before logging in.");
+                return response;
+            }
             saveLoginLog(null, request.getEmail(), null, false, "User not found");
             response.put("error", "User not found");
             return response;
@@ -270,7 +269,7 @@ public class AuthService {
         if (System.currentTimeMillis() > pendingLogin.expiresAt) {
             pendingLogins.remove(email);
 
-            Optional<User> expiredUserOptional = userRepository.findByEmail(email);
+            Optional<User> expiredUserOptional = resolveUserByEmail(email);
 
             if (expiredUserOptional.isPresent()) {
                 User expiredUser = expiredUserOptional.get();
@@ -290,7 +289,7 @@ public class AuthService {
         }
 
         if (!pendingLogin.code.equals(codeInput.trim())) {
-            Optional<User> failedUserOptional = userRepository.findByEmail(email);
+            Optional<User> failedUserOptional = resolveUserByEmail(email);
 
             if (failedUserOptional.isPresent()) {
                 User failedUser = failedUserOptional.get();
@@ -309,7 +308,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> userOptional = userRepository.findByEmail(email);
+        Optional<User> userOptional = resolveUserByEmail(email);
 
         if (userOptional.isEmpty()) {
             pendingLogins.remove(email);
@@ -359,7 +358,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> userOptional = userRepository.findByEmail(email);
+        Optional<User> userOptional = resolveUserByEmail(email);
         if (userOptional.isEmpty()) {
             response.put("error", "User not found");
             return response;
@@ -398,7 +397,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> existingUser = userRepository.findByEmail(email);
+        Optional<User> existingUser = resolveUserByEmail(email);
         if (existingUser.isPresent()) {
             response.put("error", "Email is already registered");
             return response;
@@ -474,7 +473,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> existingUser = userRepository.findByEmail(email);
+        Optional<User> existingUser = resolveUserByEmail(email);
         if (existingUser.isPresent()) {
             response.put("error", "Email is already registered");
             return response;
@@ -520,7 +519,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> userOptional = userRepository.findByEmail(email);
+        Optional<User> userOptional = resolveUserByEmail(email);
         if (userOptional.isEmpty()) {
             response.put("error", "User not found");
             return response;
@@ -625,7 +624,7 @@ public class AuthService {
             return response;
         }
 
-        Optional<User> userOptional = userRepository.findByEmail(email);
+        Optional<User> userOptional = resolveUserByEmail(email);
         if (userOptional.isEmpty()) {
             pendingPasswordResets.remove(email);
             response.put("error", "User not found");
@@ -741,7 +740,21 @@ public class AuthService {
             return "";
         }
 
-        return rawEmail.trim().toLowerCase(Locale.ROOT);
+        return rawEmail
+                .trim()
+                .replaceAll("[\\u200B-\\u200D\\uFEFF]", "")
+                .toLowerCase(Locale.ROOT);
+    }
+
+    private Optional<User> resolveUserByEmail(String normalizedEmail) {
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            return Optional.empty();
+        }
+        Optional<User> byNormalized = userRepository.findByNormalizedEmail(normalizedEmail);
+        if (byNormalized.isPresent()) {
+            return byNormalized;
+        }
+        return userRepository.findByEmail(normalizedEmail);
     }
 
     private boolean hasResolvableDomain(String email) {
@@ -1132,9 +1145,7 @@ public class AuthService {
         if (user.getRole() != Role.OWNER) {
             return "true";
         }
-        boolean done = user.getOwnerProfileCompleted() == null
-                || Boolean.TRUE.equals(user.getOwnerProfileCompleted());
-        return done ? "true" : "false";
+        return Boolean.TRUE.equals(user.getOwnerProfileCompleted()) ? "true" : "false";
     }
 
     private static class PendingRegistration {

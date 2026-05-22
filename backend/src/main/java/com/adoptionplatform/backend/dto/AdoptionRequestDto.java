@@ -33,6 +33,7 @@ public class AdoptionRequestDto {
     private List<String> preferredEnergyLevels;
     private List<String> preferredAgeRanges;
     private List<String> preferredSizes;
+    private List<String> preferredGenders;
     private List<String> groomingTolerance;
     private String specialNeedsAcceptance;
     private String notes;
@@ -111,6 +112,9 @@ public class AdoptionRequestDto {
 
     public List<String> getPreferredSizes() { return preferredSizes; }
     public void setPreferredSizes(List<String> preferredSizes) { this.preferredSizes = preferredSizes; }
+
+    public List<String> getPreferredGenders() { return preferredGenders; }
+    public void setPreferredGenders(List<String> preferredGenders) { this.preferredGenders = preferredGenders; }
 
     public List<String> getGroomingTolerance() { return groomingTolerance; }
     public void setGroomingTolerance(List<String> groomingTolerance) { this.groomingTolerance = groomingTolerance; }

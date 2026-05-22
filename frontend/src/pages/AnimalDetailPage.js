@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import "./AnimalDetailPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import ReportListingModal from "../components/ReportListingModal";
 import ContactOwnerModal from "../components/ContactOwnerModal";
+import ListingReportButton from "../components/ListingReportButton";
+import ListingImageLightbox from "../components/ListingImageLightbox";
+import ListingPhotoFrame from "../components/ListingPhotoFrame";
 import SaveHeartButton from "../components/SaveHeartButton";
 import { usePopup } from "../components/PopupProvider";
 import {
   STRONG_MATCH_THRESHOLD,
-  resolveMediaUrl
+  resolveMediaUrl,
+  fetchStrongMatchAnimals
 } from "../utils/adopterJourney";
 import {
   getApiBaseUrl,
@@ -18,28 +22,39 @@ import {
   normalizeRole
 } from "../utils/auth";
 import {
+  deleteOwnerListing,
   fetchSavedAnimalIds,
   formatListingCode,
   saveAnimalForUser,
   unsaveAnimalForUser
 } from "../utils/platformApi";
+import { formatAnimalGenderLabel, formatListedDate } from "../utils/listingDisplay";
+
+function titleCase(value) {
+  if (!value) return "";
+  const t = String(value).toLowerCase().replace(/_/g, " ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
 
 function AnimalDetailPage() {
   const user = getStoredUser();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const requestIdFromUrl = searchParams.get("requestId");
   const navigate = useNavigate();
-  const { showPopup } = usePopup();
+  const { showPopup, showConfirm } = usePopup();
 
   const [animal, setAnimal] = useState(null);
-  const [selectedImage, setSelectedImage] = useState("");
+  const [imageIndex, setImageIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-
   const role = normalizeRole(user?.role);
   const isOwner = role === "OWNER";
   const isAdopter = role === "ADOPTER";
-  const adopterUid = getResolvedUserId(user);
+  const viewerUid = getResolvedUserId(user);
+  const adopterUid = viewerUid;
 
   useEffect(() => {
     const fetchAnimal = async () => {
@@ -47,16 +62,63 @@ function AnimalDetailPage() {
         const api = getApiBaseUrl();
         const response = await fetch(`${api}/api/animals/${id}`);
         const data = await response.json();
-        setAnimal(data);
-        const imgs = Array.isArray(data.images) ? data.images.filter(Boolean) : [];
-        setSelectedImage(imgs.length > 0 ? resolveMediaUrl(imgs[0], api) || "" : "");
+        let merged = { ...data };
+
+        if (isAdopter && adopterUid != null) {
+          const rid =
+            requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
+              ? Number(requestIdFromUrl)
+              : null;
+          try {
+            const matches = await fetchStrongMatchAnimals(adopterUid, rid);
+            const row = matches.find((m) => Number(m.id) === Number(data.id));
+            if (row?.compatibilityScore != null) {
+              merged = {
+                ...merged,
+                compatibilityScore: row.compatibilityScore
+              };
+            }
+          } catch {
+            /* keep DB score if any */
+          }
+        }
+
+        setAnimal(merged);
+        setImageIndex(0);
       } catch (error) {
         console.error("Error fetching animal:", error);
       }
     };
 
     fetchAnimal();
-  }, [id]);
+  }, [id, isAdopter, adopterUid, requestIdFromUrl]);
+
+  const apiBase = getApiBaseUrl();
+
+  const galleryUrls = useMemo(() => {
+    if (!animal?.images) {
+      return [];
+    }
+    return animal.images
+      .map((img) => resolveMediaUrl(img, apiBase))
+      .filter(Boolean);
+  }, [animal, apiBase]);
+
+  const hasMultipleImages = galleryUrls.length > 1;
+
+  const goPrevImage = () => {
+    if (galleryUrls.length === 0) {
+      return;
+    }
+    setImageIndex((i) => (i - 1 + galleryUrls.length) % galleryUrls.length);
+  };
+
+  const goNextImage = () => {
+    if (galleryUrls.length === 0) {
+      return;
+    }
+    setImageIndex((i) => (i + 1) % galleryUrls.length);
+  };
 
   useEffect(() => {
     if (!isAdopter || adopterUid == null || !animal?.id) {
@@ -75,46 +137,99 @@ function AnimalDetailPage() {
     };
   }, [isAdopter, adopterUid, animal?.id]);
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    e?.stopPropagation?.();
     if (adopterUid == null || !animal?.id) {
+      showPopup({
+        type: "warning",
+        title: "Sign in required",
+        message: "Log in as an adopter to save animals."
+      });
       return;
     }
+    const animalId = Number(animal.id);
+    const rid =
+      requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
+        ? Number(requestIdFromUrl)
+        : null;
+    const nextSaved = !saved;
     try {
-      if (saved) {
-        await unsaveAnimalForUser(adopterUid, animal.id);
-        setSaved(false);
-        showPopup({
-          type: "info",
-          title: "Removed",
-          message: "Removed from saved animals."
-        });
-      } else {
-        await saveAnimalForUser(adopterUid, animal.id);
+      if (nextSaved) {
+        await saveAnimalForUser(adopterUid, animalId, rid);
         setSaved(true);
         showPopup({
           type: "success",
           title: "Saved",
           message: "Animal added to your saved list."
         });
+      } else {
+        await unsaveAnimalForUser(adopterUid, animalId);
+        setSaved(false);
+        showPopup({
+          type: "info",
+          title: "Removed",
+          message: "Animal removed from your saved list."
+        });
       }
-    } catch (e) {
+    } catch (err) {
       showPopup({
         type: "error",
         title: "Could not update",
-        message: e.message || "Try again."
+        message: err?.message || "Try again."
       });
     }
   };
 
+  const compatibilityScore =
+    animal?.compatibilityScore != null ? Math.round(animal.compatibilityScore) : null;
+
   const isStrongMatch =
-    animal?.compatibilityScore != null &&
-    Math.round(animal.compatibilityScore) >= STRONG_MATCH_THRESHOLD;
+    compatibilityScore != null && compatibilityScore >= STRONG_MATCH_THRESHOLD;
+
+  const isListingOwner =
+    isOwner &&
+    animal?.ownerId != null &&
+    viewerUid != null &&
+    Number(animal.ownerId) === Number(viewerUid);
+
+  const promptDeleteListing = () => {
+    if (!animal?.id || viewerUid == null) {
+      return;
+    }
+    const name = animal.name || "this animal";
+    showConfirm({
+      type: "critical",
+      title: "Are you sure?",
+      message: `This will permanently delete ${name}'s listing from Pavia. You will not be able to undo this.`,
+      confirmLabel: "Yes, delete",
+      cancelLabel: "No",
+      confirmDanger: true,
+      onConfirm: async () => {
+        try {
+          await deleteOwnerListing(animal.id, viewerUid);
+          showPopup({
+            type: "success",
+            title: "Listing deleted",
+            message:
+              "The listing was removed successfully. A confirmation email was sent to your account."
+          });
+          navigate("/owner-listings", { replace: true });
+        } catch (err) {
+          showPopup({
+            type: "error",
+            title: "Could not delete",
+            message: err?.message || "The listing was not removed."
+          });
+          throw err;
+        }
+      }
+    });
+  };
 
   if (!animal) {
     return <div className="loading">Loading...</div>;
   }
 
-  const apiBase = getApiBaseUrl();
   const listingCode = formatListingCode(animal);
 
   return (
@@ -125,145 +240,193 @@ function AnimalDetailPage() {
         <section className="animal-detail-hero">
           <div className="animal-detail-hero-left">
             <div className="animal-detail-main-image-wrap">
-              {selectedImage ? (
-                <img
-                  src={selectedImage}
-                  alt={animal.name}
-                  className="animal-detail-main-image"
-                />
-              ) : (
-                <div
-                  className="animal-detail-main-image-placeholder"
-                  role="img"
-                  aria-label="No photo available"
-                >
-                  No photo
-                </div>
+              <ListingPhotoFrame
+                urls={galleryUrls}
+                activeIndex={imageIndex}
+                onOpenLightbox={
+                  galleryUrls.length > 0 ? () => setLightboxOpen(true) : undefined
+                }
+                variant="detail"
+                expandHint={`View full size photo of ${animal.name}`}
+                emptyLabel="No photo"
+              />
+
+              {hasMultipleImages && (
+                <>
+                  <button
+                    type="button"
+                    className="animal-detail-gallery-nav animal-detail-gallery-nav-prev"
+                    onClick={goPrevImage}
+                    aria-label="Previous photo"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    className="animal-detail-gallery-nav animal-detail-gallery-nav-next"
+                    onClick={goNextImage}
+                    aria-label="Next photo"
+                  >
+                    ›
+                  </button>
+                </>
               )}
+
               {isAdopter && (
-                <SaveHeartButton saved={saved} onClick={handleSave} />
+                <SaveHeartButton
+                  className="animal-detail-save-heart"
+                  saved={saved}
+                  onClick={(e) => handleSave(e)}
+                />
               )}
+
               <div className="animal-detail-image-topbar">
                 <span className="animal-detail-status-badge">
                   {animal.listingStatus || "Active"}
                 </span>
-                {isAdopter && (
+                {isAdopter && compatibilityScore != null && (
                   <span className="animal-detail-score-badge">
-                    {Math.round(animal.compatibilityScore ?? 0)}% compatibility
+                    {compatibilityScore}% compatibility
                   </span>
                 )}
               </div>
+
+              {hasMultipleImages && (
+                <span className="animal-detail-image-counter" aria-live="polite">
+                  {imageIndex + 1} / {galleryUrls.length}
+                </span>
+              )}
             </div>
 
-            <div className="animal-detail-gallery">
-              {(animal.images || []).map((img, index) => {
-                const resolved = resolveMediaUrl(img, apiBase) || "";
-                if (!resolved) {
-                  return null;
-                }
-                return (
-                  <img
-                    key={index}
-                    src={resolved}
-                    alt={`Animal ${index}`}
-                    className={`animal-detail-gallery-item ${
-                      selectedImage === resolved ? "active" : ""
+            {galleryUrls.length > 1 && (
+              <div className="animal-detail-gallery">
+                {galleryUrls.map((resolved, index) => (
+                  <button
+                    key={resolved}
+                    type="button"
+                    className={`animal-detail-gallery-thumb ${
+                      index === imageIndex ? "active" : ""
                     }`}
-                    onClick={() => setSelectedImage(resolved)}
-                  />
-                );
-              })}
-            </div>
+                    onClick={() => setImageIndex(index)}
+                    aria-label={`Show photo ${index + 1}`}
+                  >
+                    <img src={resolved} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {lightboxOpen && (
+              <ListingImageLightbox
+                urls={galleryUrls}
+                startIndex={imageIndex}
+                onClose={() => setLightboxOpen(false)}
+                title={animal.name || "Listing photo"}
+              />
+            )}
           </div>
 
           <div className="animal-detail-hero-right">
-            {listingCode && (
-              <p className="animal-listing-code" title="Listing ID">
-                {listingCode}
-              </p>
-            )}
-            <h1>{animal.name}</h1>
-            <p className="animal-breed">
-              {animal.breed} • {animal.animalType}
-            </p>
-
-            {isAdopter && animal.compatibilityScore != null && (
-              <p className="animal-compatibility-threshold-note">
-                {isStrongMatch
-                  ? `Strong match — ${Math.round(
-                      animal.compatibilityScore
-                    )}% compatibility (platform uses ≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`
-                  : `${Math.round(
-                      animal.compatibilityScore
-                    )}% compatibility — below the strong-match cutoff (≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`}
-              </p>
+            {isAdopter && (
+              <div className="animal-detail-panel-report">
+                <ListingReportButton
+                  variant="panel"
+                  tooltip="Report listing"
+                  onClick={() => setReportOpen(true)}
+                />
+              </div>
             )}
 
-            <div className="animal-info-grid">
-              <div><strong>Age:</strong> {animal.ageGroup}</div>
-              <div><strong>Size:</strong> {animal.size}</div>
-              <div><strong>Energy Level:</strong> {animal.energyLevel}</div>
-              <div><strong>Grooming:</strong> {animal.groomingNeed}</div>
-              <div><strong>Special Needs:</strong> {animal.specialNeeds}</div>
-              <div><strong>Good with Children:</strong> {animal.goodWithChildren}</div>
-            </div>
+            <div className="animal-detail-panel-body">
+              {listingCode && (
+                <p className="animal-listing-code" title="Listing ID">
+                  {listingCode}
+                </p>
+              )}
+              <h1>{animal.name}</h1>
+              <p className="animal-breed">
+                {animal.breed} • {titleCase(animal.animalType)}
+              </p>
 
-            <p className="animal-description">{animal.description}</p>
-
-            <div className="animal-actions">
-              {isAdopter && (
-                <>
-                  <button
-                    className="primary-btn"
-                    onClick={() => navigate("/adoption-request")}
-                  >
-                    Send Adoption Request
-                  </button>
-                  {animal.ownerId != null && isStrongMatch && (
-                    <button
-                      type="button"
-                      className="secondary-btn animal-detail-contact-btn"
-                      onClick={() => setContactOpen(true)}
-                    >
-                      Message owner
-                    </button>
-                  )}
-                  <button type="button" className="secondary-btn" onClick={handleSave}>
-                    {saved ? "Saved ✓" : "Save animal"}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary-btn animal-detail-report-btn"
-                    onClick={() => setReportOpen(true)}
-                  >
-                    Report listing
-                  </button>
-                </>
+              {animal.registerTime && (
+                <p className="animal-listed-date">
+                  Listed on{" "}
+                  <time dateTime={String(animal.registerTime)}>
+                    {formatListedDate(animal.registerTime)}
+                  </time>
+                </p>
               )}
 
-              {isOwner && (
-                <>
-                  <button
-                    className="primary-btn"
-                    onClick={() => navigate(`/register-animal?edit=${animal.id}`)}
-                  >
-                    Edit Listing
-                  </button>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => navigate(`/animal/${animal.id}/requests`)}
-                  >
-                    Manage Requests
-                  </button>
-                  <button
-                    className="secondary-btn"
-                    onClick={() => navigate("/owner-messages")}
-                  >
-                    Inquiries
-                  </button>
-                </>
+              {isAdopter && compatibilityScore != null && (
+                <p className="animal-compatibility-threshold-note">
+                  {isStrongMatch
+                    ? `Strong match — ${compatibilityScore}% compatibility (platform uses ≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`
+                    : `${compatibilityScore}% compatibility — below the strong-match cutoff (≥ ${STRONG_MATCH_THRESHOLD}%, inclusive).`}
+                </p>
               )}
+
+              <div className="animal-info-grid">
+                <div>
+                  <strong>Gender:</strong>{" "}
+                  {formatAnimalGenderLabel(animal.gender) || "—"}
+                </div>
+                <div><strong>Age:</strong> {titleCase(animal.ageGroup)}</div>
+                <div><strong>Size:</strong> {titleCase(animal.size)}</div>
+                <div><strong>Energy Level:</strong> {titleCase(animal.energyLevel)}</div>
+                <div><strong>Grooming:</strong> {titleCase(animal.groomingNeed)}</div>
+                <div><strong>Special Needs:</strong> {titleCase(animal.specialNeeds)}</div>
+                <div>
+                  <strong>Good with Children:</strong> {titleCase(animal.goodWithChildren)}
+                </div>
+              </div>
+
+              <p className="animal-description">{animal.description}</p>
             </div>
+
+            {isAdopter && animal.ownerId != null && isStrongMatch && (
+              <div className="animal-detail-panel-actions">
+                <button
+                  type="button"
+                  className="primary-btn animal-detail-btn-contact"
+                  onClick={() => setContactOpen(true)}
+                >
+                  Message owner
+                </button>
+              </div>
+            )}
+
+            {isListingOwner && (
+              <div className="animal-detail-panel-actions animal-detail-panel-actions-owner">
+                <button
+                  type="button"
+                  className="animal-detail-owner-btn"
+                  onClick={() => navigate(`/register-animal?edit=${animal.id}`)}
+                >
+                  Edit listing
+                </button>
+                <button
+                  type="button"
+                  className="animal-detail-owner-btn"
+                  onClick={() => navigate(`/animal/${animal.id}/requests`)}
+                >
+                  Manage requests
+                </button>
+                <button
+                  type="button"
+                  className="animal-detail-owner-btn"
+                  onClick={() => navigate(`/owner-messages?animalId=${animal.id}`)}
+                >
+                  Messages
+                </button>
+                <button
+                  type="button"
+                  className="animal-detail-owner-btn animal-detail-owner-btn--delete"
+                  onClick={promptDeleteListing}
+                >
+                  Delete listing
+                </button>
+              </div>
+            )}
           </div>
         </section>
       </main>

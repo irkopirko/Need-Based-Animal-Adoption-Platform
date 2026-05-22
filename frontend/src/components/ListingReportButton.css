@@ -1,0 +1,73 @@
+.listing-report-btn {
+  position: relative;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  color: #b45309;
+  font-weight: 900;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.listing-report-btn:hover {
+  transform: scale(1.06);
+  background: #fff7ed;
+}
+
+.listing-report-btn-icon {
+  pointer-events: none;
+}
+
+.listing-report-btn-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #171717;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.listing-report-btn:hover .listing-report-btn-tooltip,
+.listing-report-btn:focus-visible .listing-report-btn-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* In-panel: small red “!” on white detail card */
+.listing-report-btn--panel {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  color: #dc2626;
+  box-shadow: none;
+  font-size: 18px;
+}
+
+.listing-report-btn--panel:hover {
+  background: #fef2f2;
+  transform: scale(1.05);
+}
+
+.listing-report-btn--panel .listing-report-btn-tooltip {
+  top: calc(100% + 4px);
+  right: 0;
+}
