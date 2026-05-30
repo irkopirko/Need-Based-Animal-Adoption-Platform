@@ -38,10 +38,7 @@ function MatchResultsPage() {
         const api = getApiBaseUrl();
         const params = new URLSearchParams();
         params.set("minOverlap", String(STRONG_MATCH_THRESHOLD));
-        const [matchResponse, profileResponse] = await Promise.all([
-          fetch(`${api}/api/match/${userId}?${params.toString()}`),
-          fetch(`${api}/api/profile/${userId}`)
-        ]);
+        const matchResponse = await fetch(`${api}/api/match/${userId}?${params.toString()}`);
 
         if (!matchResponse.ok) {
           throw new Error("Failed to fetch matches");
@@ -49,11 +46,6 @@ function MatchResultsPage() {
 
         const matchData = await matchResponse.json();
         setMatches(matchData);
-
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-          // setProfile(profileData);
-        }
       } catch (error) {
         console.error(error);
         setMessage("Could not load compatibility results.");

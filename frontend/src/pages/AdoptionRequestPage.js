@@ -12,44 +12,44 @@ import {
 } from "../utils/auth";
 import { invalidateAdopterHomeSummaryCache } from "../utils/adopterJourney";
 
+const DEFAULT_FORM_DATA = {
+  indoorSpace: "",
+  livingSpace: "",
+  livingSpaceOther: "",
+  housingStatus: "",
+  hasGarden: "",
+  outdoorAccess: "",
+  activityLevel: "",
+  workSchedule: "",
+  timeAtHome: "",
+  householdType: "",
+  hasChildren: "",
+  childrenAgeGroup: [],
+  hasOtherPets: "",
+  otherPetsType: [],
+  otherPetsTypeOther: "",
+  primaryCaretaker: "",
+  primaryCaretakerOther: "",
+  hasPreviousExperience: "",
+  previousPetTypes: [],
+  previousPetTypesOther: "",
+  preferredAnimalTypes: [],
+  preferredEnergyLevels: [],
+  preferredAgeRanges: [],
+  preferredSizes: [],
+  preferredGenders: [],
+  groomingTolerance: [],
+  specialNeedsAcceptance: "",
+  notes: ""
+};
+
 function AdoptionRequestPage() {
   const navigate = useNavigate();
   const { showPopup, showConfirm } = usePopup();
   const blockerHandledRef = useRef(false);
 
-  const defaultFormData = {
-    indoorSpace: "",
-    livingSpace: "",
-    livingSpaceOther: "",
-    housingStatus: "",
-    hasGarden: "",
-    outdoorAccess: "",
-    activityLevel: "",
-    workSchedule: "",
-    timeAtHome: "",
-    householdType: "",
-    hasChildren: "",
-    childrenAgeGroup: [],
-    hasOtherPets: "",
-    otherPetsType: [],
-    otherPetsTypeOther: "",
-    primaryCaretaker: "",
-    primaryCaretakerOther: "",
-    hasPreviousExperience: "",
-    previousPetTypes: [],
-    previousPetTypesOther: "",
-    preferredAnimalTypes: [],
-    preferredEnergyLevels: [],
-    preferredAgeRanges: [],
-    preferredSizes: [],
-    preferredGenders: [],
-    groomingTolerance: [],
-    specialNeedsAcceptance: "",
-    notes: ""
-  };
-
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState(defaultFormData);
+  const [formData, setFormData] = useState(DEFAULT_FORM_DATA);
   const [errors, setErrors] = useState({});
   const [requestSaved, setRequestSaved] = useState(false);
   const [lastSavedRequestId, setLastSavedRequestId] = useState(null);
@@ -58,7 +58,7 @@ function AdoptionRequestPage() {
   const totalSteps = 6;
 
   const hasUnsavedChanges = useMemo(
-    () => JSON.stringify(formData) !== JSON.stringify(defaultFormData),
+    () => JSON.stringify(formData) !== JSON.stringify(DEFAULT_FORM_DATA),
     [formData]
   );
   const isDirty = bootstrapped && !requestSaved && hasUnsavedChanges;
@@ -172,43 +172,6 @@ function AdoptionRequestPage() {
       cancelled = true;
     };
   }, [navigate]);
-
-  const applyDefaultValues = () => {
-    return {
-      ...formData,
-      housingStatus: formData.housingStatus || "Not Specified",
-      childrenAgeGroup:
-        formData.hasChildren === "Yes" && formData.childrenAgeGroup.length === 0
-          ? ["Not Specified"]
-          : formData.childrenAgeGroup,
-      otherPetsType:
-        formData.hasOtherPets === "Yes" && formData.otherPetsType.length === 0
-          ? ["Not Specified"]
-          : formData.otherPetsType,
-      otherPetsTypeOther:
-        formData.otherPetsType.includes("Other") &&
-        formData.otherPetsTypeOther.trim() === ""
-          ? "Not Specified"
-          : formData.otherPetsTypeOther,
-      primaryCaretaker: formData.primaryCaretaker || "Me",
-      primaryCaretakerOther:
-        formData.primaryCaretaker === "Other" &&
-        formData.primaryCaretakerOther.trim() === ""
-          ? "Not Specified"
-          : formData.primaryCaretakerOther,
-      previousPetTypes:
-        formData.hasPreviousExperience === "Yes" &&
-        formData.previousPetTypes.length === 0
-          ? ["Not Specified"]
-          : formData.previousPetTypes,
-      previousPetTypesOther:
-        formData.previousPetTypes.includes("Other") &&
-        formData.previousPetTypesOther.trim() === ""
-          ? "Not Specified"
-          : formData.previousPetTypesOther,
-      notes: formData.notes.trim() === "" ? "No additional notes" : formData.notes
-    };
-  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;

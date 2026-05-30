@@ -76,7 +76,8 @@ function initialPanelsForUser() {
 function OwnerHomePage() {
   const navigate = useNavigate();
   const initialPanels = initialPanelsForUser();
-  const [panelsLoading, setPanelsLoading] = useState(!initialPanels.hasCache);
+  const initialHasPanelsCache = initialPanels.hasCache;
+  const [panelsLoading, setPanelsLoading] = useState(!initialHasPanelsCache);
   const [summary, setSummary] = useState(initialSummaryForUser);
   const [summaryLoading, setSummaryLoading] = useState(() => !initialSummaryForUser());
   const [listings, setListings] = useState(initialPanels.listings);
@@ -133,7 +134,7 @@ function OwnerHomePage() {
             adoptedCount: 0,
             archivedCount: 0
           });
-          if (!initialPanels.hasCache) {
+          if (!initialHasPanelsCache) {
             setListings([]);
             setInquiries([]);
           }
@@ -178,7 +179,7 @@ function OwnerHomePage() {
       window.removeEventListener(PAVIA_OWNER_HOME_SUMMARY_UPDATED, onSummary);
       window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, onEngagement);
     };
-  }, [apiBaseUrl, navigate]);
+  }, [apiBaseUrl, navigate, initialHasPanelsCache]);
 
   const previewListings = useMemo(() => (listings || []).slice(0, 3), [listings]);
 

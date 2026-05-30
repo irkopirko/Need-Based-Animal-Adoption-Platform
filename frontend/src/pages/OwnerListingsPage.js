@@ -15,7 +15,6 @@ import {
   isOwnerProfileIncomplete,
   normalizeRole
 } from "../utils/auth";
-import { fetchOwnerInquiries } from "../utils/platformApi";
 import {
   fetchOwnerListingCardsCached,
   fetchOwnerInquiriesCached,
