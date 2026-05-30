@@ -1,15 +1,18 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import "./HomePage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 
 function HomePage() {
+  const navigate = useNavigate();
+
   const goToRegister = () => {
-    window.location.pathname = "/register";
+    navigate("/register");
   };
 
   const goToAbout = () => {
-    window.location.pathname = "/about";
+    navigate("/about");
   };
 
   return (
@@ -35,10 +38,8 @@ function HomePage() {
 
             <div className="home-hero-right">
               <p className="home-hero-description">
-                Pavia helps adopters and shelters connect through lifestyle
-                compatibility, care expectations, and daily routine — not only
-                appearance. The goal is to support warmer, smarter, and more
-                lasting matches.
+                Pavia matches adopters and owners on lifestyle, care, and routine —
+                not looks alone. Smarter introductions, kinder outcomes.
               </p>
 
               <div className="home-hero-buttons">

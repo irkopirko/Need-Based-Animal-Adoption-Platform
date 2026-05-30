@@ -59,10 +59,7 @@ public class MatchSnapshotService {
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Europe/Istanbul"));
         int saved = 0;
 
-        for (Animal animal : animalRepository.findAll()) {
-            if (!matchService.isListedForPublicMatching(animal)) {
-                continue;
-            }
+        for (Animal animal : animalRepository.findAllForPublicMatching()) {
             MatchService.AnimalMatchScore score = matchService.scoreAnimal(request, animal);
             if (score.percentage() < minThreshold) {
                 continue;
@@ -104,6 +101,38 @@ public class MatchSnapshotService {
         return snapshotRepository.findByAnimalIdOrderByMatchPercentageDesc(animalId).stream()
                 .map(this::toView)
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Recomputes stored match rows for a listing after the owner updates animal details.
+     */
+    @Transactional
+    public void refreshSnapshotsForAnimal(Long animalId) {
+        Animal animal = animalRepository.findById(animalId).orElse(null);
+        if (animal == null) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Europe/Istanbul"));
+        List<MatchSnapshot> snaps = snapshotRepository.findByAnimalIdOrderByMatchPercentageDesc(animalId);
+        Double best = null;
+        for (MatchSnapshot snap : snaps) {
+            AdoptionRequest request = adoptionRequestRepository.findById(snap.getAdoptionRequestId()).orElse(null);
+            if (request == null) {
+                continue;
+            }
+            MatchService.AnimalMatchScore score = matchService.scoreAnimal(request, animal);
+            snap.setMatchPercentage(score.percentage());
+            snap.setMatchReasonsJson(encodeReasons(score.reasons()));
+            snap.setUpdatedAt(now);
+            snapshotRepository.save(snap);
+            if (best == null || score.percentage() > best) {
+                best = score.percentage();
+            }
+        }
+        if (best != null) {
+            animal.setCompatibilityScore(best);
+            animalRepository.save(animal);
+        }
     }
 
     @Transactional(readOnly = true)

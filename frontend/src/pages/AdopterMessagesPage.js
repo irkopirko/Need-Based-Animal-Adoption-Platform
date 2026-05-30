@@ -5,10 +5,6 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
 import {
-  loadAdopterJourneyState,
-  STRONG_MATCH_THRESHOLD
-} from "../utils/adopterJourney";
-import {
   fetchAdopterInquiries,
   fetchInquiryThread,
   sendInquiryMessage
@@ -20,6 +16,12 @@ import {
   normalizeInquiryStatus
 } from "../utils/inquiryStatus";
 import { usePopup } from "../components/PopupProvider";
+import { updateNavbarStateForUser } from "../utils/navbarState";
+import {
+  countUnreadThreads,
+  hasUnreadInThread,
+  markThreadRead
+} from "../utils/messageReadState";
 
 function GatePanel({ badge, title, body, primaryLabel, onPrimary }) {
   return (
@@ -40,51 +42,124 @@ function AdopterMessagesPage() {
   const navigate = useNavigate();
   const { showPopup } = usePopup();
   const [loading, setLoading] = useState(true);
+  const [inquiriesLoading, setInquiriesLoading] = useState(false);
   const [scenario, setScenario] = useState("LOADING");
   const [inquiries, setInquiries] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [thread, setThread] = useState(null);
+  const [threadLoading, setThreadLoading] = useState(false);
   const [draft, setDraft] = useState("");
 
   const user = getStoredUser();
   const uid = getResolvedUserId(user);
+  const inquiriesCacheKey = uid != null ? `paviaAdopterInquiries:${uid}` : null;
+
+  const applyInquiryList = useCallback(
+    (arr) => {
+      const next = Array.isArray(arr) ? arr : [];
+      setInquiries(next);
+      updateNavbarStateForUser(uid, {
+        adopterUnreadMessages: countUnreadThreads("ADOPTER", uid, next)
+      });
+      if (next.length === 0) {
+        setScenario("READY_EMPTY");
+        setSelectedId(null);
+        setThread(null);
+        return;
+      }
+      setScenario("READY");
+      setSelectedId((prev) => {
+        if (prev != null && next.some((i) => Number(i.id) === Number(prev))) {
+          return prev;
+        }
+        return next[0].id;
+      });
+    },
+    [uid]
+  );
 
   const refresh = useCallback(async () => {
     const role = normalizeRole(user?.role);
     if (uid == null || role !== "ADOPTER") {
       setScenario("NOT_ADOPTER");
+      setInquiriesLoading(false);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const state = await loadAdopterJourneyState(uid);
-      if (state.noRequest) {
-        setScenario("NO_REQUEST");
-      } else if (state.draftOnly) {
-        setScenario("DRAFT_ONLY");
-      } else if (state.submitted && state.strongMatches.length === 0) {
-        setScenario("SUBMITTED_NO_MATCHES");
-      } else if (state.submitted && state.strongMatches.length > 0) {
-        const list = await fetchAdopterInquiries(uid);
-        const arr = Array.isArray(list) ? list : [];
-        setInquiries(arr);
-        if (arr.length === 0) {
-          setScenario("READY_EMPTY");
-        } else {
-          setScenario("READY");
-          setSelectedId(arr[0].id);
+    let cached = [];
+    if (inquiriesCacheKey && typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(inquiriesCacheKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed?.data)) {
+            cached = parsed.data;
+          }
         }
-      } else {
-        setScenario("NO_REQUEST");
+      } catch {
+        cached = [];
       }
-    } catch (e) {
-      console.error(e);
-      setScenario("NO_REQUEST");
-    } finally {
+    }
+    if (cached.length > 0) {
+      applyInquiryList(cached);
       setLoading(false);
     }
-  }, [uid, user?.role]);
+    setInquiriesLoading(true);
+    try {
+      let list = null;
+      if (inquiriesCacheKey && typeof window !== "undefined") {
+        try {
+          const raw = sessionStorage.getItem(inquiriesCacheKey);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (
+              parsed?.at &&
+              Date.now() - parsed.at < 30_000 &&
+              Array.isArray(parsed.data) &&
+              parsed.data.length > 0
+            ) {
+              list = parsed.data;
+            }
+          }
+        } catch {
+          // ignore malformed cache
+        }
+      }
+      if (!Array.isArray(list)) {
+        list = await fetchAdopterInquiries(uid);
+        if (inquiriesCacheKey && typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(
+              inquiriesCacheKey,
+              JSON.stringify({ at: Date.now(), data: Array.isArray(list) ? list : [] })
+            );
+          } catch {
+            // ignore cache write issues
+          }
+        }
+      }
+      let arr = Array.isArray(list) ? list : [];
+      if (arr.length === 0 && cached.length > 0) {
+        arr = cached;
+      }
+      applyInquiryList(arr);
+    } catch (e) {
+      console.error(e);
+      if (cached.length > 0) {
+        applyInquiryList(cached);
+      } else {
+        setScenario("READY_EMPTY");
+      }
+      showPopup({
+        type: "warning",
+        title: "Messages unavailable",
+        message: "Could not refresh conversations right now. Showing latest available state."
+      });
+    } finally {
+      setInquiriesLoading(false);
+      setLoading(false);
+    }
+  }, [uid, user?.role, inquiriesCacheKey, applyInquiryList, showPopup]);
 
   useEffect(() => {
     refresh();
@@ -93,12 +168,63 @@ function AdopterMessagesPage() {
   useEffect(() => {
     if (!selectedId || uid == null || scenario !== "READY") {
       setThread(null);
+      setThreadLoading(false);
       return;
     }
+    const threadCacheKey = `paviaInquiryThread:${uid}:${selectedId}`;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = sessionStorage.getItem(threadCacheKey);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed?.at && Date.now() - parsed.at < 60_000 && parsed?.data) {
+            setThread(parsed.data);
+          }
+        }
+      } catch {
+        // ignore malformed cache
+      }
+    }
+    setThreadLoading(true);
     fetchInquiryThread(selectedId, uid)
-      .then(setThread)
-      .catch(() => setThread(null));
+      .then((data) => {
+        setThread(data);
+        if (typeof window !== "undefined") {
+          try {
+            sessionStorage.setItem(threadCacheKey, JSON.stringify({ at: Date.now(), data }));
+          } catch {
+            // ignore cache write issues
+          }
+        }
+      })
+      .catch(() => setThread(null))
+      .finally(() => setThreadLoading(false));
   }, [selectedId, uid, scenario]);
+
+  useEffect(() => {
+    if (uid == null) {
+      return;
+    }
+    const unread = countUnreadThreads("ADOPTER", uid, inquiries.filter((inq) => inq.id !== selectedId));
+    updateNavbarStateForUser(uid, { adopterUnreadMessages: unread });
+  }, [uid, inquiries, selectedId]);
+
+  useEffect(() => {
+    if (uid == null || selectedId == null) {
+      return;
+    }
+    const selected = inquiries.find((inq) => Number(inq.id) === Number(selectedId));
+    if (!selected) {
+      return;
+    }
+    markThreadRead("ADOPTER", uid, selected.id, selected.updatedAt);
+    const unread = countUnreadThreads(
+      "ADOPTER",
+      uid,
+      inquiries.filter((inq) => Number(inq.id) !== Number(selectedId))
+    );
+    updateNavbarStateForUser(uid, { adopterUnreadMessages: unread });
+  }, [uid, selectedId, inquiries]);
 
   const handleSend = async () => {
     const text = draft.trim();
@@ -122,6 +248,23 @@ function AdopterMessagesPage() {
       setDraft("");
       const updated = await fetchInquiryThread(selectedId, uid);
       setThread(updated);
+      if (typeof window !== "undefined") {
+        try {
+          sessionStorage.setItem(
+            `paviaInquiryThread:${uid}:${selectedId}`,
+            JSON.stringify({ at: Date.now(), data: updated })
+          );
+        } catch {
+          // ignore cache write issues
+        }
+      }
+      if (inquiriesCacheKey && typeof window !== "undefined") {
+        try {
+          sessionStorage.removeItem(inquiriesCacheKey);
+        } catch {
+          // ignore
+        }
+      }
       refresh();
     } catch (e) {
       showPopup({ type: "error", title: "Send failed", message: e.message });
@@ -173,48 +316,6 @@ function AdopterMessagesPage() {
     </div>
   );
 
-  if (scenario === "NO_REQUEST") {
-    return shell(
-      "Start with your adoption request",
-      "Messaging opens once your request is submitted and strong matches exist.",
-      <GatePanel
-        badge="Step 1"
-        title="No adoption request yet"
-        body={`Submit an adoption request first. Owner messaging unlocks for listings at ≥ ${STRONG_MATCH_THRESHOLD}% compatibility.`}
-        primaryLabel="Create adoption request"
-        onPrimary={() => navigate("/adoption-request")}
-      />
-    );
-  }
-
-  if (scenario === "DRAFT_ONLY") {
-    return shell(
-      "Almost there",
-      "Submit your draft so we can run the match engine.",
-      <GatePanel
-        badge="Draft saved"
-        title="Submit your adoption request"
-        body="After submission, contact owners from compatible animal profiles."
-        primaryLabel="Continue adoption request"
-        onPrimary={() => navigate("/adoption-request")}
-      />
-    );
-  }
-
-  if (scenario === "SUBMITTED_NO_MATCHES") {
-    return shell(
-      "Waiting for a strong match",
-      `Animals need ≥ ${STRONG_MATCH_THRESHOLD}% compatibility.`,
-      <GatePanel
-        badge={`No ≥${STRONG_MATCH_THRESHOLD}% matches`}
-        title="No compatible animals at the threshold yet"
-        body="When strong matches appear, use Contact owner on a listing profile."
-        primaryLabel="View compatible animals"
-        onPrimary={() => navigate("/compatible-animals")}
-      />
-    );
-  }
-
   if (scenario === "READY_EMPTY") {
     return shell(
       "Your conversations",
@@ -236,14 +337,24 @@ function AdopterMessagesPage() {
         <h1 className="messages-title">Your conversations</h1>
         <div className="adopter-inquiry-layout">
           <aside className="adopter-inquiry-list">
-            {inquiries.map((inq) => (
+            {inquiriesLoading && inquiries.length === 0 ? (
+              <p className="messages-loading-msg">Loading conversations…</p>
+            ) : null}
+            {inquiries.map((inq) => {
+              const unread = hasUnreadInThread("ADOPTER", uid, inq);
+              return (
               <button
                 key={inq.id}
                 type="button"
                 className={`adopter-inquiry-item ${inq.id === selectedId ? "is-selected" : ""}`}
                 onClick={() => setSelectedId(inq.id)}
               >
-                <strong>{inq.animalName}</strong>
+                <span className="adopter-inquiry-item-top">
+                  <strong>{inq.animalName}</strong>
+                  {unread && inq.id !== selectedId ? (
+                    <span className="adopter-inquiry-unread-dot" aria-label="Unread messages" />
+                  ) : null}
+                </span>
                 <span
                   className={
                     isInquiryRejected(inq.status) ? "adopter-inquiry-item-status-rejected" : ""
@@ -254,48 +365,55 @@ function AdopterMessagesPage() {
                     : inq.status}
                 </span>
               </button>
-            ))}
+              );
+            })}
           </aside>
-          {thread && (
+          {(threadLoading || thread) && (
             <section className="adopter-inquiry-thread-panel">
-              <h2>
-                {thread.animalName} · {thread.listingCode}
-              </h2>
-              <p className="adopter-inquiry-status">Status: {thread.status}</p>
-              <div className="adopter-inquiry-messages">
-                {(thread.messages || []).map((m) => (
-                  <div
-                    key={m.id}
-                    className={`adopter-inquiry-msg adopter-inquiry-msg-${m.senderRole?.toLowerCase()}`}
-                  >
-                    <p>{m.body}</p>
-                    <time>{m.createdAt ? new Date(m.createdAt).toLocaleString() : ""}</time>
+              {threadLoading || !thread ? (
+                <p className="messages-loading-msg">Loading conversation…</p>
+              ) : (
+                <>
+                  <h2>
+                    {thread.animalName} · {thread.listingCode}
+                  </h2>
+                  <p className="adopter-inquiry-status">Status: {thread.status}</p>
+                  <div className="adopter-inquiry-messages">
+                    {(thread.messages || []).map((m) => (
+                      <div
+                        key={m.id}
+                        className={`adopter-inquiry-msg adopter-inquiry-msg-${m.senderRole?.toLowerCase()}`}
+                      >
+                        <p>{m.body}</p>
+                        <time>{m.createdAt ? new Date(m.createdAt).toLocaleString() : ""}</time>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-              {canAdopterComposeInThread(thread) ? (
-                <div className="adopter-inquiry-compose">
-                  <textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    rows={3}
-                    placeholder="Type a message…"
-                    maxLength={1000}
-                  />
-                  <button type="button" className="messages-primary-btn" onClick={handleSend}>
-                    Send
-                  </button>
-                  {normalizeInquiryStatus(thread.status) === "PENDING" && (
-                    <p className="adopter-inquiry-hint">
-                      Your message request is with the owner. They can read your adoption
-                      profile and approve before you can send more messages here.
+                  {canAdopterComposeInThread(thread) ? (
+                    <div className="adopter-inquiry-compose">
+                      <textarea
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        rows={3}
+                        placeholder="Type a message…"
+                        maxLength={1000}
+                      />
+                      <button type="button" className="messages-primary-btn" onClick={handleSend}>
+                        Send
+                      </button>
+                      {normalizeInquiryStatus(thread.status) === "PENDING" && (
+                        <p className="adopter-inquiry-hint">
+                          Your message request is with the owner. They can read your adoption
+                          profile and approve before you can send more messages here.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="adopter-inquiry-wait" role="status">
+                      {adopterComposeBlockedReason(thread)}
                     </p>
                   )}
-                </div>
-              ) : (
-                <p className="adopter-inquiry-wait" role="status">
-                  {adopterComposeBlockedReason(thread)}
-                </p>
+                </>
               )}
             </section>
           )}

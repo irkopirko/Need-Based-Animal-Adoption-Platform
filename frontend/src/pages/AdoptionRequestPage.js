@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import "./AdoptionRequestPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
-import { useNavigate } from "react-router-dom";
+import { useBlocker, useNavigate } from "react-router-dom";
 import { usePopup } from "../components/PopupProvider";
 import {
   broadcastStoredUserRefresh,
@@ -10,10 +10,12 @@ import {
   getStoredUser,
   normalizeRole
 } from "../utils/auth";
+import { invalidateAdopterHomeSummaryCache } from "../utils/adopterJourney";
 
 function AdoptionRequestPage() {
   const navigate = useNavigate();
-  const { showPopup } = usePopup();
+  const { showPopup, showConfirm } = usePopup();
+  const blockerHandledRef = useRef(false);
 
   const defaultFormData = {
     indoorSpace: "",
@@ -40,6 +42,7 @@ function AdoptionRequestPage() {
     preferredEnergyLevels: [],
     preferredAgeRanges: [],
     preferredSizes: [],
+    preferredGenders: [],
     groomingTolerance: [],
     specialNeedsAcceptance: "",
     notes: ""
@@ -53,6 +56,56 @@ function AdoptionRequestPage() {
   const [bootstrapped, setBootstrapped] = useState(false);
 
   const totalSteps = 6;
+
+  const hasUnsavedChanges = useMemo(
+    () => JSON.stringify(formData) !== JSON.stringify(defaultFormData),
+    [formData]
+  );
+  const isDirty = bootstrapped && !requestSaved && hasUnsavedChanges;
+
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isDirty && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    if (blocker.state !== "blocked") {
+      blockerHandledRef.current = false;
+      return;
+    }
+    if (blockerHandledRef.current) {
+      return;
+    }
+    blockerHandledRef.current = true;
+    showConfirm({
+      type: "warning",
+      title: "Leave this form?",
+      message:
+        "You have unsaved changes to your adoption request. Leave without saving?",
+      confirmLabel: "Leave",
+      cancelLabel: "Stay",
+      confirmDanger: true
+    }).then((ok) => {
+      blockerHandledRef.current = false;
+      if (ok) {
+        blocker.proceed();
+      } else {
+        blocker.reset();
+      }
+    });
+  }, [blocker, showConfirm]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (!isDirty) {
+        return;
+      }
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -375,6 +428,20 @@ function AdoptionRequestPage() {
     }
   };
 
+  const handleFormKeyDown = (e) => {
+    if (e.key !== "Enter" || e.shiftKey) {
+      return;
+    }
+    const tag = e.target?.tagName?.toLowerCase();
+    if (tag === "textarea" || tag === "button") {
+      return;
+    }
+    if (step < totalSteps) {
+      e.preventDefault();
+      goNext();
+    }
+  };
+
   const handleSubmit = async (e) => {
   e.preventDefault();
 
@@ -519,6 +586,7 @@ function AdoptionRequestPage() {
         if (typeof window !== "undefined") {
           window.localStorage.setItem("adoptionRequestCompleted", "true");
         }
+        invalidateAdopterHomeSummaryCache(user.userId);
         navigate(`/compatible-animals?requestId=${encodeURIComponent(String(requestId))}`);
       } else {
         navigate("/compatible-animals");
@@ -634,7 +702,7 @@ function AdoptionRequestPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} onKeyDown={handleFormKeyDown}>
             {step === 1 && (
               <div className="adoption-step-section">
                 <h3>Home Information</h3>
@@ -1011,6 +1079,14 @@ function AdoptionRequestPage() {
                   </div>
                 )}
 
+                <div className="adoption-request-group adoption-request-full">
+                  <label>Preferred gender (optional)</label>
+                  <p className="adoption-request-hint">
+                    Leave empty to include both male and female animals in matching.
+                  </p>
+                  <CheckboxGroup fieldName="preferredGenders" options={["Male", "Female"]} />
+                </div>
+
                 {selectedAnimalTypes.length > 0 && (
                   <div className={`adoption-request-group adoption-request-full ${errors.groomingTolerance ? "error-group" : ""}`}>
                     <RequiredLabel>Grooming Tolerance</RequiredLabel>
@@ -1097,6 +1173,12 @@ function AdoptionRequestPage() {
                     <p><strong>Energy Levels:</strong> {formData.preferredEnergyLevels.join(", ") || "-"}</p>
                     <p><strong>Age Ranges:</strong> {formData.preferredAgeRanges.join(", ") || "-"}</p>
                     <p><strong>Sizes:</strong> {formData.preferredSizes.join(", ") || "-"}</p>
+                    <p>
+                      <strong>Preferred gender:</strong>{" "}
+                      {formData.preferredGenders.length > 0
+                        ? formData.preferredGenders.join(", ")
+                        : "Any (male and female)"}
+                    </p>
                     <p><strong>Grooming:</strong> {formData.groomingTolerance.join(", ") || "-"}</p>
                     <p><strong>Special Needs Acceptance:</strong> {formData.specialNeedsAcceptance || "-"}</p>
                   </div>

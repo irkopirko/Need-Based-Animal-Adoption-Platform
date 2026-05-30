@@ -12,6 +12,7 @@ import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.User;
 import com.adoptionplatform.backend.repository.AdoptionCaseRepository;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
+import com.adoptionplatform.backend.repository.AnimalListingMetaProjection;
 import com.adoptionplatform.backend.repository.AnimalRepository;
 import com.adoptionplatform.backend.repository.InquiryMessageRepository;
 import com.adoptionplatform.backend.repository.ListingInquiryRepository;
@@ -19,13 +20,21 @@ import com.adoptionplatform.backend.repository.UserRepository;
 import com.adoptionplatform.backend.util.ListingCodeUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -177,16 +186,14 @@ public class InquiryService {
 
     @Transactional(readOnly = true)
     public List<InquiryThreadDto> listForOwner(Long ownerId) {
-        return inquiryRepository.findByOwnerUserIdOrderByCreatedAtDesc(ownerId).stream()
-                .map(i -> toThreadDto(i, true))
-                .collect(Collectors.toList());
+        List<ListingInquiry> inquiries = inquiryRepository.findByOwnerUserIdOrderByCreatedAtDesc(ownerId);
+        return toThreadDtosBatch(inquiries, false);
     }
 
     @Transactional(readOnly = true)
     public List<InquiryThreadDto> listForAdopter(Long adopterId) {
-        return inquiryRepository.findByAdopterUserIdOrderByCreatedAtDesc(adopterId).stream()
-                .map(i -> toThreadDto(i, true))
-                .collect(Collectors.toList());
+        List<ListingInquiry> inquiries = inquiryRepository.findByAdopterUserIdOrderByCreatedAtDesc(adopterId);
+        return toThreadDtosBatch(inquiries, false);
     }
 
     @Transactional(readOnly = true)
@@ -203,11 +210,38 @@ public class InquiryService {
         if ("REJECTED".equalsIgnoreCase(inquiry.getStatus())) {
             throw new IllegalArgumentException("This inquiry was already rejected");
         }
+        boolean alreadyAccepted = "ACCEPTED".equalsIgnoreCase(inquiry.getStatus());
         inquiry.setStatus("ACCEPTED");
         inquiry.setUpdatedAt(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
         ListingInquiry saved = inquiryRepository.save(inquiry);
         adoptionCaseService.acceptCaseForInquiry(inquiryId, ownerId);
+        if (!alreadyAccepted) {
+            notifyAdopterInquiryAccepted(saved);
+        }
         return toThreadDto(saved, true);
+    }
+
+    private void notifyAdopterInquiryAccepted(ListingInquiry inquiry) {
+        userRepository.findById(inquiry.getAdopterUserId()).ifPresent(adopter -> {
+            String email = adopter.getEmail();
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            Animal animal = animalRepository.findById(inquiry.getAnimalId()).orElse(null);
+            String animalName = animal != null ? animal.getName() : null;
+            Long animalId = animal != null ? animal.getId() : inquiry.getAnimalId();
+            String listingCode = animalId != null ? ListingCodeUtil.format(animalId) : "";
+            try {
+                emailService.sendAdopterInquiryAcceptedNotice(
+                        email.trim(),
+                        animalName,
+                        listingCode,
+                        animalId
+                );
+            } catch (RuntimeException ex) {
+                // Acceptance is saved even if email delivery fails.
+            }
+        });
     }
 
     @Transactional
@@ -215,7 +249,45 @@ public class InquiryService {
         ListingInquiry inquiry = loadOwnedInquiry(inquiryId, ownerId);
         inquiry.setStatus("REJECTED");
         inquiry.setUpdatedAt(LocalDateTime.now(ZoneId.of("Europe/Istanbul")));
-        return toThreadDto(inquiryRepository.save(inquiry), true);
+        ListingInquiry saved = inquiryRepository.save(inquiry);
+        scheduleAdopterDeclinedEmail(saved);
+        return toThreadDto(saved, true);
+    }
+
+    private void scheduleAdopterDeclinedEmail(ListingInquiry inquiry) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            notifyAdopterInquiryDeclined(inquiry);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                notifyAdopterInquiryDeclined(inquiry);
+            }
+        });
+    }
+
+    private void notifyAdopterInquiryDeclined(ListingInquiry inquiry) {
+        userRepository.findById(inquiry.getAdopterUserId()).ifPresent(adopter -> {
+            String email = adopter.getEmail();
+            if (email == null || email.isBlank()) {
+                return;
+            }
+            Animal animal = animalRepository.findById(inquiry.getAnimalId()).orElse(null);
+            String animalName = animal != null ? animal.getName() : null;
+            Long animalId = animal != null ? animal.getId() : inquiry.getAnimalId();
+            String listingCode = animalId != null ? ListingCodeUtil.format(animalId) : "";
+            try {
+                emailService.sendAdopterInquiryDeclinedNotice(
+                        email.trim(),
+                        animalName,
+                        listingCode,
+                        animalId
+                );
+            } catch (RuntimeException ex) {
+                // Rejection is saved even if email delivery fails.
+            }
+        });
     }
 
     @Transactional
@@ -250,6 +322,11 @@ public class InquiryService {
                 throw new IllegalArgumentException(
                         "Your message request is pending. The owner must accept before you can send more messages.");
             }
+        }
+
+        if ("PENDING".equalsIgnoreCase(inquiry.getStatus()) && "OWNER".equals(role)) {
+            throw new IllegalArgumentException(
+                    "Approve the message request before sending a reply to the adopter.");
         }
 
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Europe/Istanbul"));
@@ -314,6 +391,92 @@ public class InquiryService {
             return requested.trim().toUpperCase(Locale.ROOT);
         }
         throw new IllegalArgumentException("Not authorized to send in this thread");
+    }
+
+    private List<InquiryThreadDto> toThreadDtosBatch(List<ListingInquiry> inquiries, boolean withMessages) {
+        if (inquiries == null || inquiries.isEmpty()) {
+            return List.of();
+        }
+        List<Long> inquiryIds = inquiries.stream().map(ListingInquiry::getId).filter(Objects::nonNull).toList();
+        List<Long> animalIds = inquiries.stream().map(ListingInquiry::getAnimalId).filter(Objects::nonNull).distinct().toList();
+        List<Long> adopterIds = inquiries.stream().map(ListingInquiry::getAdopterUserId).filter(Objects::nonNull).distinct().toList();
+
+        Map<Long, AnimalListingMeta> animalsById = new HashMap<>();
+        if (!animalIds.isEmpty()) {
+            for (AnimalListingMetaProjection meta : animalRepository.findListingMetaByIdIn(animalIds)) {
+                animalsById.put(
+                        meta.getId(),
+                        new AnimalListingMeta(meta.getName(), meta.getCoverImageUrl())
+                );
+            }
+        }
+        Map<Long, User> usersById = new HashMap<>();
+        for (User u : userRepository.findAllById(adopterIds)) {
+            usersById.put(u.getId(), u);
+        }
+
+        Set<Long> inquiryIdsWithMessages = new HashSet<>(
+                messageRepository.findInquiryIdsWithMessages(inquiryIds)
+        );
+
+        Map<Long, List<InquiryMessageDto>> messagesByInquiry = new HashMap<>();
+        if (withMessages) {
+            for (InquiryMessage msg : messageRepository.findByInquiryIdInOrderByCreatedAtAsc(inquiryIds)) {
+                messagesByInquiry
+                        .computeIfAbsent(msg.getInquiryId(), k -> new ArrayList<>())
+                        .add(toMessageDto(msg));
+            }
+        }
+
+        return inquiries.stream()
+                .map(inq -> {
+                    InquiryThreadDto dto = buildThreadDto(inq, animalsById, usersById, withMessages);
+                    boolean hasMsg = inquiryIdsWithMessages.contains(inq.getId());
+                    dto.setHasMessages(hasMsg);
+                    if (withMessages) {
+                        dto.setMessages(messagesByInquiry.getOrDefault(inq.getId(), List.of()));
+                    }
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private InquiryThreadDto buildThreadDto(
+            ListingInquiry inquiry,
+            Map<Long, AnimalListingMeta> animalsById,
+            Map<Long, User> usersById,
+            boolean includeAdoptionCase
+    ) {
+        InquiryThreadDto dto = new InquiryThreadDto();
+        dto.setId(inquiry.getId());
+        dto.setAnimalId(inquiry.getAnimalId());
+        dto.setListingCode(ListingCodeUtil.format(inquiry.getAnimalId()));
+        dto.setAdopterUserId(inquiry.getAdopterUserId());
+        dto.setOwnerUserId(inquiry.getOwnerUserId());
+        dto.setStatus(inquiry.getStatus());
+        dto.setInitialMessage(inquiry.getInitialMessage());
+        dto.setAdoptionRequestId(inquiry.getAdoptionRequestId());
+        dto.setMatchPercentageAtContact(inquiry.getMatchPercentageAtContact());
+        dto.setCreatedAt(inquiry.getCreatedAt());
+        dto.setUpdatedAt(inquiry.getUpdatedAt());
+
+        if (includeAdoptionCase) {
+            adoptionCaseRepository.findByInquiryId(inquiry.getId()).ifPresent(c -> dto.setAdoptionCaseId(c.getId()));
+        }
+
+        AnimalListingMeta animal = animalsById.get(inquiry.getAnimalId());
+        if (animal != null) {
+            dto.setAnimalName(animal.name());
+            if (animal.coverImageUrl() != null && !animal.coverImageUrl().isBlank()) {
+                dto.setAnimalImageUrl(animal.coverImageUrl());
+            }
+        }
+        User adopter = usersById.get(inquiry.getAdopterUserId());
+        if (adopter != null) {
+            dto.setAdopterName(adopter.getFullName());
+            dto.setAdopterEmail(adopter.getEmail());
+        }
+        return dto;
     }
 
     private InquiryThreadDto toThreadDto(ListingInquiry inquiry, boolean withMessages) {
@@ -386,4 +549,6 @@ public class InquiryService {
         }
         return t;
     }
+
+    private record AnimalListingMeta(String name, String coverImageUrl) {}
 }

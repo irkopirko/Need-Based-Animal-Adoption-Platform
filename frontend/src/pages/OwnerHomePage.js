@@ -13,14 +13,13 @@ import {
   normalizeRole
 } from "../utils/auth";
 import {
-  filterInquiriesForOpenDashboardListings,
-  filterOpenDashboardListings
-} from "../utils/listingDisplay";
-import {
-  countOwnerListingStatuses,
-  fetchOwnerListings,
-  loadOwnerEngagementState,
+  loadOwnerHomePanels,
+  loadOwnerHomeSummary,
   ownerListingImageUrls,
+  PAVIA_OWNER_ENGAGEMENT_UPDATED,
+  PAVIA_OWNER_HOME_SUMMARY_UPDATED,
+  readOwnerHomePanelsCache,
+  readOwnerHomeSummaryCache,
   resolveOwnerListingImageUrl
 } from "../utils/ownerJourney";
 
@@ -49,11 +48,39 @@ function inquiryTagClass(status) {
   return "owner-request-tag owner-request-tag-muted";
 }
 
+function initialSummaryForUser() {
+  const user = getStoredUser();
+  const uid = getResolvedUserId(user);
+  if (uid == null) {
+    return null;
+  }
+  return readOwnerHomeSummaryCache(uid);
+}
+
+function initialPanelsForUser() {
+  const uid = getResolvedUserId(getStoredUser());
+  if (uid == null) {
+    return { listings: [], inquiries: [], hasCache: false };
+  }
+  const cached = readOwnerHomePanelsCache(uid);
+  if (!cached) {
+    return { listings: [], inquiries: [], hasCache: false };
+  }
+  return {
+    listings: cached.listings || [],
+    inquiries: cached.inquiries || [],
+    hasCache: (cached.listings || []).length > 0
+  };
+}
+
 function OwnerHomePage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [listings, setListings] = useState([]);
-  const [inquiries, setInquiries] = useState([]);
+  const initialPanels = initialPanelsForUser();
+  const [panelsLoading, setPanelsLoading] = useState(!initialPanels.hasCache);
+  const [summary, setSummary] = useState(initialSummaryForUser);
+  const [summaryLoading, setSummaryLoading] = useState(() => !initialSummaryForUser());
+  const [listings, setListings] = useState(initialPanels.listings);
+  const [inquiries, setInquiries] = useState(initialPanels.inquiries);
   const apiBaseUrl = getApiBaseUrl();
 
   useEffect(() => {
@@ -88,69 +115,85 @@ function OwnerHomePage() {
       })
       .catch(() => {});
 
-    Promise.all([fetchOwnerListings(uid), loadOwnerEngagementState(uid)])
-      .then(([ownerListings, engagement]) => {
+    Promise.all([loadOwnerHomeSummary(uid), loadOwnerHomePanels(uid)])
+      .then(([summaryData, panelsData]) => {
         if (cancelled) {
           return;
         }
-        setListings(ownerListings);
-        setInquiries(engagement?.inquiries || []);
+        setSummary(summaryData);
+        setListings(panelsData.listings || []);
+        setInquiries(panelsData.inquiries || []);
       })
       .catch(() => {
         if (!cancelled) {
-          setListings([]);
-          setInquiries([]);
+          setSummary((prev) => prev || {
+            activeListings: 0,
+            pendingRequests: 0,
+            acceptedInquiries: 0,
+            adoptedCount: 0,
+            archivedCount: 0
+          });
+          if (!initialPanels.hasCache) {
+            setListings([]);
+            setInquiries([]);
+          }
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setLoading(false);
+          setSummaryLoading(false);
+          setPanelsLoading(false);
         }
       });
 
+    const onSummary = () => {
+      const cached = readOwnerHomeSummaryCache(uid);
+      if (cached) {
+        setSummary(cached);
+      }
+    };
+    const onEngagement = () => {
+      loadOwnerHomePanels(uid, { force: true })
+        .then((panels) => {
+          if (!cancelled) {
+            setListings(panels.listings || []);
+            setInquiries(panels.inquiries || []);
+          }
+        })
+        .catch(() => {});
+      loadOwnerHomeSummary(uid, { force: true })
+        .then((data) => {
+          if (!cancelled) {
+            setSummary(data);
+          }
+        })
+        .catch(() => {});
+    };
+
+    window.addEventListener(PAVIA_OWNER_HOME_SUMMARY_UPDATED, onSummary);
+    window.addEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, onEngagement);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(PAVIA_OWNER_HOME_SUMMARY_UPDATED, onSummary);
+      window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, onEngagement);
     };
   }, [apiBaseUrl, navigate]);
 
-  const activeListings = useMemo(
-    () => filterOpenDashboardListings(listings),
-    [listings]
-  );
-
-  const openInquiries = useMemo(
-    () => filterInquiriesForOpenDashboardListings(inquiries, listings),
-    [inquiries, listings]
-  );
-
-  const adoptedCount = useMemo(
-    () => countOwnerListingStatuses(listings).adopted,
-    [listings]
-  );
-
-  const previewListings = useMemo(() => activeListings.slice(0, 3), [activeListings]);
+  const previewListings = useMemo(() => (listings || []).slice(0, 3), [listings]);
 
   const previewInquiries = useMemo(() => {
-    return [...openInquiries]
+    return [...(inquiries || [])]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 3);
-  }, [openInquiries]);
+  }, [inquiries]);
 
-  const pendingCount = useMemo(
-    () =>
-      openInquiries.filter(
-        (item) => String(item.status || "").toUpperCase() === "PENDING"
-      ).length,
-    [openInquiries]
-  );
-
-  const completedCount = useMemo(
-    () =>
-      openInquiries.filter(
-        (item) => String(item.status || "").toUpperCase() === "ACCEPTED"
-      ).length,
-    [openInquiries]
-  );
+  const statValue = (key) => {
+    if (summaryLoading && !summary) {
+      return "—";
+    }
+    return summary?.[key] ?? 0;
+  };
 
   if (isOwnerProfileIncomplete(getStoredUser())) {
     return null;
@@ -185,7 +228,7 @@ function OwnerHomePage() {
             <div className="owner-hero-buttons">
               <button
                 type="button"
-                className="owner-primary-btn"
+                className="owner-primary-btn owner-hero-action-btn"
                 onClick={() => navigate("/register-animal")}
               >
                 Register New Animal
@@ -193,7 +236,7 @@ function OwnerHomePage() {
 
               <button
                 type="button"
-                className="owner-secondary-btn"
+                className="owner-secondary-btn owner-hero-action-btn"
                 onClick={() => navigate("/owner-requests")}
               >
                 Manage Requests
@@ -203,32 +246,44 @@ function OwnerHomePage() {
         </section>
 
         <section className="owner-summary-grid" aria-label="Overview">
-          <div className="owner-summary-card">
+          <button
+            type="button"
+            className="owner-summary-card owner-summary-card-link"
+            onClick={() => navigate("/owner-listings")}
+          >
             <div className="owner-summary-head">
               <span className="owner-summary-label">Active Listings</span>
               <span className="owner-summary-mini-dot" />
             </div>
-            <p className="owner-summary-value">{loading ? "—" : activeListings.length}</p>
+            <p className="owner-summary-value">{statValue("activeListings")}</p>
             <span className="owner-summary-note">Animals currently visible</span>
-          </div>
+          </button>
 
-          <div className="owner-summary-card">
+          <button
+            type="button"
+            className="owner-summary-card owner-summary-card-link"
+            onClick={() => navigate("/owner-requests?filter=pending")}
+          >
             <div className="owner-summary-head">
               <span className="owner-summary-label">Pending Requests</span>
               <span className="owner-summary-mini-dot" />
             </div>
-            <p className="owner-summary-value">{loading ? "—" : pendingCount}</p>
+            <p className="owner-summary-value">{statValue("pendingRequests")}</p>
             <span className="owner-summary-note">Waiting for owner review</span>
-          </div>
+          </button>
 
-          <div className="owner-summary-card">
+          <button
+            type="button"
+            className="owner-summary-card owner-summary-card-link"
+            onClick={() => navigate("/owner-requests?filter=accepted")}
+          >
             <div className="owner-summary-head">
               <span className="owner-summary-label">Accepted Inquiries</span>
               <span className="owner-summary-mini-dot" />
             </div>
-            <p className="owner-summary-value">{loading ? "—" : completedCount}</p>
+            <p className="owner-summary-value">{statValue("acceptedInquiries")}</p>
             <span className="owner-summary-note">Successfully accepted</span>
-          </div>
+          </button>
 
           <button
             type="button"
@@ -239,7 +294,7 @@ function OwnerHomePage() {
               <span className="owner-summary-label">Found their forever home</span>
               <span className="owner-summary-mini-dot owner-summary-dot-adopted" />
             </div>
-            <p className="owner-summary-value">{loading ? "—" : adoptedCount}</p>
+            <p className="owner-summary-value">{statValue("adoptedCount")}</p>
             <span className="owner-summary-note">Adopted listings · View all</span>
           </button>
         </section>
@@ -270,7 +325,7 @@ function OwnerHomePage() {
                 <span>Status</span>
               </div>
 
-              {loading ? (
+              {panelsLoading ? (
                 <p className="owner-panel-empty">Loading listings…</p>
               ) : previewListings.length === 0 ? (
                 <p className="owner-panel-empty">
@@ -332,7 +387,7 @@ function OwnerHomePage() {
             </div>
 
             <div className="owner-request-list">
-              {loading ? (
+              {panelsLoading ? (
                 <p className="owner-panel-empty">Loading requests…</p>
               ) : previewInquiries.length === 0 ? (
                 <p className="owner-panel-empty">No adoption requests yet.</p>

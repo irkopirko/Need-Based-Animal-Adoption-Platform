@@ -5,11 +5,11 @@ import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getApiBaseUrl, getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
 import OwnerInquiryThreadPanel from "../components/OwnerInquiryThreadPanel";
+import { STRONG_MATCH_THRESHOLD } from "../utils/adopterJourney";
 import {
   normalizeAnimalFromApi,
   fetchInquiriesForAnimal,
-  formatInquiryDate,
-  STRONG_MATCH_THRESHOLD
+  formatInquiryDate
 } from "../utils/ownerJourney";
 
 function AnimalOwnerRequestsPage() {

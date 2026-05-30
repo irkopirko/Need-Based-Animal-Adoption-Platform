@@ -1,9 +1,5 @@
 import { getApiBaseUrl } from "./auth";
-import {
-  fetchStrongMatchAnimals,
-  resolveMediaUrl,
-  STRONG_MATCH_THRESHOLD
-} from "./adopterJourney";
+import { resolveMediaUrl, STRONG_MATCH_THRESHOLD } from "./adopterJourney";
 import { fetchOwnerInquiries } from "./platformApi";
 import {
   filterInquiriesForOpenDashboardListings,
@@ -14,6 +10,221 @@ const INQUIRIES_KEY = "paviaOwnerInquiries";
 const THREADS_KEY = "paviaOwnerMessageThreads";
 
 export const PAVIA_OWNER_ENGAGEMENT_UPDATED = "paviaOwnerEngagementUpdated";
+export const PAVIA_OWNER_HOME_SUMMARY_UPDATED = "paviaOwnerHomeSummaryUpdated";
+
+const ENGAGEMENT_CACHE_MS = 45_000;
+const OWNER_HOME_SUMMARY_CACHE_MS = 120_000;
+const OWNER_HOME_SUMMARY_CACHE_VERSION = 1;
+const OWNER_REQUESTS_CACHE_MS = 45_000;
+const OWNER_LISTINGS_CACHE_MS = 90_000;
+const OWNER_INQUIRIES_CACHE_MS = 30_000;
+const OWNER_LISTINGS_CACHE_VERSION = 2;
+const OWNER_INQUIRIES_CACHE_VERSION = 1;
+let engagementCache = { ownerId: null, at: 0, data: null };
+let ownerRequestsCache = { ownerId: null, at: 0, data: null };
+
+function ownerHomeSummaryCacheKey(ownerId) {
+  return `paviaOwnerHomeSummary:v${OWNER_HOME_SUMMARY_CACHE_VERSION}:${ownerId}`;
+}
+
+function normalizeOwnerHomeSummary(data) {
+  return {
+    activeListings: Number(data?.activeListings) || 0,
+    pendingRequests: Number(data?.pendingRequests) || 0,
+    acceptedInquiries: Number(data?.acceptedInquiries) || 0,
+    adoptedCount: Number(data?.adoptedCount) || 0,
+    archivedCount: Number(data?.archivedCount) || 0
+  };
+}
+
+/** Instant read for owner home stat cards (sessionStorage). */
+export function readOwnerHomeSummaryCache(ownerId) {
+  if (ownerId == null || typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = sessionStorage.getItem(ownerHomeSummaryCacheKey(ownerId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.data || Date.now() - (parsed.at || 0) > OWNER_HOME_SUMMARY_CACHE_MS) {
+      return null;
+    }
+    return normalizeOwnerHomeSummary(parsed.data);
+  } catch {
+    return null;
+  }
+}
+
+export function writeOwnerHomeSummaryCache(ownerId, data) {
+  if (ownerId == null || typeof window === "undefined" || !data) {
+    return;
+  }
+  try {
+    sessionStorage.setItem(
+      ownerHomeSummaryCacheKey(ownerId),
+      JSON.stringify({ at: Date.now(), data: normalizeOwnerHomeSummary(data) })
+    );
+  } catch {
+    /* ignore quota */
+  }
+}
+
+export function invalidateOwnerHomeSummaryCache(ownerId) {
+  if (ownerId == null || typeof window === "undefined") {
+    return;
+  }
+  try {
+    sessionStorage.removeItem(ownerHomeSummaryCacheKey(ownerId));
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function fetchOwnerHomeSummary(ownerId) {
+  const oid = Number(ownerId);
+  if (!Number.isFinite(oid)) {
+    throw new Error("Missing or invalid owner id.");
+  }
+  const api = getApiBaseUrl();
+  const res = await fetch(
+    apiUrl(api, `/api/animals/owner/${oid}/dashboard-summary?viewerId=${oid}`)
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = `Summary request failed (${res.status}).`;
+    try {
+      const body = JSON.parse(text);
+      if (body?.error) {
+        msg = body.error;
+      }
+    } catch {
+      if (text?.trim()) {
+        msg = text.trim().slice(0, 200);
+      }
+    }
+    throw new Error(msg);
+  }
+  const data = normalizeOwnerHomeSummary(await res.json());
+  writeOwnerHomeSummaryCache(oid, data);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(PAVIA_OWNER_HOME_SUMMARY_UPDATED));
+  }
+  return data;
+}
+
+/** Fast counts for owner home; uses cache when available. */
+export async function loadOwnerHomeSummary(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+  if (!force) {
+    const cached = readOwnerHomeSummaryCache(oid);
+    if (cached) {
+      fetchOwnerHomeSummary(oid).catch(() => {});
+      return cached;
+    }
+  }
+  return fetchOwnerHomeSummary(oid);
+}
+
+export function invalidateOwnerEngagementCache(ownerId) {
+  if (ownerId == null || engagementCache.ownerId === Number(ownerId)) {
+    engagementCache = { ownerId: null, at: 0, data: null };
+  }
+  if (ownerId == null || ownerRequestsCache.ownerId === Number(ownerId)) {
+    ownerRequestsCache = { ownerId: null, at: 0, data: null };
+  }
+  invalidateOwnerHomeSummaryCache(ownerId);
+  if (ownerId != null && typeof window !== "undefined") {
+    try {
+      sessionStorage.removeItem(ownerListingsCacheKey(ownerId));
+      sessionStorage.removeItem(ownerInquiriesCacheKey(ownerId));
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function ownerListingsCacheKey(ownerId) {
+  return `paviaOwnerListingCards:v${OWNER_LISTINGS_CACHE_VERSION}:${ownerId}`;
+}
+
+function ownerInquiriesCacheKey(ownerId) {
+  return `paviaOwnerInquiriesApi:v${OWNER_INQUIRIES_CACHE_VERSION}:${ownerId}`;
+}
+
+export function readOwnerListingsCache(ownerId) {
+  if (ownerId == null || typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = sessionStorage.getItem(ownerListingsCacheKey(ownerId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.data || Date.now() - (parsed.at || 0) > OWNER_LISTINGS_CACHE_MS) {
+      return null;
+    }
+    return (Array.isArray(parsed.data) ? parsed.data : []).map(normalizeAnimalFromApi);
+  } catch {
+    return null;
+  }
+}
+
+export function readOwnerInquiriesCache(ownerId) {
+  if (ownerId == null || typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = sessionStorage.getItem(ownerInquiriesCacheKey(ownerId));
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed?.data || Date.now() - (parsed.at || 0) > OWNER_INQUIRIES_CACHE_MS) {
+      return null;
+    }
+    return Array.isArray(parsed.data) ? parsed.data : [];
+  } catch {
+    return null;
+  }
+}
+
+function writeOwnerListingsCache(ownerId, listings) {
+  if (ownerId == null || typeof window === "undefined") {
+    return;
+  }
+  try {
+    sessionStorage.setItem(
+      ownerListingsCacheKey(ownerId),
+      JSON.stringify({
+        at: Date.now(),
+        data: (listings || []).map(normalizeAnimalFromApi)
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function writeOwnerInquiriesCache(ownerId, inquiries) {
+  if (ownerId == null || typeof window === "undefined") {
+    return;
+  }
+  try {
+    sessionStorage.setItem(
+      ownerInquiriesCacheKey(ownerId),
+      JSON.stringify({
+        at: Date.now(),
+        data: Array.isArray(inquiries) ? inquiries : []
+      })
+    );
+  } catch {
+    /* ignore */
+  }
+}
 
 /** Same-origin safe when {@code getApiBaseUrl()} is {@code ""} (CRA {@code setupProxy}). */
 function apiUrl(apiBase, path) {
@@ -79,6 +290,7 @@ export function resolveOwnerListingImageUrl(path, apiBaseUrl) {
 }
 
 export function notifyOwnerEngagementUpdated() {
+  invalidateOwnerEngagementCache();
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent(PAVIA_OWNER_ENGAGEMENT_UPDATED));
   }
@@ -130,6 +342,147 @@ export async function fetchOwnerListings(ownerId) {
   const data = await res.json();
   const raw = Array.isArray(data) ? data : [];
   return raw.map(normalizeAnimalFromApi);
+}
+
+/** Lightweight owner listing cards (single SQL query). Falls back to full owner listings API. */
+export async function fetchOwnerListingCards(ownerId) {
+  const oid = Number(ownerId);
+  if (!Number.isFinite(oid)) {
+    throw new Error("Missing or invalid owner id.");
+  }
+  const api = getApiBaseUrl();
+  try {
+    const res = await fetch(
+      apiUrl(api, `/api/animals/owner/${oid}/cards?viewerId=${oid}`)
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const raw = Array.isArray(data) ? data : [];
+      return raw.map(normalizeAnimalFromApi);
+    }
+  } catch {
+    /* fall through to full listings API */
+  }
+  return fetchOwnerListings(oid);
+}
+
+export async function fetchOwnerListingCardsCached(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+  if (!force) {
+    const fresh = readOwnerListingsCache(oid);
+    if (fresh && fresh.length > 0) {
+      fetchOwnerListingCards(oid)
+        .then((rows) => writeOwnerListingsCache(oid, rows))
+        .catch(() => {});
+      return fresh;
+    }
+  }
+  let rows = [];
+  try {
+    rows = await fetchOwnerListingCards(oid);
+  } catch {
+    try {
+      rows = await fetchOwnerListings(oid);
+    } catch (err) {
+      throw err;
+    }
+  }
+  if (!Array.isArray(rows) || rows.length === 0) {
+    try {
+      const full = await fetchOwnerListings(oid);
+      if (Array.isArray(full) && full.length > 0) {
+        rows = full;
+      }
+    } catch {
+      /* keep cards result (possibly empty) */
+    }
+  }
+  writeOwnerListingsCache(oid, rows);
+  return rows;
+}
+
+export async function fetchOwnerInquiriesCached(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+  if (!force) {
+    const fresh = readOwnerInquiriesCache(oid);
+    if (fresh) {
+      fetchOwnerInquiries(oid)
+        .then((rows) => writeOwnerInquiriesCache(oid, rows))
+        .catch(() => {});
+      return fresh;
+    }
+  }
+  const rows = await fetchOwnerInquiries(oid);
+  writeOwnerInquiriesCache(oid, rows);
+  return rows;
+}
+
+function buildOwnerRequestsState(allNormalized, inquiriesRaw) {
+  const listings = filterOpenDashboardListings(allNormalized);
+  const inquiries = Array.isArray(inquiriesRaw) ? inquiriesRaw : [];
+  const openInquiries = filterInquiriesForOpenDashboardListings(inquiries, allNormalized);
+  const fromInquiries = listingsWithInquiries(listings, openInquiries);
+  const matchedListings = filterOpenDashboardListings(fromInquiries);
+  const hasAnyMessages = openInquiries.some(
+    (inq) =>
+      inq.hasMessages === true ||
+      (Array.isArray(inq.messages) && inq.messages.length > 0)
+  );
+  return {
+    listings,
+    allListings: allNormalized,
+    matchedListings,
+    inquiries: openInquiries,
+    hasListings: allNormalized.length > 0,
+    hasStrongMatchOnListings:
+      matchedListings.length > 0 || openInquiries.length > 0,
+    hasInquiries: openInquiries.length > 0,
+    hasAnyMessages
+  };
+}
+
+/** Active listings + open inquiries for owner home preview panels. */
+export function deriveOwnerHomePanels(allListings, inquiriesRaw) {
+  const allNormalized = (allListings || []).map(normalizeAnimalFromApi);
+  const inquiries = Array.isArray(inquiriesRaw) ? inquiriesRaw : [];
+  return {
+    listings: filterOpenDashboardListings(allNormalized),
+    inquiries: filterInquiriesForOpenDashboardListings(inquiries, allNormalized)
+  };
+}
+
+export function readOwnerHomePanelsCache(ownerId) {
+  const all = readOwnerListingsCache(ownerId);
+  const inquiries = readOwnerInquiriesCache(ownerId);
+  if ((!all || all.length === 0) && !inquiries) {
+    return null;
+  }
+  return deriveOwnerHomePanels(all || [], inquiries || []);
+}
+
+/** Cache-first load for owner home listing/request preview rows. */
+export async function loadOwnerHomePanels(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+  if (!force) {
+    const cached = readOwnerHomePanelsCache(oid);
+    if (cached && cached.listings?.length > 0) {
+      Promise.all([
+        fetchOwnerListingCardsCached(oid),
+        fetchOwnerInquiriesCached(oid)
+      ])
+        .then(([listings, inquiries]) => deriveOwnerHomePanels(listings, inquiries))
+        .catch(() => {});
+      return cached;
+    }
+  }
+  const [listings, inquiries] = await Promise.all([
+    fetchOwnerListingCardsCached(oid, { force }),
+    fetchOwnerInquiriesCached(oid, { force })
+  ]);
+  return deriveOwnerHomePanels(listings, inquiries);
 }
 
 export function normalizeListingStatusKey(status) {
@@ -290,44 +643,73 @@ export function resolveOwnerScenario(state) {
   return "FULL";
 }
 
-export async function loadOwnerEngagementState(ownerId) {
-  const animals = await fetchAllAnimals();
-  const allListings = filterListingsForOwner(animals, ownerId);
-  const listings = filterOpenDashboardListings(allListings);
-  let inquiries = [];
-  try {
-    const fromApi = await fetchOwnerInquiries(ownerId);
-    inquiries = Array.isArray(fromApi) ? fromApi : [];
-  } catch {
-    inquiries = [];
+async function fetchOwnerDashboard(ownerId) {
+  const oid = Number(ownerId);
+  if (!Number.isFinite(oid)) {
+    throw new Error("Missing or invalid owner id.");
   }
+  const api = getApiBaseUrl();
+  const res = await fetch(
+    apiUrl(api, `/api/animals/owner/${oid}/dashboard?viewerId=${oid}`)
+  );
+  if (!res.ok) {
+    const text = await res.text();
+    let msg = `Dashboard request failed (${res.status}).`;
+    try {
+      const body = JSON.parse(text);
+      if (body?.error) {
+        msg = body.error;
+      }
+    } catch {
+      if (text?.trim()) {
+        msg = text.trim().slice(0, 200);
+      }
+    }
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+export async function loadOwnerEngagementState(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+  const now = Date.now();
+
+  if (
+    !force &&
+    engagementCache.ownerId === oid &&
+    engagementCache.data &&
+    now - engagementCache.at < ENGAGEMENT_CACHE_MS
+  ) {
+    return engagementCache.data;
+  }
+
+  const dashboard = await fetchOwnerDashboard(oid);
+  const allListings = (dashboard.listings || []).map(normalizeAnimalFromApi);
+  const listings = filterOpenDashboardListings(allListings);
+  const inquiries = Array.isArray(dashboard.inquiries) ? dashboard.inquiries : [];
   const openInquiries = filterInquiriesForOpenDashboardListings(inquiries, allListings);
 
+  const strongIdSet = new Set(
+    (dashboard.strongMatchListingIds || [])
+      .map((id) => Number(id))
+      .filter(Number.isFinite)
+  );
+  const fromSnapshots = listings.filter((l) => strongIdSet.has(Number(l.id)));
   const fromInquiries = listingsWithInquiries(listings, openInquiries);
-  let fromSnapshots = [];
-  try {
-    fromSnapshots = await fetchOwnerStrongMatchListings(ownerId, listings);
-  } catch {
-    fromSnapshots = [];
-  }
-
   let matchedListings = mergeOwnerListingsById(fromInquiries, fromSnapshots);
   matchedListings = filterOpenDashboardListings(matchedListings);
-  let strongMatches = [];
-
-  if (matchedListings.length === 0) {
-    strongMatches = await fetchStrongMatchAnimals();
-    matchedListings = ownerListingsInStrongMatches(listings, strongMatches);
-  }
 
   const hasAnyMessages = openInquiries.some(
-    (inq) => Array.isArray(inq.messages) && inq.messages.length > 0
+    (inq) =>
+      inq.hasMessages === true ||
+      (Array.isArray(inq.messages) && inq.messages.length > 0)
   );
 
-  return {
+  const result = {
     listings,
     allListings,
-    strongMatches,
+    strongMatches: fromSnapshots,
     matchedListings,
     inquiries: openInquiries,
     hasListings: listings.length > 0,
@@ -336,6 +718,70 @@ export async function loadOwnerEngagementState(ownerId) {
     hasInquiries: openInquiries.length > 0,
     hasAnyMessages
   };
+
+  engagementCache = { ownerId: oid, at: now, data: result };
+  return result;
+}
+
+/**
+ * Lighter load for manage-requests: parallel listings + inquiries, no strong-match scan.
+ */
+export async function loadOwnerRequestsState(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+  const now = Date.now();
+
+  if (
+    !force &&
+    ownerRequestsCache.ownerId === oid &&
+    ownerRequestsCache.data &&
+    now - ownerRequestsCache.at < OWNER_REQUESTS_CACHE_MS
+  ) {
+    return ownerRequestsCache.data;
+  }
+
+  const [allListings, inquiriesRaw] = await Promise.all([
+    fetchOwnerListingCardsCached(oid, { force }),
+    fetchOwnerInquiriesCached(oid, { force })
+  ]);
+  const allNormalized = (allListings || []).map(normalizeAnimalFromApi);
+  const result = buildOwnerRequestsState(allNormalized, inquiriesRaw);
+
+  ownerRequestsCache = { ownerId: oid, at: now, data: result };
+  return result;
+}
+
+/** Cache-first parallel load for owner messages / requests pages. */
+export async function loadOwnerInboxState(ownerId, options = {}) {
+  const oid = Number(ownerId);
+  const force = options.force === true;
+
+  if (!force) {
+    const mem = ownerRequestsCache;
+    if (mem.ownerId === oid && mem.data && Date.now() - mem.at < OWNER_REQUESTS_CACHE_MS) {
+      return mem.data;
+    }
+    const cachedListings = readOwnerListingsCache(oid);
+    const cachedInquiries = readOwnerInquiriesCache(oid);
+    if (cachedListings || cachedInquiries) {
+      const snapshot = buildOwnerRequestsState(
+        cachedListings || [],
+        cachedInquiries || []
+      );
+      Promise.all([
+        fetchOwnerListingCardsCached(oid, { force: false }),
+        fetchOwnerInquiriesCached(oid, { force: false })
+      ])
+        .then(([listings, inquiries]) => {
+          const next = buildOwnerRequestsState(listings, inquiries);
+          ownerRequestsCache = { ownerId: oid, at: Date.now(), data: next };
+        })
+        .catch(() => {});
+      return snapshot;
+    }
+  }
+
+  return loadOwnerRequestsState(oid, { force });
 }
 
 /** Inquiries for one listing from the database (owner/shelter ↔ adopter threads). */

@@ -2,13 +2,16 @@ package com.adoptionplatform.backend.service;
 
 import com.adoptionplatform.backend.config.UploadRootHolder;
 import com.adoptionplatform.backend.dto.AnimalRequest;
+import com.adoptionplatform.backend.dto.OwnerListingCardDto;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.entity.AnimalImage;
 import com.adoptionplatform.backend.entity.Role;
 import com.adoptionplatform.backend.entity.SavedAnimal;
 import com.adoptionplatform.backend.entity.User;
+import com.adoptionplatform.backend.repository.AnimalDetailProjection;
 import com.adoptionplatform.backend.repository.AnimalImageRepository;
 import com.adoptionplatform.backend.repository.AnimalRepository;
+import com.adoptionplatform.backend.repository.OwnerListingCardProjection;
 import com.adoptionplatform.backend.repository.MatchSnapshotRepository;
 import com.adoptionplatform.backend.repository.SavedAnimalRepository;
 import com.adoptionplatform.backend.repository.UserRepository;
@@ -59,6 +62,7 @@ public class AnimalService {
     private final UserRepository userRepository;
     private final SavedAnimalRepository savedAnimalRepository;
     private final MatchSnapshotRepository matchSnapshotRepository;
+    private final MatchSnapshotService matchSnapshotService;
     private final EmailService emailService;
     private final JdbcTemplate jdbcTemplate;
     private final EntityManager entityManager;
@@ -71,6 +75,7 @@ public class AnimalService {
             UserRepository userRepository,
             SavedAnimalRepository savedAnimalRepository,
             MatchSnapshotRepository matchSnapshotRepository,
+            MatchSnapshotService matchSnapshotService,
             EmailService emailService,
             JdbcTemplate jdbcTemplate,
             EntityManager entityManager,
@@ -82,6 +87,7 @@ public class AnimalService {
         this.userRepository = userRepository;
         this.savedAnimalRepository = savedAnimalRepository;
         this.matchSnapshotRepository = matchSnapshotRepository;
+        this.matchSnapshotService = matchSnapshotService;
         this.emailService = emailService;
         this.jdbcTemplate = jdbcTemplate;
         this.entityManager = entityManager;
@@ -130,9 +136,138 @@ public class AnimalService {
         return list;
     }
 
+    @Transactional(readOnly = true)
+    public List<OwnerListingCardDto> listOwnerListingCardsForOwner(Long ownerId, Long viewerId) {
+        if (ownerId == null || viewerId == null) {
+            throw new IllegalArgumentException("Owner id and viewer id are required");
+        }
+        if (!ownerId.equals(viewerId)) {
+            throw new IllegalArgumentException("You can only load your own listings");
+        }
+        userRepository.findById(ownerId)
+                .orElseThrow(() -> new IllegalArgumentException("Owner not found"));
+        List<OwnerListingCardDto> out = new ArrayList<>();
+        for (OwnerListingCardProjection row : animalRepository.findOwnerListingCards(ownerId)) {
+            out.add(toOwnerListingCardDto(row));
+        }
+        return out;
+    }
+
+    private static OwnerListingCardDto toOwnerListingCardDto(OwnerListingCardProjection row) {
+        OwnerListingCardDto dto = new OwnerListingCardDto();
+        dto.setId(row.getId());
+        dto.setOwnerId(row.getOwnerId());
+        dto.setName(row.getName());
+        dto.setAnimalType(row.getAnimalType());
+        dto.setBreed(row.getBreed());
+        dto.setAgeGroup(row.getAgeGroup());
+        dto.setSize(row.getSize());
+        dto.setEnergyLevel(row.getEnergyLevel());
+        dto.setGroomingNeed(row.getGroomingNeed());
+        dto.setSpecialNeeds(row.getSpecialNeeds());
+        dto.setGoodWithChildren(row.getGoodWithChildren());
+        dto.setGoodWithPets(row.getGoodWithPets());
+        dto.setDescription(row.getDescription());
+        dto.setListingStatus(row.getListingStatus());
+        dto.setGender(row.getGender());
+        dto.setHousingLocation(row.getHousingLocation());
+        dto.setRegisterTime(row.getRegisterTime());
+        dto.setImages(decodePackedImageUrls(row.getImageUrlsPacked()));
+        return dto;
+    }
+
+    private static List<String> decodePackedImageUrls(String packed) {
+        if (packed == null || packed.isBlank()) {
+            return List.of();
+        }
+        List<String> out = new ArrayList<>();
+        for (String part : packed.split("\u001e")) {
+            if (part != null && !part.isBlank()) {
+                out.add(part.trim());
+            }
+        }
+        return out;
+    }
+
     public Animal getAnimalById(Long id) {
-        return animalRepository.findById(id)
+        AnimalDetailProjection row = animalRepository.findListingDetailById(id)
                 .orElseThrow(() -> new RuntimeException("Animal not found with id: " + id));
+        Animal animal = animalFromDetailProjection(row);
+        if (row.getOwnerId() != null) {
+            animal.setOwner(entityManager.getReference(User.class, row.getOwnerId()));
+        }
+        return animal;
+    }
+
+    private static Animal animalFromDetailProjection(AnimalDetailProjection row) {
+        Animal animal = new Animal();
+        animal.setId(row.getId());
+        animal.setName(row.getName());
+        animal.setAnimalType(row.getAnimalType());
+        animal.setBreed(row.getBreed());
+        animal.setAgeGroup(row.getAgeGroup());
+        animal.setSize(row.getSize());
+        animal.setEnergyLevel(row.getEnergyLevel());
+        animal.setGroomingNeed(row.getGroomingNeed());
+        animal.setSpecialNeeds(row.getSpecialNeeds());
+        animal.setGoodWithChildren(row.getGoodWithChildren());
+        animal.setGoodWithPets(row.getGoodWithPets());
+        animal.setDescription(row.getDescription());
+        animal.setListingStatus(row.getListingStatus());
+        animal.setGender(row.getGender());
+        animal.setHousingLocation(row.getHousingLocation());
+        animal.setRegisterTime(row.getRegisterTime());
+        animal.setCompatibilityScore(row.getCompatibilityScore());
+        animal.setImages(decodePackedImageUrls(row.getImageUrlsPacked()));
+        return animal;
+    }
+
+    @Transactional(readOnly = true)
+    public com.adoptionplatform.backend.dto.AdopterAnimalViewDto getAdopterAnimalView(
+            Long animalId,
+            Long adopterUserId,
+            Long adoptionRequestId
+    ) {
+        Animal animal = getAnimalById(animalId);
+        com.adoptionplatform.backend.dto.AdopterAnimalViewDto view =
+                new com.adoptionplatform.backend.dto.AdopterAnimalViewDto();
+        view.setAnimal(animal);
+        if (adopterUserId == null) {
+            return view;
+        }
+        Long requestId = adoptionRequestId;
+        if (requestId == null) {
+            return view;
+        }
+        matchSnapshotRepository
+                .findByAdopterUserIdAndAnimalIdAndAdoptionRequestId(adopterUserId, animalId, requestId)
+                .ifPresent(snap -> {
+                    view.setMatchPercentage(snap.getMatchPercentage());
+                    view.setMatchReasons(decodeSnapshotReasons(snap.getMatchReasonsJson()));
+                });
+        if (view.getMatchPercentage() == null) {
+            Double cached = animal.getCompatibilityScore();
+            if (cached != null) {
+                view.setMatchPercentage(cached);
+            }
+        }
+        return view;
+    }
+
+    private static List<String> decodeSnapshotReasons(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new ArrayList<>();
+        }
+        if (raw.startsWith("[")) {
+            return new ArrayList<>();
+        }
+        List<String> out = new ArrayList<>();
+        for (String part : raw.split("\u001e")) {
+            if (part != null && !part.isBlank()) {
+                out.add(part.trim());
+            }
+        }
+        return out;
     }
 
     public Animal saveAnimal(Animal animal) {
@@ -181,7 +316,10 @@ public class AnimalService {
     public Animal markListingAdopted(Long id, Long viewerId) {
         Animal animal = assertAnimalOwnedBy(id, viewerId);
         animal.setListingStatus("ADOPTED");
-        return animalRepository.save(animal);
+        animal.setCompatibilityScore(null);
+        Animal saved = animalRepository.save(animal);
+        matchSnapshotRepository.deleteByAnimalId(saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -586,7 +724,9 @@ public class AnimalService {
         reconcileImageUrls(existingAnimal, updatedAnimal.getImages());
         existingAnimal.setOwner(ownerKeep);
 
-        return animalRepository.save(existingAnimal);
+        Animal saved = animalRepository.save(existingAnimal);
+        matchSnapshotService.refreshSnapshotsForAnimal(saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -773,7 +913,7 @@ public class AnimalService {
             try {
                 emailService.sendOwnerListingDeletedNotice(email.trim(), animalName);
             } catch (RuntimeException ex) {
-                // deletion succeeds even if the email delivery fails.
+                // Deletion succeeds even if email delivery fails.
             }
         });
     }

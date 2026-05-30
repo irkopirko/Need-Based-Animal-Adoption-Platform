@@ -4,19 +4,27 @@ import "./OwnerMessagesPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getResolvedUserId, getStoredUser, normalizeRole } from "../utils/auth";
+import { STRONG_MATCH_THRESHOLD } from "../utils/adopterJourney";
 import {
-  loadOwnerEngagementState,
+  loadOwnerInboxState,
   normalizeAnimalFromApi,
   resolveOwnerScenario,
   formatInquiryDate,
   getInquiryPreviewFromMessages,
   PAVIA_OWNER_ENGAGEMENT_UPDATED,
-  STRONG_MATCH_THRESHOLD,
+  readOwnerInquiriesCache,
+  readOwnerListingsCache,
   resolveOwnerListingImageUrl
 } from "../utils/ownerJourney";
 import { getApiBaseUrl } from "../utils/auth";
 import OwnerListingPicker from "../components/OwnerListingPicker";
 import OwnerInquiryThreadPanel from "../components/OwnerInquiryThreadPanel";
+import { updateNavbarStateForUser } from "../utils/navbarState";
+import {
+  countUnreadThreads,
+  hasUnreadInThread,
+  markThreadRead
+} from "../utils/messageReadState";
 
 function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onSecondary }) {
   return (
@@ -49,7 +57,15 @@ function Gate({ badge, title, body, primaryLabel, onPrimary, secondaryLabel, onS
 function OwnerMessagesPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [loading, setLoading] = useState(true);
+  const user = getStoredUser();
+  const ownerId = getResolvedUserId(user);
+  const apiBase = getApiBaseUrl();
+  const [loading, setLoading] = useState(() => {
+    if (ownerId == null) {
+      return true;
+    }
+    return !readOwnerInquiriesCache(ownerId) && !readOwnerListingsCache(ownerId);
+  });
   const [scenario, setScenario] = useState("NO_LISTINGS");
   const [inquiries, setInquiries] = useState([]);
   const [listings, setListings] = useState([]);
@@ -58,10 +74,6 @@ function OwnerMessagesPage() {
   const [selectedChatId, setSelectedChatId] = useState(null);
   const [focusedAnimal, setFocusedAnimal] = useState(null);
   const [focusedAnimalError, setFocusedAnimalError] = useState(false);
-
-  const user = getStoredUser();
-  const ownerId = getResolvedUserId(user);
-  const apiBase = getApiBaseUrl();
 
   const focusedAnimalId = useMemo(() => {
     const raw = searchParams.get("animalId");
@@ -78,9 +90,13 @@ function OwnerMessagesPage() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const cachedInquiries = readOwnerInquiriesCache(ownerId);
+    const cachedListings = readOwnerListingsCache(ownerId);
+    if (!cachedInquiries && !cachedListings) {
+      setLoading(true);
+    }
     try {
-      const data = await loadOwnerEngagementState(ownerId);
+      const data = await loadOwnerInboxState(ownerId, { force: false });
       const scen = resolveOwnerScenario({
         hasListings: data.hasListings,
         hasStrongMatchOnListings: data.hasStrongMatchOnListings,
@@ -90,9 +106,11 @@ function OwnerMessagesPage() {
       setScenario(scen);
       const list = Array.isArray(data.inquiries) ? data.inquiries : [];
       setInquiries(list);
-      setListings(data.listings || []);
+      setListings(data.allListings || data.listings || []);
       setMatchedListings(
-        data.matchedListings?.length ? data.matchedListings : data.listings || []
+        data.matchedListings?.length
+          ? data.matchedListings
+          : data.allListings || data.listings || []
       );
 
       if (focusedAnimalId != null) {
@@ -122,6 +140,8 @@ function OwnerMessagesPage() {
           setSelectedListingId(null);
         }
       }
+      const unreadCount = countUnreadThreads("OWNER", ownerId, list);
+      updateNavbarStateForUser(ownerId, { ownerUnreadMessages: unreadCount });
     } catch (e) {
       console.error(e);
       setScenario("NO_LISTINGS");
@@ -193,12 +213,40 @@ function OwnerMessagesPage() {
   useEffect(() => {
     if (filteredInquiries.length === 0) {
       setSelectedChatId(null);
+      if (ownerId != null) {
+        updateNavbarStateForUser(ownerId, { ownerUnreadMessages: 0 });
+      }
       return;
     }
     if (!filteredInquiries.some((i) => i.id === selectedChatId)) {
       setSelectedChatId(filteredInquiries[0]?.id ?? null);
     }
-  }, [filteredInquiries, selectedChatId]);
+    if (ownerId != null) {
+      const unread = countUnreadThreads(
+        "OWNER",
+        ownerId,
+        filteredInquiries.filter((i) => Number(i.id) !== Number(selectedChatId))
+      );
+      updateNavbarStateForUser(ownerId, { ownerUnreadMessages: unread });
+    }
+  }, [filteredInquiries, selectedChatId, ownerId]);
+
+  useEffect(() => {
+    if (ownerId == null || selectedChatId == null) {
+      return;
+    }
+    const selected = inquiries.find((inq) => Number(inq.id) === Number(selectedChatId));
+    if (!selected) {
+      return;
+    }
+    markThreadRead("OWNER", ownerId, selected.id, selected.updatedAt);
+    const unread = countUnreadThreads(
+      "OWNER",
+      ownerId,
+      inquiries.filter((inq) => Number(inq.id) !== Number(selectedChatId))
+    );
+    updateNavbarStateForUser(ownerId, { ownerUnreadMessages: unread });
+  }, [ownerId, selectedChatId, inquiries]);
 
   const conversations = useMemo(
     () =>
@@ -330,10 +378,9 @@ function OwnerMessagesPage() {
               </>
             ) : (
               <>
-                <h1>Inbox — adopter message requests</h1>
+                <h1>Message inbox</h1>
                 <p>
-                  Choose a matching listing (≥ {STRONG_MATCH_THRESHOLD}% compatibility), open a
-                  request, review the adoption profile, approve if you want to chat, and reply here.
+                  Open a request, approve it, then chat. Replies are only available after approval.
                 </p>
               </>
             )}
@@ -380,7 +427,14 @@ function OwnerMessagesPage() {
                   </p>
                 </div>
               ) : (
-                conversations.map((c) => (
+                conversations.map((c) => {
+                  const source = filteredInquiries.find((inq) => Number(inq.id) === Number(c.id));
+                  const unread =
+                    source != null
+                      ? hasUnreadInThread("OWNER", ownerId, source) &&
+                        Number(selectedChatId) !== Number(c.id)
+                      : false;
+                  return (
                   <button
                     key={c.id}
                     type="button"
@@ -403,7 +457,15 @@ function OwnerMessagesPage() {
                     )}
                     <div className="owner-conversation-content">
                       {c.listingCode && (
-                        <p className="owner-conversation-listing-id">{c.listingCode}</p>
+                        <p className="owner-conversation-listing-id">
+                          {c.listingCode}
+                          {unread ? (
+                            <span
+                              className="owner-conversation-unread-dot"
+                              aria-label="Unread messages"
+                            />
+                          ) : null}
+                        </p>
                       )}
                       <h3>{c.adopterName}</h3>
                       <p className="owner-conversation-adopter-line">
@@ -414,7 +476,8 @@ function OwnerMessagesPage() {
                     </div>
                     <span className="owner-conversation-time">{c.time}</span>
                   </button>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

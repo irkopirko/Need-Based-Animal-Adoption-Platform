@@ -82,6 +82,7 @@ export function buildAdoptionProfileSections(request) {
         ["Preferred energy", listVal(request.preferredEnergyLevels)],
         ["Preferred age ranges", listVal(request.preferredAgeRanges)],
         ["Preferred sizes", listVal(request.preferredSizes)],
+        ["Preferred gender", listVal(request.preferredGenders)],
         ["Grooming tolerance", val(request.groomingTolerance)],
         ["Special needs acceptance", val(request.specialNeedsAcceptance)]
       ]

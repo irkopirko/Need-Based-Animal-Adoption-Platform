@@ -1,8 +1,11 @@
 package com.adoptionplatform.backend.controller;
 
 import com.adoptionplatform.backend.dto.AnimalRequest;
+import com.adoptionplatform.backend.dto.OwnerDashboardDto;
+import com.adoptionplatform.backend.dto.OwnerDashboardSummaryDto;
 import com.adoptionplatform.backend.entity.Animal;
 import com.adoptionplatform.backend.service.AnimalService;
+import com.adoptionplatform.backend.service.OwnerDashboardService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,9 +32,61 @@ public class AnimalController {
     private static final Logger log = LoggerFactory.getLogger(AnimalController.class);
 
     private final AnimalService animalService;
+    private final OwnerDashboardService ownerDashboardService;
 
-    public AnimalController(AnimalService animalService) {
+    public AnimalController(AnimalService animalService, OwnerDashboardService ownerDashboardService) {
         this.animalService = animalService;
+        this.ownerDashboardService = ownerDashboardService;
+    }
+
+    @GetMapping("/owner/{ownerId}/dashboard-summary")
+    public ResponseEntity<?> ownerDashboardSummary(
+            @PathVariable Long ownerId,
+            @RequestParam("viewerId") Long viewerId
+    ) {
+        try {
+            OwnerDashboardSummaryDto summary = ownerDashboardService.loadSummary(ownerId, viewerId);
+            return ResponseEntity.ok(summary);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            log.error("ownerDashboardSummary failed ownerId={} viewerId={}", ownerId, viewerId, ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Could not load owner dashboard summary."));
+        }
+    }
+
+    @GetMapping("/owner/{ownerId}/dashboard")
+    public ResponseEntity<?> ownerDashboard(
+            @PathVariable Long ownerId,
+            @RequestParam("viewerId") Long viewerId
+    ) {
+        try {
+            OwnerDashboardDto dashboard = ownerDashboardService.loadDashboard(ownerId, viewerId);
+            return ResponseEntity.ok(dashboard);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            log.error("ownerDashboard failed ownerId={} viewerId={}", ownerId, viewerId, ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Could not load owner dashboard."));
+        }
+    }
+
+    @GetMapping("/owner/{ownerId}/cards")
+    public ResponseEntity<?> listOwnerCards(
+            @PathVariable Long ownerId,
+            @RequestParam("viewerId") Long viewerId
+    ) {
+        try {
+            return ResponseEntity.ok(animalService.listOwnerListingCardsForOwner(ownerId, viewerId));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
+        } catch (Exception ex) {
+            log.error("listOwnerCards failed ownerId={} viewerId={}", ownerId, viewerId, ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Could not load owner listing cards."));
+        }
     }
 
     /**
@@ -124,6 +179,19 @@ public class AnimalController {
     @GetMapping("/{id}")
     public Animal getAnimalById(@PathVariable Long id) {
         return animalService.getAnimalById(id);
+    }
+
+    @GetMapping("/{id}/adopter-view")
+    public ResponseEntity<?> getAdopterAnimalView(
+            @PathVariable Long id,
+            @RequestParam Long adopterUserId,
+            @RequestParam(required = false) Long requestId
+    ) {
+        try {
+            return ResponseEntity.ok(animalService.getAdopterAnimalView(id, adopterUserId, requestId));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
+        }
     }
 
     /**

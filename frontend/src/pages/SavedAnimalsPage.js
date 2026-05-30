@@ -61,7 +61,10 @@ function SavedAnimalsPage() {
 
     try {
       const apiBaseUrl = getApiBaseUrl();
-      const requests = await fetchUserAdoptionRequests(uid);
+      const [requests, entries] = await Promise.all([
+        fetchUserAdoptionRequests(uid),
+        fetchSavedAnimalEntries(uid)
+      ]);
       const { hasSubmitted, hasDraft } = summarizeAdoptionRequests(requests);
       const submitted = requests.filter(
         (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
@@ -87,7 +90,6 @@ function SavedAnimalsPage() {
         return;
       }
 
-      const entries = await fetchSavedAnimalEntries(uid);
       setSavedEntries(entries);
 
       const ridParam =
@@ -138,8 +140,7 @@ function SavedAnimalsPage() {
       );
 
       if (merged.length === 0) {
-        const anyMatches = await fetchStrongMatchAnimals(uid, ridParam);
-        setScenario(anyMatches.length === 0 ? "SUBMITTED_NO_MATCHES" : "READY_EMPTY");
+        setScenario(matches.length === 0 ? "SUBMITTED_NO_MATCHES" : "READY_EMPTY");
         setRequestGroup({
           requestId: ridParam,
           request: selectedRequest,

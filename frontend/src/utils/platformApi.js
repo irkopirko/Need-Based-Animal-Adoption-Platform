@@ -1,4 +1,8 @@
 import { getApiBaseUrl } from "./auth";
+import {
+  invalidateAdopterHomeSummaryCache,
+  invalidateSavedAnimalEntriesCache
+} from "./adopterJourney";
 
 function apiUrl(path) {
   const base = (getApiBaseUrl() || "").replace(/\/$/, "");
@@ -13,6 +17,22 @@ async function parseJson(res) {
     throw new Error(msg);
   }
   return data;
+}
+
+/** Shared fetch wrapper for consistent headers and JSON error parsing. */
+export async function apiFetch(path, options = {}) {
+  const headers = {
+    ...(options.body != null && !(options.headers || {})["Content-Type"]
+      ? { "Content-Type": "application/json" }
+      : {}),
+    ...(options.headers || {})
+  };
+  const res = await fetch(apiUrl(path), { ...options, headers });
+  return res;
+}
+
+export async function apiFetchJson(path, options = {}) {
+  return parseJson(await apiFetch(path, options));
 }
 
 export async function submitListingReport({
@@ -73,10 +93,14 @@ export async function saveAnimalForUser(userId, animalId, adoptionRequestId = nu
   }
   const res = await fetch(apiUrl(`/api/saved?${params.toString()}`), { method: "POST" });
   if (res.ok) {
+    invalidateAdopterHomeSummaryCache(userId);
+    invalidateSavedAnimalEntriesCache(userId);
     return res.text();
   }
   const body = await res.text();
   if (res.status === 400 && body.includes("Already saved")) {
+    invalidateAdopterHomeSummaryCache(userId);
+    invalidateSavedAnimalEntriesCache(userId);
     return body;
   }
   throw new Error(body || `Save failed (${res.status})`);
@@ -88,6 +112,8 @@ export async function unsaveAnimalForUser(userId, animalId) {
     { method: "DELETE" }
   );
   if (res.ok) {
+    invalidateAdopterHomeSummaryCache(userId);
+    invalidateSavedAnimalEntriesCache(userId);
     return res.text();
   }
   const body = await res.text();

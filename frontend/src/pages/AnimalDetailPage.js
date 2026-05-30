@@ -11,9 +11,13 @@ import ListingPhotoFrame from "../components/ListingPhotoFrame";
 import SaveHeartButton from "../components/SaveHeartButton";
 import { usePopup } from "../components/PopupProvider";
 import {
-  STRONG_MATCH_THRESHOLD,
+  fetchAdopterAnimalView,
+  findAnimalInBrowseCaches,
+  loadAnimalDetail,
+  readAnimalDetailCache,
   resolveMediaUrl,
-  fetchStrongMatchAnimals
+  STRONG_MATCH_THRESHOLD,
+  writeAnimalDetailCache
 } from "../utils/adopterJourney";
 import {
   getApiBaseUrl,
@@ -21,6 +25,7 @@ import {
   getStoredUser,
   normalizeRole
 } from "../utils/auth";
+import { readOwnerListingsCache } from "../utils/ownerJourney";
 import {
   deleteOwnerListing,
   fetchSavedAnimalIds,
@@ -36,6 +41,31 @@ function titleCase(value) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+function seedAnimalForDetail(animalId, viewerUserId, role) {
+  const aid = Number(animalId);
+  if (!Number.isFinite(aid)) {
+    return null;
+  }
+  const cached = readAnimalDetailCache(aid);
+  if (cached) {
+    return cached;
+  }
+  if (normalizeRole(role) === "ADOPTER") {
+    const fromBrowse = findAnimalInBrowseCaches(aid, viewerUserId);
+    if (fromBrowse) {
+      return fromBrowse;
+    }
+  }
+  if (viewerUserId != null) {
+    const list = readOwnerListingsCache(viewerUserId);
+    const hit = (list || []).find((a) => Number(a.id) === aid);
+    if (hit) {
+      return hit;
+    }
+  }
+  return null;
+}
+
 function AnimalDetailPage() {
   const user = getStoredUser();
   const { id } = useParams();
@@ -43,57 +73,81 @@ function AnimalDetailPage() {
   const requestIdFromUrl = searchParams.get("requestId");
   const navigate = useNavigate();
   const { showPopup, showConfirm } = usePopup();
+  const viewerUid = getResolvedUserId(user);
+  const role = normalizeRole(user?.role);
+  const initialAnimal = seedAnimalForDetail(id, viewerUid, role);
 
-  const [animal, setAnimal] = useState(null);
+  const [animal, setAnimal] = useState(initialAnimal);
+  const [detailLoading, setDetailLoading] = useState(!initialAnimal);
   const [imageIndex, setImageIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
-  const role = normalizeRole(user?.role);
   const isOwner = role === "OWNER";
   const isAdopter = role === "ADOPTER";
   const isAdmin = role === "ADMIN";
   const fromAdmin = searchParams.get("from") === "admin";
-  const viewerUid = getResolvedUserId(user);
   const adopterUid = viewerUid;
 
   useEffect(() => {
-    const fetchAnimal = async () => {
-      try {
-        const api = getApiBaseUrl();
-        const response = await fetch(`${api}/api/animals/${id}`);
-        const data = await response.json();
-        let merged = { ...data };
+    let cancelled = false;
 
-        if (isAdopter && adopterUid != null) {
-          const rid =
-            requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
-              ? Number(requestIdFromUrl)
-              : null;
-          try {
-            const matches = await fetchStrongMatchAnimals(adopterUid, rid);
-            const row = matches.find((m) => Number(m.id) === Number(data.id));
-            if (row?.compatibilityScore != null) {
-              merged = {
-                ...merged,
-                compatibilityScore: row.compatibilityScore
-              };
-            }
-          } catch {
-            /* keep DB score if any */
+    const load = async () => {
+      const rid =
+        requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
+          ? Number(requestIdFromUrl)
+          : null;
+
+      if (!initialAnimal) {
+        setDetailLoading(true);
+      }
+
+      try {
+        const [view, detail, savedIds] = await Promise.all([
+          isAdopter && adopterUid != null
+            ? fetchAdopterAnimalView(adopterUid, id, rid)
+            : Promise.resolve(null),
+          loadAnimalDetail(id),
+          isAdopter && adopterUid != null
+            ? fetchSavedAnimalIds(adopterUid).catch(() => [])
+            : Promise.resolve(null)
+        ]);
+
+        let merged = null;
+        if (view?.animal) {
+          merged = { ...view.animal };
+          if (view.matchPercentage != null) {
+            merged.compatibilityScore = Math.round(Number(view.matchPercentage));
           }
+        } else {
+          merged = detail;
+        }
+        if (cancelled || !merged) {
+          return;
         }
 
+        writeAnimalDetailCache(id, merged);
         setAnimal(merged);
         setImageIndex(0);
+
+        if (isAdopter && adopterUid != null && Array.isArray(savedIds)) {
+          setSaved(savedIds.includes(Number(merged.id)));
+        }
       } catch (error) {
         console.error("Error fetching animal:", error);
+      } finally {
+        if (!cancelled) {
+          setDetailLoading(false);
+        }
       }
     };
 
-    fetchAnimal();
-  }, [id, isAdopter, adopterUid, requestIdFromUrl]);
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [id, isAdopter, adopterUid, requestIdFromUrl, initialAnimal]);
 
   const apiBase = getApiBaseUrl();
 
@@ -123,21 +177,11 @@ function AnimalDetailPage() {
   };
 
   useEffect(() => {
-    if (!isAdopter || adopterUid == null || !animal?.id) {
+    if (galleryUrls.length === 0) {
       return;
     }
-    let cancelled = false;
-    fetchSavedAnimalIds(adopterUid)
-      .then((ids) => {
-        if (!cancelled) {
-          setSaved(ids.includes(Number(animal.id)));
-        }
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdopter, adopterUid, animal?.id]);
+    setImageIndex((i) => Math.min(i, galleryUrls.length - 1));
+  }, [galleryUrls.length]);
 
   const handleSave = async (e) => {
     e?.stopPropagation?.();
@@ -228,8 +272,12 @@ function AnimalDetailPage() {
     });
   };
 
-  if (!animal) {
+  if (!animal && detailLoading) {
     return <div className="loading">Loading...</div>;
+  }
+
+  if (!animal) {
+    return <div className="loading">Animal not found.</div>;
   }
 
   const listingCode = formatListingCode(animal);

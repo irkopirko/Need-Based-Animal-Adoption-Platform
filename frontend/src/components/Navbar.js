@@ -6,15 +6,19 @@ import {
   getOwnerHomePath,
   getResolvedUserId,
   getStoredUser,
-  isOwnerProfileIncomplete,
   getUserInitials,
   normalizeRole,
   PAVIA_USER_UPDATED_EVENT
 } from "../utils/auth";
 import {
-  countOwnerListingStatuses,
-  fetchOwnerListings
+  readOwnerHomeSummaryCache
 } from "../utils/ownerJourney";
+import { getNavbarConfig } from "./navbar/menuConfig";
+import {
+  clearNavbarStateForUser,
+  getNavbarStateForUser,
+  PAVIA_NAVBAR_STATE_UPDATED
+} from "../utils/navbarState";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -23,6 +27,11 @@ function Navbar() {
   const [ownerListingCounts, setOwnerListingCounts] = useState({
     archived: 0,
     adopted: 0
+  });
+  const [badgeState, setBadgeState] = useState({
+    ownerPendingRequests: 0,
+    ownerUnreadMessages: 0,
+    adopterUnreadMessages: 0
   });
   const menuRef = useRef(null);
 
@@ -35,6 +44,7 @@ function Navbar() {
 
   const isLoggedIn = !!user;
   const normalizedRole = normalizeRole(user?.role);
+  const resolvedUserId = getResolvedUserId(user);
 
   const refreshOwnerListingCounts = useCallback(() => {
     if (normalizedRole !== "OWNER") {
@@ -44,10 +54,36 @@ function Navbar() {
     if (uid == null) {
       return;
     }
-    fetchOwnerListings(uid)
-      .then((list) => setOwnerListingCounts(countOwnerListingStatuses(list)))
-      .catch(() => setOwnerListingCounts({ archived: 0, adopted: 0 }));
+    const cached = readOwnerHomeSummaryCache(uid);
+    if (cached) {
+      setOwnerListingCounts({
+        archived: cached.archivedCount,
+        adopted: cached.adoptedCount
+      });
+    } else {
+      setOwnerListingCounts({ archived: 0, adopted: 0 });
+    }
   }, [normalizedRole, user]);
+
+  useEffect(() => {
+    if (!resolvedUserId) {
+      setBadgeState({
+        ownerPendingRequests: 0,
+        ownerUnreadMessages: 0,
+        adopterUnreadMessages: 0
+      });
+      return;
+    }
+    setBadgeState(getNavbarStateForUser(resolvedUserId));
+    const onState = (event) => {
+      const eventUid = Number(event?.detail?.userId);
+      if (eventUid === Number(resolvedUserId)) {
+        setBadgeState(getNavbarStateForUser(resolvedUserId));
+      }
+    };
+    window.addEventListener(PAVIA_NAVBAR_STATE_UPDATED, onState);
+    return () => window.removeEventListener(PAVIA_NAVBAR_STATE_UPDATED, onState);
+  }, [resolvedUserId]);
 
   useEffect(() => {
     if (normalizedRole !== "OWNER") {
@@ -76,73 +112,19 @@ function Navbar() {
 
   const goRegister = () => navigate("/register");
   const goLogin = () => navigate("/login");
-  const goToAbout = () => navigate("/about");
-  const goGuestAdopt = () => navigate("/adopt");
-  const goAdoptionRequest = () => navigate("/adoption-request");
-  const goCompatibleAnimals = () => navigate("/compatible-animals");
-  const goOwnerManageRequests = () => navigate("/owner-requests");
-  const goOwnerMessages = () => navigate("/owner-messages");
-
   const handleLogout = () => {
+    if (resolvedUserId) {
+      clearNavbarStateForUser(resolvedUserId);
+    }
     localStorage.removeItem("paviaUser");
     setUser(null);
     setShowMenu(false);
-    navigate("/");
-    window.location.reload();
+    navigate("/", { replace: true });
   };
 
   const closeMenuAndNavigate = (path) => {
     setShowMenu(false);
     navigate(path);
-  };
-
-  const getMenuItems = () => {
-    if (!user) return [];
-
-    if (normalizedRole === "ADMIN") {
-      return [{ label: "Moderation dashboard", path: "/adminhomepage" }];
-    }
-
-    if (normalizedRole === "OWNER") {
-      const items = [];
-      if (isOwnerProfileIncomplete(user)) {
-        items.push({ label: "Complete profile", path: "/complete-owner-profile" });
-      }
-      items.push(
-        { label: "Dashboard", path: "/ownerhomepage" },
-        { label: "Listed animals", path: "/owner-listings" },
-        { label: "Register an animal", path: "/register-animal" },
-        { label: "Manage requests", path: "/owner-requests" },
-        { label: "Messages", path: "/owner-messages" },
-        {
-          label: "Archived listings",
-          path: "/owner-listings?tab=archived",
-          count: ownerListingCounts.archived
-        },
-        {
-          label: "Adopted animals",
-          path: "/owner-listings?tab=adopted",
-          count: ownerListingCounts.adopted
-        }
-      );
-      return items;
-    }
-
-    const adopterItems = [];
-    if (user.adopterProfileCompleted === false) {
-      adopterItems.push({ label: "Complete profile", path: "/complete-adopter-profile" });
-    }
-    adopterItems.push(
-      { label: "Home", path: "/adopterhomepage" },
-      { label: "Adoption request", path: "/adoption-request" },
-      { label: "My adoption requests", path: "/my-adoption-requests" },
-      { label: "Compatible animals", path: "/compatible-animals" },
-      { label: "Saved animals", path: "/saved-animals" },
-      { label: "My adoptions", path: "/my-adoptions" },
-      { label: "Messages", path: "/adopter-messages" },
-      { label: "Edit profile", path: "/account" }
-    );
-    return adopterItems;
   };
 
   useEffect(() => {
@@ -159,7 +141,14 @@ function Navbar() {
     };
   }, []);
 
-  const menuItems = getMenuItems();
+  const navbarConfig = getNavbarConfig({
+    user,
+    role: normalizedRole,
+    ownerListingCounts,
+    badgeState
+  });
+  const directItems = navbarConfig.direct || [];
+  const menuItems = navbarConfig.menu || [];
 
   return (
     <header className="navbar">
@@ -169,37 +158,19 @@ function Navbar() {
       </div>
 
       <nav className="navbar-links">
-        <button type="button" className="navbar-link-btn" onClick={goToAbout}>
-          About Us
-        </button>
-
-        {!isLoggedIn && (
-          <button type="button" className="navbar-link-btn" onClick={goGuestAdopt}>
-            Adopt
+        {directItems.map((item) => (
+          <button
+            key={item.label}
+            type="button"
+            className="navbar-link-btn navbar-link-btn-with-badge"
+            onClick={() => navigate(item.path)}
+          >
+            {item.label}
+            {item.attentionCount > 0 && (
+              <span className="navbar-link-attention-badge">{item.attentionCount}</span>
+            )}
           </button>
-        )}
-
-        {isLoggedIn && normalizedRole === "ADOPTER" && (
-          <>
-            <button type="button" className="navbar-link-btn" onClick={goAdoptionRequest}>
-              Adopt
-            </button>
-            <button type="button" className="navbar-link-btn" onClick={goCompatibleAnimals}>
-              View Matches
-            </button>
-          </>
-        )}
-
-        {isLoggedIn && normalizedRole === "OWNER" && (
-          <>
-            <button type="button" className="navbar-link-btn" onClick={goOwnerMessages}>
-              Messages
-            </button>
-            <button type="button" className="navbar-link-btn" onClick={goOwnerManageRequests}>
-              Manage requests
-            </button>
-          </>
-        )}
+        ))}
       </nav>
 
       <div className="navbar-actions">

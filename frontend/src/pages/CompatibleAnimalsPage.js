@@ -19,11 +19,31 @@ import {
   fetchStrongMatchAnimals
 } from "../utils/adopterJourney";
 import {
-  fetchSavedAnimalIds,
   saveAnimalForUser,
   unsaveAnimalForUser
 } from "../utils/platformApi";
 import { formatAnimalGenderLabel } from "../utils/listingDisplay";
+
+const COMPATIBLE_RELOAD_MS = 120_000;
+let lastCompatibleLoadAt = 0;
+
+function formatRequestPhase(phase) {
+  const p = String(phase || "").toUpperCase();
+  return p === "SUBMITTED" ? "Submitted" : "Draft";
+}
+
+function sortAdoptionRequests(list) {
+  return [...list].sort((a, b) => {
+    const aSub = String(a.requestPhase || "").toUpperCase() === "SUBMITTED" ? 1 : 0;
+    const bSub = String(b.requestPhase || "").toUpperCase() === "SUBMITTED" ? 1 : 0;
+    if (aSub !== bSub) {
+      return bSub - aSub;
+    }
+    const ta = a.requestTime ? new Date(a.requestTime).getTime() : 0;
+    const tb = b.requestTime ? new Date(b.requestTime).getTime() : 0;
+    return tb - ta;
+  });
+}
 
 function CompatibleAnimalsPage() {
   const navigate = useNavigate();
@@ -42,7 +62,9 @@ function CompatibleAnimalsPage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [reportAnimalId, setReportAnimalId] = useState(null);
   const [submittedRequests, setSubmittedRequests] = useState([]);
+  const [allRequests, setAllRequests] = useState([]);
   const [needsRequestPick, setNeedsRequestPick] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const user = getStoredUser();
   const adopterUid = getResolvedUserId(user);
@@ -58,35 +80,90 @@ function CompatibleAnimalsPage() {
         localStorage.getItem("adoptionRequestCompleted") === "true";
 
       const resolvedUid = getResolvedUserId(user);
-      let submitted = [];
-      if (resolvedUid != null) {
-        const requests = await fetchUserAdoptionRequests(resolvedUid);
-        const { hasSubmitted } = summarizeAdoptionRequests(requests);
-        allowed = hasSubmitted || allowed;
-        submitted = requests.filter(
-          (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
-        );
+      const apiBase = getApiBaseUrl();
+      const ridNum =
+        requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
+          ? Number(requestIdFromUrl)
+          : null;
+
+      let requests = [];
+      try {
+        if (resolvedUid != null && ridNum != null) {
+          const fromMatch = await fetchStrongMatchAnimals(resolvedUid, ridNum);
+          if (cancelled) {
+            return;
+          }
+          const normalized = (Array.isArray(fromMatch) ? fromMatch : []).map((a) => {
+            if (!a.images?.length) {
+              return a;
+            }
+            const resolved = resolveAnimalImageUrl(a, apiBase);
+            return { ...a, images: [resolved || a.images[0]] };
+          });
+          setAnimals(normalized);
+          setSavedIds(
+            normalized
+              .filter((a) => a.isSaved === true)
+              .map((a) => Number(a.id))
+              .filter(Number.isFinite)
+          );
+          setHasAdoptionRequest(true);
+          setNeedsRequestPick(false);
+          setLoading(false);
+          lastCompatibleLoadAt = Date.now();
+
+          fetchUserAdoptionRequests(resolvedUid)
+            .then((reqList) => {
+              if (cancelled) {
+                return;
+              }
+              const submitted = reqList.filter(
+                (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
+              );
+              setSubmittedRequests(submitted);
+              setAllRequests(sortAdoptionRequests(reqList));
+              const { hasSubmitted } = summarizeAdoptionRequests(reqList);
+              setHasAdoptionRequest(hasSubmitted || allowed);
+            })
+            .catch(() => {});
+          return;
+        }
+
+        requests = await fetchUserAdoptionRequests(resolvedUid);
+        requests = sortAdoptionRequests(requests);
+      } catch (error) {
+        console.error("Error fetching compatible animals:", error);
+        if (!cancelled) {
+          showPopup({
+            type: "critical",
+            title: "Loading Failed",
+            message: error?.message || "Compatible animals could not be loaded from backend."
+          });
+          setLoading(false);
+        }
+        return;
       }
 
       if (cancelled) {
         return;
       }
+
+      const { hasSubmitted } = summarizeAdoptionRequests(requests);
+      allowed = hasSubmitted || allowed;
+      const submitted = requests.filter(
+        (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
+      );
       setHasAdoptionRequest(allowed);
       setSubmittedRequests(submitted);
+      setAllRequests(requests);
 
       if (!allowed) {
         setAnimals([]);
+        setSavedIds([]);
         setNeedsRequestPick(false);
         setLoading(false);
         return;
       }
-
-      const apiBase = getApiBaseUrl();
-      const uid = getResolvedUserId(user);
-      const ridNum =
-        requestIdFromUrl != null && /^\d+$/.test(String(requestIdFromUrl).trim())
-          ? Number(requestIdFromUrl)
-          : null;
 
       if (submitted.length === 1 && ridNum == null) {
         navigate(
@@ -98,6 +175,7 @@ function CompatibleAnimalsPage() {
 
       if (submitted.length > 1 && ridNum == null) {
         setAnimals([]);
+        setSavedIds([]);
         setNeedsRequestPick(true);
         setLoading(false);
         return;
@@ -105,8 +183,13 @@ function CompatibleAnimalsPage() {
 
       setNeedsRequestPick(false);
 
+      if (resolvedUid == null || ridNum == null) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const fromMatch = await fetchStrongMatchAnimals(uid, ridNum);
+        const fromMatch = await fetchStrongMatchAnimals(resolvedUid, ridNum);
         const normalized = (Array.isArray(fromMatch) ? fromMatch : []).map((a) => {
           if (!a.images?.length) {
             return a;
@@ -116,6 +199,12 @@ function CompatibleAnimalsPage() {
         });
         if (!cancelled) {
           setAnimals(normalized);
+          setSavedIds(
+            normalized
+              .filter((a) => a.isSaved === true)
+              .map((a) => Number(a.id))
+              .filter(Number.isFinite)
+          );
         }
       } catch (error) {
         console.error("Error fetching compatible animals:", error);
@@ -129,6 +218,7 @@ function CompatibleAnimalsPage() {
       } finally {
         if (!cancelled) {
           setLoading(false);
+          lastCompatibleLoadAt = Date.now();
         }
       }
     };
@@ -137,20 +227,22 @@ function CompatibleAnimalsPage() {
     return () => {
       cancelled = true;
     };
-    // showPopup from context is stable; avoid re-fetch on identity change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestIdFromUrl]);
+  }, [requestIdFromUrl, reloadToken]);
 
   useEffect(() => {
-    const user = getStoredUser();
-    const uid = getResolvedUserId(user);
-    if (uid == null) {
-      return;
-    }
-    fetchSavedAnimalIds(uid)
-      .then((ids) => setSavedIds(ids))
-      .catch(() => setSavedIds([]));
-  }, [animals.length]);
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+      if (Date.now() - lastCompatibleLoadAt < COMPATIBLE_RELOAD_MS) {
+        return;
+      }
+      setReloadToken((t) => t + 1);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   let filteredAnimals = [...animals];
 
@@ -258,6 +350,14 @@ function CompatibleAnimalsPage() {
     navigate(`/compatible-animals?requestId=${encodeURIComponent(String(id))}`);
   };
 
+  const selectRequestForSaved = (id) => {
+    navigate(`/saved-animals?requestId=${encodeURIComponent(String(id))}`);
+  };
+
+  const continueDraft = () => {
+    navigate("/adoption-request");
+  };
+
   if (loading) {
     return (
       <div className="compatible-page">
@@ -282,23 +382,24 @@ function CompatibleAnimalsPage() {
               <p className="compatible-hero-tag">Compatible Animals</p>
               <h1 className="compatible-hero-title">Choose an adoption request</h1>
               <p className="compatible-hero-text">
-                Strong matches are calculated per submitted request. Select which request
-                you want to browse compatible animals for.
+                Submitted requests unlock compatible and saved animals. Drafts stay listed
+                so you can continue editing them.
               </p>
             </div>
           </section>
           <ul className="adopter-requests-list">
-            {submittedRequests.map((r) => {
+            {allRequests.map((r) => {
               const phaseKey = String(r.requestPhase || "draft").toLowerCase();
+              const isSubmitted = phaseKey === "submitted";
               return (
                 <li key={r.id} className="adopter-requests-row">
                   <div className="adopter-requests-row-body">
                     <div className="adopter-requests-row-head">
                       <strong>Request #{r.id}</strong>
                       <span
-                        className={`adopter-requests-phase adopter-requests-phase-${phaseKey === "submitted" ? "submitted" : "draft"}`}
+                        className={`adopter-requests-phase adopter-requests-phase-${isSubmitted ? "submitted" : "draft"}`}
                       >
-                        Submitted
+                        {formatRequestPhase(r.requestPhase)}
                       </span>
                     </div>
                     <p className="adopter-requests-meta">
@@ -309,13 +410,32 @@ function CompatibleAnimalsPage() {
                     </p>
                   </div>
                   <div className="adopter-requests-actions">
-                    <button
-                      type="button"
-                      className="adopter-requests-btn"
-                      onClick={() => selectRequestForMatches(r.id)}
-                    >
-                      View compatible animals
-                    </button>
+                    {isSubmitted ? (
+                      <>
+                        <button
+                          type="button"
+                          className="adopter-requests-btn"
+                          onClick={() => selectRequestForMatches(r.id)}
+                        >
+                          View compatible animals
+                        </button>
+                        <button
+                          type="button"
+                          className="adopter-requests-btn adopter-requests-btn-secondary"
+                          onClick={() => selectRequestForSaved(r.id)}
+                        >
+                          View saved animals
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="adopter-requests-btn"
+                        onClick={continueDraft}
+                      >
+                        Continue draft
+                      </button>
+                    )}
                   </div>
                 </li>
               );
@@ -373,13 +493,22 @@ function CompatibleAnimalsPage() {
               or higher (inclusive) are shown here. None meet that bar right now.
               You can review your request later or wait for new listings.
             </p>
-            <button
-              type="button"
-              className="compatible-primary-btn"
-              onClick={goToRequestForm}
-            >
-              Review Adoption Request
-            </button>
+            <div className="compatible-hero-buttons">
+              <button
+                type="button"
+                className="compatible-primary-btn"
+                onClick={goToRequestForm}
+              >
+                Review Adoption Request
+              </button>
+              <button
+                type="button"
+                className="compatible-secondary-btn"
+                onClick={goToSavedAnimals}
+              >
+                View saved animals
+              </button>
+            </div>
           </section>
         </main>
 
@@ -417,10 +546,8 @@ function CompatibleAnimalsPage() {
               your lifestyle best.
             </h1>
             <p className="compatible-hero-text">
-              These listings scored at least{" "}
-              <strong>{STRONG_MATCH_THRESHOLD}%</strong> overlap between your submitted adoption
-              request and each active listing (only fields where both sides supply comparable context
-              count toward the percentage). Explore them in order of fit for your home and routine.
+              Listings with at least <strong>{STRONG_MATCH_THRESHOLD}%</strong> fit to your adoption
+              request, ranked by compatibility. Details refresh when owners update their listings.
             </p>
 
             <div className="compatible-hero-buttons">
@@ -508,6 +635,13 @@ function CompatibleAnimalsPage() {
 
           <div className="compatible-toolbar-right">
             <span>{filteredAnimals.length} animals available</span>
+            <button
+              type="button"
+              className="compatible-toolbar-saved-btn"
+              onClick={goToSavedAnimals}
+            >
+              Saved animals
+            </button>
           </div>
         </section>
 

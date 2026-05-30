@@ -4,11 +4,16 @@ package com.adoptionplatform.backend.repository;
 import com.adoptionplatform.backend.entity.SavedAnimal;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
 
 public interface SavedAnimalRepository extends JpaRepository<SavedAnimal, Long> {
+
+    @Query("SELECT COUNT(DISTINCT s.animalId) FROM SavedAnimal s WHERE s.userId = :userId")
+    long countDistinctAnimalsByUserId(@Param("userId") Long userId);
 
     List<SavedAnimal> findByUserId(Long userId);
 

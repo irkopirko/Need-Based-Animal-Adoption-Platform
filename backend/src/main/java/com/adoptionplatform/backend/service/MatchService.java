@@ -1,18 +1,30 @@
 package com.adoptionplatform.backend.service;
 
+import com.adoptionplatform.backend.dto.AnimalMatchScoreDto;
 import com.adoptionplatform.backend.dto.MatchResultDto;
 import com.adoptionplatform.backend.entity.AdoptionRequest;
 import com.adoptionplatform.backend.entity.Animal;
+import com.adoptionplatform.backend.entity.MatchSnapshot;
 import com.adoptionplatform.backend.repository.AdoptionRequestRepository;
 import com.adoptionplatform.backend.repository.AnimalRepository;
+import com.adoptionplatform.backend.repository.CompatibleCardProjection;
+import com.adoptionplatform.backend.repository.MatchSnapshotRepository;
 import com.adoptionplatform.backend.repository.SavedAnimalRepository;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
+import com.adoptionplatform.backend.entity.SavedAnimal;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -23,15 +35,21 @@ public class MatchService {
     private final AdoptionRequestRepository adoptionRequestRepository;
     private final AnimalRepository animalRepository;
     private final SavedAnimalRepository savedRepo;
+    private final MatchSnapshotRepository matchSnapshotRepository;
+    private final MatchSnapshotService matchSnapshotService;
 
     public MatchService(
             AdoptionRequestRepository adoptionRequestRepository,
             AnimalRepository animalRepository,
-            SavedAnimalRepository savedAnimalRepository
+            SavedAnimalRepository savedAnimalRepository,
+            MatchSnapshotRepository matchSnapshotRepository,
+            @Lazy MatchSnapshotService matchSnapshotService
     ) {
         this.adoptionRequestRepository = adoptionRequestRepository;
         this.animalRepository = animalRepository;
         this.savedRepo = savedAnimalRepository;
+        this.matchSnapshotRepository = matchSnapshotRepository;
+        this.matchSnapshotService = matchSnapshotService;
     }
 
     public List<MatchResultDto> getMatches(Long userId) {
@@ -46,58 +64,227 @@ public class MatchService {
     }
 
 
+    public record StrongMatchTally(int count, Set<Long> animalIds) {
+        public StrongMatchTally {
+            animalIds = animalIds != null ? animalIds : Collections.emptySet();
+        }
+    }
+
+    /**
+     * Same scoring as {@link #getMatches(Long, Long, Double)} (live, public listings only).
+     */
+    public StrongMatchTally tallyStrongMatches(Long userId, Long requestId, double minOverlapPercent) {
+        List<AdoptionRequest> requests = adoptionRequestRepository.findByUserId(userId);
+        if (requests == null || requests.isEmpty()) {
+            return new StrongMatchTally(0, Set.of());
+        }
+        AdoptionRequest latestRequest = selectRequestForMatching(requests, userId, requestId);
+        if (latestRequest == null) {
+            return new StrongMatchTally(0, Set.of());
+        }
+        Set<Long> ids = new HashSet<>();
+        for (Animal animal : animalRepository.findAllForPublicMatching()) {
+            DetailedScore detailed = calculateDetailedScore(latestRequest, animal);
+            if (detailed.percentage >= minOverlapPercent) {
+                ids.add(animal.getId());
+            }
+        }
+        return new StrongMatchTally(ids.size(), ids);
+    }
+
+    public int countStrongMatches(Long userId, Long requestId, double minOverlapPercent) {
+        return tallyStrongMatches(userId, requestId, minOverlapPercent).count();
+    }
+
     public List<MatchResultDto> getMatches(Long userId, Long requestId, Double minOverlapPercent) {
         List<AdoptionRequest> requests = adoptionRequestRepository.findByUserId(userId);
-
         if (requests == null || requests.isEmpty()) {
             return new ArrayList<>();
         }
-
         AdoptionRequest latestRequest = selectRequestForMatching(requests, userId, requestId);
         if (latestRequest == null) {
             return new ArrayList<>();
         }
 
-        List<Animal> animals = animalRepository.findAll();
-        List<MatchResultDto> results = new ArrayList<>();
+        double min = minOverlapPercent != null && minOverlapPercent > 0
+                ? minOverlapPercent
+                : 0.0;
 
-        for (Animal animal : animals) {
-            if (!isListedForPublicMatching(animal)) {
+        return loadCompatibleMatches(userId, latestRequest.getId(), min, latestRequest);
+    }
+
+    private List<MatchResultDto> loadCompatibleMatches(
+            Long userId,
+            Long adoptionRequestId,
+            double minOverlap,
+            AdoptionRequest request
+    ) {
+        List<CompatibleCardProjection> cards = matchSnapshotRepository.findCompatibleCardsForAdopter(
+                userId,
+                adoptionRequestId,
+                minOverlap
+        );
+        if (cards.isEmpty()) {
+            boolean snapshotsExist = !matchSnapshotRepository
+                    .findByAdopterUserIdAndAdoptionRequestIdOrderByMatchPercentageDesc(userId, adoptionRequestId)
+                    .isEmpty();
+            if (!snapshotsExist) {
+                matchSnapshotService.refreshSnapshotsForRequest(
+                        userId,
+                        adoptionRequestId,
+                        STRONG_MATCH_THRESHOLD
+                );
+                cards = matchSnapshotRepository.findCompatibleCardsForAdopter(
+                        userId,
+                        adoptionRequestId,
+                        minOverlap
+                );
+            }
+        }
+        if (!cards.isEmpty()) {
+            return mapCompatibleCards(cards);
+        }
+        return computeMatchesLive(userId, request, minOverlap);
+    }
+
+    public Optional<AnimalMatchScoreDto> getMatchForAnimal(Long userId, Long animalId, Long requestId) {
+        if (userId == null || animalId == null) {
+            return Optional.empty();
+        }
+        List<AdoptionRequest> requests = adoptionRequestRepository.findByUserId(userId);
+        AdoptionRequest request = selectRequestForMatching(requests, userId, requestId);
+        if (request == null) {
+            return Optional.empty();
+        }
+
+        Optional<MatchSnapshot> snap = matchSnapshotRepository.findByAdopterUserIdAndAnimalIdAndAdoptionRequestId(
+                userId,
+                animalId,
+                request.getId()
+        );
+        if (snap.isPresent()) {
+            AnimalMatchScoreDto dto = new AnimalMatchScoreDto();
+            dto.setAnimalId(animalId);
+            dto.setMatchPercentage(snap.get().getMatchPercentage());
+            dto.setMatchReasons(decodeSnapshotReasons(snap.get().getMatchReasonsJson()));
+            return Optional.of(dto);
+        }
+
+        Animal animal = animalRepository.findById(animalId).orElse(null);
+        if (animal == null || !isListedForPublicMatching(animal)) {
+            return Optional.empty();
+        }
+        DetailedScore detailed = calculateDetailedScore(request, animal);
+        AnimalMatchScoreDto dto = new AnimalMatchScoreDto();
+        dto.setAnimalId(animalId);
+        dto.setMatchPercentage(detailed.percentage);
+        dto.setMatchReasons(detailed.reasons);
+        return Optional.of(dto);
+    }
+
+    private List<MatchResultDto> mapCompatibleCards(List<CompatibleCardProjection> cards) {
+        List<MatchResultDto> results = new ArrayList<>(cards.size());
+        for (CompatibleCardProjection row : cards) {
+            if (row.getAnimalId() == null) {
                 continue;
             }
-            DetailedScore detailed = calculateDetailedScore(latestRequest, animal);
-
+            double pct = row.getMatchPercentage() != null ? row.getMatchPercentage() : 0.0;
             MatchResultDto dto = new MatchResultDto(
-                    animal.getId(),
-                    animal.getName(),
-                    animal.getAnimalType(),
-                    animal.getBreed(),
-                    animal.getSize(),
-                    animal.getAgeGroup(),
-                    animal.getEnergyLevel(),
-                    animal.getHousingLocation(),
-                    detailed.percentage,
-                    detailed.reasons
+                    row.getAnimalId(),
+                    row.getName(),
+                    row.getAnimalType(),
+                    row.getBreed(),
+                    row.getSize(),
+                    row.getAgeGroup(),
+                    row.getEnergyLevel(),
+                    row.getHousingLocation(),
+                    pct,
+                    decodeSnapshotReasons(row.getMatchReasonsJson())
             );
-
-            dto.setCoverImageUrl(getCoverImageUrl(animal));
-            List<String> imgs = animal.getImages();
-            if (imgs != null && !imgs.isEmpty()) {
-                dto.setListingImageUrls(new ArrayList<>(imgs));
+            dto.setDescription(row.getDescription());
+            dto.setGender(row.getGender());
+            dto.setGroomingNeed(row.getGroomingNeed());
+            dto.setSpecialNeeds(row.getSpecialNeeds());
+            dto.setGoodWithChildren(row.getGoodWithChildren());
+            dto.setGoodWithPets(row.getGoodWithPets());
+            String cover = row.getCoverImageUrl();
+            if (cover != null && !cover.isBlank()) {
+                dto.setCoverImageUrl(cover);
+                dto.setListingImageUrls(List.of(cover));
             }
-            dto.setHighlightTags(getHighlightTags(animal));
-            dto.setSaved(savedRepo.existsByUserIdAndAnimalId(userId, animal.getId()));
-
+            dto.setSaved(row.getSavedFlag() != null && row.getSavedFlag() > 0);
             results.add(dto);
+        }
+        return results;
+    }
+
+    private List<MatchResultDto> computeMatchesLive(Long userId, AdoptionRequest request, double minOverlap) {
+        Set<Long> savedAnimalIds = savedRepo.findByUserId(userId).stream()
+                .map(SavedAnimal::getAnimalId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toCollection(HashSet::new));
+        List<MatchResultDto> results = new ArrayList<>();
+
+        for (Animal animal : animalRepository.findAllForPublicMatching()) {
+            DetailedScore detailed = calculateDetailedScore(request, animal);
+            if (minOverlap > 0 && detailed.percentage < minOverlap) {
+                continue;
+            }
+            results.add(buildMatchResultDto(animal, detailed.percentage, detailed.reasons, savedAnimalIds));
         }
 
         results.sort(Comparator.comparingDouble(MatchResultDto::getMatchPercentage).reversed());
-        if (minOverlapPercent != null && minOverlapPercent > 0) {
-            return results.stream()
-                    .filter(d -> d.getMatchPercentage() >= minOverlapPercent)
-                    .collect(Collectors.toCollection(ArrayList::new));
-        }
         return results;
+    }
+
+    private MatchResultDto buildMatchResultDto(
+            Animal animal,
+            double percentage,
+            List<String> reasons,
+            Set<Long> savedAnimalIds
+    ) {
+        MatchResultDto dto = new MatchResultDto(
+                animal.getId(),
+                animal.getName(),
+                animal.getAnimalType(),
+                animal.getBreed(),
+                animal.getSize(),
+                animal.getAgeGroup(),
+                animal.getEnergyLevel(),
+                animal.getHousingLocation(),
+                percentage,
+                reasons
+        );
+        dto.setDescription(animal.getDescription());
+        dto.setGender(animal.getGender());
+        dto.setGroomingNeed(animal.getGroomingNeed());
+        dto.setSpecialNeeds(animal.getSpecialNeeds());
+        dto.setGoodWithChildren(animal.getGoodWithChildren());
+        dto.setGoodWithPets(animal.getGoodWithPets());
+        dto.setCoverImageUrl(getCoverImageUrl(animal));
+        List<String> imgs = animal.getImages();
+        if (imgs != null && !imgs.isEmpty()) {
+            dto.setListingImageUrls(new ArrayList<>(imgs));
+        }
+        dto.setHighlightTags(getHighlightTags(animal));
+        dto.setSaved(savedAnimalIds.contains(animal.getId()));
+        return dto;
+    }
+
+    private static List<String> decodeSnapshotReasons(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new ArrayList<>();
+        }
+        if (raw.startsWith("[")) {
+            return new ArrayList<>();
+        }
+        List<String> out = new ArrayList<>();
+        for (String part : raw.split("\u001e")) {
+            if (part != null && !part.isBlank()) {
+                out.add(part.trim());
+            }
+        }
+        return out;
     }
 
     private AdoptionRequest selectRequestForMatching(List<AdoptionRequest> requests, Long userId, Long requestId) {

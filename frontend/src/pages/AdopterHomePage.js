@@ -26,15 +26,26 @@ import {
   normalizeRole
 } from "../utils/auth";
 import {
-  loadAdopterJourneyState,
-  summarizeAdoptionRequests,
-  STRONG_MATCH_THRESHOLD
+  loadAdopterHomeSummary,
+  PAVIA_ADOPTER_HOME_SUMMARY_UPDATED,
+  readAdopterHomeSummaryCache,
+  summarizeAdoptionRequests
 } from "../utils/adopterJourney";
+
+function initialSummaryForUser() {
+  const user = getStoredUser();
+  const uid = getResolvedUserId(user);
+  if (uid == null) {
+    return null;
+  }
+  return readAdopterHomeSummaryCache(uid);
+}
 
 function AdopterHomePage() {
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [journey, setJourney] = useState(null);
+  const [summary, setSummary] = useState(initialSummaryForUser);
+  const [summaryLoading, setSummaryLoading] = useState(() => !initialSummaryForUser());
 
   const slides = [
     animalSlide1,
@@ -93,16 +104,52 @@ function AdopterHomePage() {
       })
       .catch(() => {});
 
-    loadAdopterJourneyState(uid).then((state) => {
-      if (!cancelled) {
-        setJourney(state);
+    const cached = readAdopterHomeSummaryCache(uid);
+    if (cached && !cancelled) {
+      setSummary(cached);
+      setSummaryLoading(false);
+    } else if (!cancelled) {
+      setSummaryLoading(true);
+    }
+
+    loadAdopterHomeSummary(uid)
+      .then((data) => {
+        if (!cancelled) {
+          setSummary(data);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSummaryLoading(false);
+        }
+      });
+
+    const onSummaryUpdated = (event) => {
+      const detailUid = Number(event?.detail?.userId);
+      if (detailUid === uid && event.detail?.data && !cancelled) {
+        setSummary(event.detail.data);
+        setSummaryLoading(false);
       }
-    });
+    };
+    window.addEventListener(PAVIA_ADOPTER_HOME_SUMMARY_UPDATED, onSummaryUpdated);
 
     return () => {
       cancelled = true;
+      window.removeEventListener(PAVIA_ADOPTER_HOME_SUMMARY_UPDATED, onSummaryUpdated);
     };
   }, [navigate]);
+
+  const requests = summary?.requests || [];
+  const submittedRequests = requests.filter(
+    (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
+  );
+  const { hasSubmitted, hasDraft, hasAny } = summarizeAdoptionRequests(requests);
+  const localSubmitted =
+    typeof window !== "undefined" &&
+    localStorage.getItem("adoptionRequestCompleted") === "true";
+  const submitted = hasSubmitted || (!hasAny && localSubmitted);
+  const noRequest = !hasAny && !localSubmitted;
+  const draftOnly = hasAny && hasDraft && !hasSubmitted && !localSubmitted;
 
   const goToAdoptionRequest = () => {
     navigate("/adoption-request");
@@ -113,6 +160,15 @@ function AdopterHomePage() {
   };
 
   const goToSavedAnimals = () => {
+    const primaryRid =
+      summary?.primarySubmittedRequestId ??
+      (submittedRequests.length === 1 ? submittedRequests[0].id : null);
+    if (primaryRid != null) {
+      navigate(
+        `/saved-animals?requestId=${encodeURIComponent(String(primaryRid))}`
+      );
+      return;
+    }
     navigate("/saved-animals");
   };
 
@@ -120,48 +176,8 @@ function AdopterHomePage() {
     navigate("/adopter-messages");
   };
 
-  const submittedRequests = (journey?.requests || []).filter(
-    (r) => String(r.requestPhase || "").toUpperCase() === "SUBMITTED"
-  );
-  const { hasSubmitted, hasDraft } = summarizeAdoptionRequests(journey?.requests || []);
-
-  const requestSummaryValue = () => {
-    if (!journey) {
-      return "…";
-    }
-    if (journey.noRequest) {
-      return "Not started";
-    }
-    if (journey.draftOnly) {
-      return "Draft";
-    }
-    if (hasSubmitted) {
-      return `${submittedRequests.length} submitted`;
-    }
-    return "In progress";
-  };
-
-  const compatibleSummaryValue = () => {
-    if (!journey || journey.noRequest || journey.draftOnly) {
-      return "Locked";
-    }
-    if (!hasSubmitted) {
-      return "Locked";
-    }
-    const n = journey.strongMatches?.length ?? 0;
-    return n > 0 ? `${n} matches` : "No matches yet";
-  };
-
-  const savedSummaryValue = () => {
-    if (!journey || !hasSubmitted) {
-      return "Locked";
-    }
-    const n = journey.savedEntries?.length ?? journey.savedAnimals?.length ?? 0;
-    return n > 0 ? `${n} saved` : "None yet";
-  };
-
   const handleRequestCardClick = () => {
-    if (!journey || journey.noRequest) {
+    if (noRequest) {
       goToAdoptionRequest();
       return;
     }
@@ -173,13 +189,16 @@ function AdopterHomePage() {
   };
 
   const handleCompatibleCardClick = () => {
-    if (!hasSubmitted) {
+    if (!submitted) {
       goToAdoptionRequest();
       return;
     }
-    if (submittedRequests.length === 1) {
+    const primaryRid =
+      summary?.primarySubmittedRequestId ??
+      (submittedRequests.length === 1 ? submittedRequests[0].id : null);
+    if (primaryRid != null) {
       navigate(
-        `/compatible-animals?requestId=${encodeURIComponent(String(submittedRequests[0].id))}`
+        `/compatible-animals?requestId=${encodeURIComponent(String(primaryRid))}`
       );
       return;
     }
@@ -187,17 +206,57 @@ function AdopterHomePage() {
   };
 
   const handleSavedCardClick = () => {
-    if (!hasSubmitted) {
+    if (!submitted) {
       goToAdoptionRequest();
       return;
     }
-    if (submittedRequests.length === 1) {
-      navigate(
-        `/saved-animals?requestId=${encodeURIComponent(String(submittedRequests[0].id))}`
-      );
-      return;
+    goToSavedAnimals();
+  };
+
+  const requestSummaryValue = () => {
+    if (!summary && summaryLoading) {
+      return "…";
     }
-    navigate("/saved-animals");
+    if (noRequest) {
+      return "Not started";
+    }
+    if (draftOnly) {
+      return "Draft";
+    }
+    if (hasSubmitted) {
+      const n = summary?.submittedRequestCount ?? submittedRequests.length;
+      return n > 0 ? `${n} submitted` : "Submitted";
+    }
+    return "In progress";
+  };
+
+  const compatibleSummaryValue = () => {
+    if (!summary && summaryLoading) {
+      return "…";
+    }
+    if (noRequest || draftOnly || !submitted) {
+      return "Locked";
+    }
+    const n = summary?.strongMatchCount ?? 0;
+    return n > 0 ? `${n} matches` : "No matches yet";
+  };
+
+  const savedSummaryValue = () => {
+    if (!summary && summaryLoading) {
+      return "…";
+    }
+    if (!submitted) {
+      return "Locked";
+    }
+    const n = summary?.savedCount ?? 0;
+    return n > 0 ? `${n} saved` : "None yet";
+  };
+
+  const onSummaryKeyDown = (event, handler) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handler();
+    }
   };
 
   return (
@@ -276,6 +335,8 @@ function AdopterHomePage() {
             type="button"
             className="adopter-summary-card adopter-summary-card-btn"
             onClick={handleRequestCardClick}
+            onKeyDown={(e) => onSummaryKeyDown(e, handleRequestCardClick)}
+            aria-label="Go to adoption requests"
           >
             <div className="adopter-summary-head">
               <span className="adopter-summary-label">Adoption Request</span>
@@ -293,6 +354,8 @@ function AdopterHomePage() {
             type="button"
             className="adopter-summary-card adopter-summary-card-btn"
             onClick={handleCompatibleCardClick}
+            onKeyDown={(e) => onSummaryKeyDown(e, handleCompatibleCardClick)}
+            aria-label="Go to compatible animals"
           >
             <div className="adopter-summary-head">
               <span className="adopter-summary-label">Compatible Animals</span>
@@ -312,6 +375,8 @@ function AdopterHomePage() {
             type="button"
             className="adopter-summary-card adopter-summary-card-btn"
             onClick={handleSavedCardClick}
+            onKeyDown={(e) => onSummaryKeyDown(e, handleSavedCardClick)}
+            aria-label="Go to saved animals"
           >
             <div className="adopter-summary-head">
               <span className="adopter-summary-label">Saved Animals</span>
@@ -390,36 +455,49 @@ function AdopterHomePage() {
         </section>
 
         <section className="adopter-action-strip">
-          <div className="adopter-action-card">
-            <h3>Start your request</h3>
-            <p>Complete the required flow so matching can begin.</p>
-            <button type="button" onClick={goToAdoptionRequest}>
-              Create Adoption Request
-            </button>
-            <button
-              type="button"
-              className="adopter-action-sub-link"
-              onClick={goToMyMatches}
-            >
-              View my matches
-            </button>
-          </div>
+          <button
+            type="button"
+            className="adopter-action-card adopter-action-card-btn"
+            onClick={handleRequestCardClick}
+            aria-label="Adoption request"
+          >
+            <h3>Adoption request</h3>
+            <p>Create, continue, or review your submitted requests.</p>
+            <span className="adopter-action-card-cta">Open requests</span>
+          </button>
 
-          <div className="adopter-action-card">
+          <button
+            type="button"
+            className="adopter-action-card adopter-action-card-btn"
+            onClick={handleCompatibleCardClick}
+            aria-label="Compatible animals"
+          >
+            <h3>Compatible animals</h3>
+            <p>View listings that strongly match your submitted request.</p>
+            <span className="adopter-action-card-cta">View matches</span>
+          </button>
+
+          <button
+            type="button"
+            className="adopter-action-card adopter-action-card-btn"
+            onClick={handleSavedCardClick}
+            aria-label="Saved animals"
+          >
             <h3>Saved animals</h3>
             <p>Saved listings are organised under each submitted request.</p>
-            <button type="button" onClick={goToSavedAnimals}>
-              View Saved Animals
-            </button>
-          </div>
+            <span className="adopter-action-card-cta">View saved</span>
+          </button>
 
-          <div className="adopter-action-card">
+          <button
+            type="button"
+            className="adopter-action-card adopter-action-card-btn"
+            onClick={goToMessages}
+            aria-label="Messages"
+          >
             <h3>Messages</h3>
             <p>Review your communication as the process moves forward.</p>
-            <button type="button" onClick={goToMessages}>
-              Open Messages
-            </button>
-          </div>
+            <span className="adopter-action-card-cta">Open messages</span>
+          </button>
         </section>
       </main>
 

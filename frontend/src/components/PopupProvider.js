@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 import "./PopupProvider.css";
@@ -12,6 +13,7 @@ const PopupContext = createContext(null);
 
 export function PopupProvider({ children }) {
   const [popup, setPopup] = useState(null);
+  const popupTimerRef = useRef(null);
 
   const getPopupIcon = useCallback((type) => {
     if (type === "success") return "✓";
@@ -31,6 +33,10 @@ export function PopupProvider({ children }) {
   const [confirm, setConfirm] = useState(null);
 
   const closePopup = useCallback(() => {
+    if (popupTimerRef.current != null) {
+      window.clearTimeout(popupTimerRef.current);
+      popupTimerRef.current = null;
+    }
     setPopup(null);
   }, []);
 
@@ -127,6 +133,11 @@ export function PopupProvider({ children }) {
         return;
       }
 
+      if (popupTimerRef.current != null) {
+        window.clearTimeout(popupTimerRef.current);
+        popupTimerRef.current = null;
+      }
+
       setPopup({
         type,
         title: title || getDefaultTitle(type),
@@ -135,7 +146,8 @@ export function PopupProvider({ children }) {
       });
 
       if (durationMs > 0) {
-        window.setTimeout(() => {
+        popupTimerRef.current = window.setTimeout(() => {
+          popupTimerRef.current = null;
           setPopup((current) =>
             current && current.message === safeMessage ? null : current
           );

@@ -1,0 +1,35 @@
+.page-state {
+  margin: 2rem auto;
+  max-width: 520px;
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e8eaed;
+}
+
+.page-state-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  color: #1a1f1a;
+}
+
+.page-state-message {
+  margin: 0;
+  color: #555;
+  line-height: 1.5;
+}
+
+.page-state-action {
+  margin-top: 1rem;
+}
+
+.page-state--error {
+  border-color: #f5c6cb;
+  background: #fff8f8;
+}
+
+.page-state--locked {
+  border-color: #ffe8a3;
+  background: #fffdf5;
+}

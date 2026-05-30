@@ -72,9 +72,61 @@
 
 .owner-hero-buttons {
   margin-top: 28px;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, 240px);
   gap: 12px;
+  max-width: 100%;
+}
+
+.owner-hero-buttons .owner-hero-action-btn {
+  width: 240px;
+  max-width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.2;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.owner-hero-buttons .owner-primary-btn {
+  background: #22c55e;
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.owner-hero-buttons .owner-primary-btn:hover {
+  filter: brightness(1.06);
+}
+
+.owner-hero-buttons .owner-secondary-btn {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(4px);
+}
+
+.owner-hero-buttons .owner-secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+@media (max-width: 560px) {
+  .owner-hero-buttons {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .owner-hero-buttons .owner-hero-action-btn {
+    width: 100%;
+  }
 }
 
 .owner-primary-btn,
@@ -85,12 +137,13 @@
   font-weight: 800;
   cursor: pointer;
   font-family: inherit;
-  border: none;
+  box-sizing: border-box;
 }
 
 .owner-primary-btn {
   background: #22c55e;
   color: #ffffff;
+  border: 1px solid transparent;
 }
 
 .owner-primary-btn:hover {

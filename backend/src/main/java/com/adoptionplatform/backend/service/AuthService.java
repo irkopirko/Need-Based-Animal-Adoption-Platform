@@ -73,6 +73,9 @@ public class AuthService {
     private AnimalRepository animalRepository;
 
     @Autowired
+    private AnimalService animalService;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -632,7 +635,7 @@ public class AuthService {
         }
 
         User user = userOptional.get();
-        user.setPassword(newPassword);
+        user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
         pendingPasswordResets.remove(email);
@@ -1056,10 +1059,8 @@ public class AuthService {
                 SQL_ANIMAL_IDS_BY_OWNER,
                 (rs, rowNum) -> rs.getLong("id"),
                 userId);
-        if (!animalIds.isEmpty()) {
-            List<Animal> ownedAnimals = new ArrayList<>(animalRepository.findAllById(animalIds));
-            savedAnimalRepository.deleteByAnimalIdIn(animalIds);
-            animalRepository.deleteAll(ownedAnimals);
+        for (Long animalId : animalIds) {
+            animalService.removeListingFromDatabase(animalId);
         }
 
         adoptionRequestRepository.deleteByUserId(userId);

@@ -137,6 +137,44 @@ public class EmailService {
         sendHtmlEmail(recipientEmail, subject, inner);
     }
 
+    public void sendAdopterInquiryDeclinedNotice(
+            String recipientEmail,
+            String animalName,
+            String listingCode,
+            Long listingId
+    ) {
+        String safeName = animalName == null || animalName.isBlank() ? "this listing" : animalName.trim();
+        String safeCode = listingCode == null || listingCode.isBlank() ? "" : listingCode.trim();
+        String idLabel = listingId == null ? "—" : String.valueOf(listingId);
+        String subject = "Your message request was declined";
+        String inner = "The owner declined your message request for <strong>" + escapeHtml(safeName)
+                + "</strong> on Pavia.<br/><br/>"
+                + "<strong>Listing ID:</strong> " + escapeHtml(idLabel)
+                + (safeCode.isEmpty() ? "" : "<br/><strong>Listing code:</strong> " + escapeHtml(safeCode))
+                + "<br/><br/>"
+                + "You can continue exploring other compatible animals from your adopter dashboard.";
+        sendHtmlEmail(recipientEmail, subject, inner);
+    }
+
+    public void sendAdopterInquiryAcceptedNotice(
+            String recipientEmail,
+            String animalName,
+            String listingCode,
+            Long listingId
+    ) {
+        String safeName = animalName == null || animalName.isBlank() ? "this listing" : animalName.trim();
+        String safeCode = listingCode == null || listingCode.isBlank() ? "" : listingCode.trim();
+        String idLabel = listingId == null ? "—" : String.valueOf(listingId);
+        String subject = "Your message request was accepted";
+        String inner = "The owner has accepted your message request for <strong>" + escapeHtml(safeName)
+                + "</strong> on Pavia.<br/><br/>"
+                + "<strong>Listing ID:</strong> " + escapeHtml(idLabel)
+                + (safeCode.isEmpty() ? "" : "<br/><strong>Listing code:</strong> " + escapeHtml(safeCode))
+                + "<br/><br/>"
+                + "You can continue the conversation from <strong>Messages</strong> in your adopter dashboard.";
+        sendHtmlEmail(recipientEmail, subject, inner);
+    }
+
     public void sendOwnerListingAdoptedThankYouNotice(
             String recipientEmail,
             String animalName,

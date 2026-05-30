@@ -12,6 +12,12 @@ public class MatchResultDto {
     private String ageGroup;
     private String energyLevel;
     private String housingLocation;
+    private String description;
+    private String gender;
+    private String groomingNeed;
+    private String specialNeeds;
+    private String goodWithChildren;
+    private String goodWithPets;
     private double matchPercentage;
     private List<String> matchReasons;
     private String coverImageUrl;
@@ -72,6 +78,24 @@ public class MatchResultDto {
 
     public String getHousingLocation() { return housingLocation; }
     public void setHousingLocation(String housingLocation) { this.housingLocation = housingLocation; }
+
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+
+    public String getGender() { return gender; }
+    public void setGender(String gender) { this.gender = gender; }
+
+    public String getGroomingNeed() { return groomingNeed; }
+    public void setGroomingNeed(String groomingNeed) { this.groomingNeed = groomingNeed; }
+
+    public String getSpecialNeeds() { return specialNeeds; }
+    public void setSpecialNeeds(String specialNeeds) { this.specialNeeds = specialNeeds; }
+
+    public String getGoodWithChildren() { return goodWithChildren; }
+    public void setGoodWithChildren(String goodWithChildren) { this.goodWithChildren = goodWithChildren; }
+
+    public String getGoodWithPets() { return goodWithPets; }
+    public void setGoodWithPets(String goodWithPets) { this.goodWithPets = goodWithPets; }
 
     public double getMatchPercentage() { return matchPercentage; }
     public void setMatchPercentage(double matchPercentage) { this.matchPercentage = matchPercentage; }

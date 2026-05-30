@@ -15,15 +15,18 @@ import {
   isOwnerProfileIncomplete,
   normalizeRole
 } from "../utils/auth";
+import { fetchOwnerInquiries } from "../utils/platformApi";
 import {
-  fetchOwnerListings,
-  loadOwnerEngagementState,
+  fetchOwnerListingCardsCached,
+  fetchOwnerInquiriesCached,
+  readOwnerListingsCache,
+  readOwnerInquiriesCache,
   ownerListingImageUrls,
-  resolveOwnerListingImageUrl
+  resolveOwnerListingImageUrl,
+  PAVIA_OWNER_ENGAGEMENT_UPDATED
 } from "../utils/ownerJourney";
 import {
   archiveOwnerListing,
-  fetchOwnerInquiries,
   formatListingCode,
   unarchiveOwnerListing
 } from "../utils/platformApi";
@@ -227,9 +230,19 @@ function OwnerListingsPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showPopup, showConfirm } = usePopup();
-  const [loading, setLoading] = useState(true);
-  const [animals, setAnimals] = useState([]);
-  const [inquiries, setInquiries] = useState([]);
+  const [loading, setLoading] = useState(() => {
+    const uid = getResolvedUserId(getStoredUser());
+    return uid == null || !readOwnerListingsCache(uid);
+  });
+  const [animals, setAnimals] = useState(() => {
+    const uid = getResolvedUserId(getStoredUser());
+    const cached = uid != null ? readOwnerListingsCache(uid) : null;
+    return cached && cached.length > 0 ? cached : [];
+  });
+  const [inquiries, setInquiries] = useState(() => {
+    const uid = getResolvedUserId(getStoredUser());
+    return uid != null ? readOwnerInquiriesCache(uid) || [] : [];
+  });
   const [strongMatchIds, setStrongMatchIds] = useState(() => new Set());
   const [tab, setTab] = useState(() => listingTabFromParams(searchParams));
   const apiBaseUrl = getApiBaseUrl();
@@ -294,32 +307,50 @@ function OwnerListingsPage() {
       navigate("/", { replace: true });
       return;
     }
-    setLoading(true);
+    const cachedListings = readOwnerListingsCache(uid);
+    const cachedInquiries = readOwnerInquiriesCache(uid);
+    if (cachedListings && cachedListings.length > 0) {
+      setAnimals(cachedListings);
+      if (cachedInquiries) {
+        setInquiries(cachedInquiries);
+      }
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
-      const [list, inqList, engagement] = await Promise.all([
-        fetchOwnerListings(uid),
-        fetchOwnerInquiries(uid),
-        loadOwnerEngagementState(uid)
+      const [allListings, inquiriesRaw] = await Promise.all([
+        fetchOwnerListingCardsCached(uid),
+        fetchOwnerInquiriesCached(uid)
       ]);
-      setAnimals(list);
-      setInquiries(Array.isArray(inqList) ? inqList : []);
-      setStrongMatchIds(
-        new Set(
-          (engagement?.matchedListings || [])
-            .map((a) => Number(a.id))
-            .filter(Number.isFinite)
-        )
+      setAnimals(Array.isArray(allListings) ? allListings : []);
+      setInquiries(Array.isArray(inquiriesRaw) ? inquiriesRaw : []);
+      const openIds = new Set(
+        (allListings || [])
+          .filter((a) => {
+            const s = listingLifecycleKey(a.listingStatus);
+            return s !== "ARCHIVED" && s !== "ADOPTED";
+          })
+          .map((a) => Number(a.id))
       );
+      const withInquiry = new Set(
+        (inquiriesRaw || [])
+          .map((i) => Number(i.animalId))
+          .filter((id) => openIds.has(id))
+      );
+      setStrongMatchIds(withInquiry);
     } catch (e) {
       console.error(e);
-      showPopup({
-        type: "error",
-        title: "Could not load",
-        message: e?.message || "Listings could not be loaded."
-      });
-      setAnimals([]);
-      setInquiries([]);
-      setStrongMatchIds(new Set());
+      if (!cachedListings) {
+        showPopup({
+          type: "error",
+          title: "Could not load",
+          message: e?.message || "Listings could not be loaded."
+        });
+        setAnimals([]);
+        setInquiries([]);
+        setStrongMatchIds(new Set());
+      }
     } finally {
       setLoading(false);
     }
@@ -327,6 +358,9 @@ function OwnerListingsPage() {
 
   useEffect(() => {
     load();
+    const onRefresh = () => load();
+    window.addEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, onRefresh);
+    return () => window.removeEventListener(PAVIA_OWNER_ENGAGEMENT_UPDATED, onRefresh);
   }, [load]);
 
   const inquiryStatsByAnimalId = useMemo(

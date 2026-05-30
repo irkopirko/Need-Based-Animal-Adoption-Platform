@@ -22,6 +22,7 @@ public class InquiryThreadDto {
     private Long adoptionCaseId;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private boolean hasMessages;
     private List<InquiryMessageDto> messages = new ArrayList<>();
 
     public Long getId() {
@@ -150,6 +151,14 @@ public class InquiryThreadDto {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public boolean isHasMessages() {
+        return hasMessages;
+    }
+
+    public void setHasMessages(boolean hasMessages) {
+        this.hasMessages = hasMessages;
     }
 
     public List<InquiryMessageDto> getMessages() {

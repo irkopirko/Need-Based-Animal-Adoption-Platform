@@ -32,6 +32,11 @@ function AdopterMyRequestsPage() {
     setLoading(true);
     const list = await fetchUserAdoptionRequests(uid);
     const sorted = [...list].sort((a, b) => {
+      const aSub = String(a.requestPhase || "").toUpperCase() === "SUBMITTED" ? 1 : 0;
+      const bSub = String(b.requestPhase || "").toUpperCase() === "SUBMITTED" ? 1 : 0;
+      if (aSub !== bSub) {
+        return bSub - aSub;
+      }
       const ta = a.requestTime ? new Date(a.requestTime).getTime() : 0;
       const tb = b.requestTime ? new Date(b.requestTime).getTime() : 0;
       return tb - ta;
@@ -49,7 +54,7 @@ function AdopterMyRequestsPage() {
     if (p === "SUBMITTED") {
       navigate(`/compatible-animals?requestId=${encodeURIComponent(String(id))}`);
     } else {
-      navigate("/adoption-request");
+      navigate(`/adoption-request?requestId=${encodeURIComponent(String(id))}`);
     }
   };
 
@@ -58,7 +63,7 @@ function AdopterMyRequestsPage() {
     if (p === "SUBMITTED") {
       navigate(`/saved-animals?requestId=${encodeURIComponent(String(id))}`);
     } else {
-      navigate("/adoption-request");
+      navigate(`/adoption-request?requestId=${encodeURIComponent(String(id))}`);
     }
   };
 
@@ -70,8 +75,8 @@ function AdopterMyRequestsPage() {
           <p className="adopter-requests-tag">Adopter</p>
           <h1>View my matches</h1>
           <p>
-            Choose a <strong>submitted</strong> adoption request to see compatible animals,
-            contact owners, and review saved listings for that request.
+            All adoption requests appear here, including <strong>drafts</strong>. For a
+            submitted request, open compatible animals or saved listings for that request.
           </p>
         </section>
         {loading ? (
@@ -121,7 +126,7 @@ function AdopterMyRequestsPage() {
                       className="adopter-requests-btn"
                       onClick={() => goMatchesForRequest(r.id, r.requestPhase)}
                     >
-                      {isSubmitted ? "Compatible animals" : "Continue draft"}
+                      {isSubmitted ? "View compatible animals" : "Continue draft"}
                     </button>
                     {isSubmitted && (
                       <button
@@ -129,7 +134,7 @@ function AdopterMyRequestsPage() {
                         className="adopter-requests-btn adopter-requests-btn-secondary"
                         onClick={() => goSavedForRequest(r.id, r.requestPhase)}
                       >
-                        Saved for this request
+                        View saved animals
                       </button>
                     )}
                   </div>

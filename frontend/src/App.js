@@ -28,46 +28,185 @@ import AdminHomePage from "./pages/AdminHomePage";
 import AdopterAdoptionsPage from "./pages/AdopterAdoptionsPage";
 import OwnerAdoptionsPage from "./pages/OwnerAdoptionsPage";
 import ChangePasswordPage from "./pages/ChangePasswordPage";
+import ProtectedRoute from "./components/ProtectedRoute";
 import { PopupProvider } from "./components/PopupProvider";
-
 
 function App() {
   return (
     <PopupProvider>
       <Router>
         <Routes>
-          <Route path="/matches" element={<MatchResultsPage />} />
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
           <Route path="/verify-email" element={<Verify2FAPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/new" element={<ResetPasswordPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/account" element={<AccountProfilePage />} />
-          <Route path="/account/change-password" element={<ChangePasswordPage />} />
-          <Route path="/adopterhomepage" element={<AdopterHomePage />} />
-          <Route path="/ownerhomepage" element={<OwnerHomePage />} />
-          <Route path="/adminhomepage" element={<AdminHomePage />} />
-          <Route path="/complete-adopter-profile" element={<CompleteAdopterProfilePage />} />
-          <Route path="/complete-owner-profile" element={<CompleteOwnerProfilePage />} />
-          <Route path="/adoption-request" element={<AdoptionRequestPage />} />
           <Route path="/about" element={<AboutUsPage />} />
           <Route path="/adopt" element={<GuestAdoptPage />} />
-          <Route path="/saved-animals" element={<SavedAnimalsPage />} />
-          <Route path="/adopter-messages" element={<AdopterMessagesPage />} />
-          <Route path="/owner-messages" element={<OwnerMessagesPage />} />
-          <Route path="/owner-requests" element={<OwnerManageRequestsPage />} />
-          <Route path="/animal/:animalId/requests" element={<AnimalOwnerRequestsPage />} />
+          <Route path="/matches" element={<MatchResultsPage />} />
+
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute>
+                <AccountProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account/change-password"
+            element={
+              <ProtectedRoute>
+                <ChangePasswordPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/adopterhomepage"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <AdopterHomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/complete-adopter-profile"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <CompleteAdopterProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/adoption-request"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <AdoptionRequestPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/saved-animals"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <SavedAnimalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/adopter-messages"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <AdopterMessagesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/compatible-animals"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <CompatibleAnimalsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-adoption-requests"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <AdopterMyRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/my-adoptions"
+            element={
+              <ProtectedRoute roles={["ADOPTER"]}>
+                <AdopterAdoptionsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/ownerhomepage"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <OwnerHomePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/complete-owner-profile"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <CompleteOwnerProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner-messages"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <OwnerMessagesPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner-requests"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <OwnerManageRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/animal/:animalId/requests"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <AnimalOwnerRequestsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/register-animal"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <RegisterAnimalPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner-listings"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <OwnerListingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/owner-adoptions"
+            element={
+              <ProtectedRoute roles={["OWNER"]}>
+                <OwnerAdoptionsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/adminhomepage"
+            element={
+              <ProtectedRoute roles={["ADMIN"]} requireAdminEmail>
+                <AdminHomePage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/animal/:id" element={<AnimalDetailPage />} />
-          <Route path="/register-animal" element={<RegisterAnimalPage />} />
-          <Route path="/owner-listings" element={<OwnerListingsPage />} />
-          <Route path="/compatible-animals" element={<CompatibleAnimalsPage />} />
-          <Route path="/my-adoption-requests" element={<AdopterMyRequestsPage />} />
-          <Route path="/my-adoptions" element={<AdopterAdoptionsPage />} />
-          <Route path="/owner-adoptions" element={<OwnerAdoptionsPage />} />
         </Routes>
       </Router>
     </PopupProvider>
   );
 }
+
 export default App;

@@ -3,7 +3,7 @@ import "../pages/OwnerMessagesPage.css";
 import OwnerAdoptionProfilePanel from "./OwnerAdoptionProfilePanel";
 import OwnerAdopterContactPanel from "./OwnerAdopterContactPanel";
 import { usePopup } from "./PopupProvider";
-import { STRONG_MATCH_THRESHOLD } from "../utils/ownerJourney";
+import { STRONG_MATCH_THRESHOLD } from "../utils/adopterJourney";
 import {
   acceptInquiry,
   completeAdoptionCase,
@@ -222,8 +222,7 @@ function OwnerInquiryThreadPanel({ inquiryId, ownerId, onUpdated }) {
   const threadStatus = normalizeInquiryStatus(thread.status);
   const showPendingActions = threadStatus === "PENDING";
   const canCompose =
-    !isInquiryRejected(thread.status) &&
-    (threadStatus === "PENDING" || threadStatus === "ACCEPTED");
+    !isInquiryRejected(thread.status) && threadStatus === "ACCEPTED";
   const caseStatus = adoptionCase?.status;
   const adoptionComplete = caseStatus === "COMPLETED";
   const canComplete =
@@ -284,8 +283,8 @@ function OwnerInquiryThreadPanel({ inquiryId, ownerId, onUpdated }) {
       {showPendingActions && (
         <div className="owner-inquiry-decision-block">
           <p className="owner-inquiry-decision-hint">
-            Review the adoption profile above, reply below if you wish, then approve or decline
-            the message request.
+            Review the adoption profile above, then approve or decline the message request. You can
+            reply after approval.
           </p>
           <div className="owner-inquiry-decision-btns">
             <button
@@ -353,14 +352,24 @@ function OwnerInquiryThreadPanel({ inquiryId, ownerId, onUpdated }) {
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             rows={3}
-            placeholder="Write your reply to the adopter…"
+            placeholder="Write your reply to the adopter… (Enter to send, Shift+Enter for new line)"
             maxLength={1000}
           />
           <button type="button" className="owner-chat-send-btn" onClick={handleSend}>
             Send reply
           </button>
         </div>
+      ) : showPendingActions ? (
+        <p className="owner-chat-closed-note">
+          Approve the message request above before you can reply to this adopter.
+        </p>
       ) : (
         <p className="owner-chat-closed-note">This thread is closed.</p>
       )}

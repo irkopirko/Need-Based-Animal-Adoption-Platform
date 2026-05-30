@@ -194,6 +194,21 @@
   background: #f0faf8;
 }
 
+.adopter-inquiry-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.adopter-inquiry-unread-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #ef4444;
+  flex-shrink: 0;
+}
+
 .adopter-inquiry-item-status-rejected {
   color: #b91c1c;
   font-weight: 700;

@@ -171,8 +171,16 @@
 }
 
 .owner-listing-card-archived {
+  filter: grayscale(0.85);
+  opacity: 0.92;
+  background: linear-gradient(180deg, #fafafa 0%, #f0f0f0 100%);
+  border-color: #d1d5db;
+}
+
+.owner-listing-card-archived .owner-listing-carousel,
+.owner-listing-card-archived .owner-listing-name,
+.owner-listing-card-archived .owner-listing-line {
   opacity: 0.88;
-  background: #fafafa;
 }
 
 .owner-listing-carousel {
@@ -271,7 +279,46 @@
 }
 
 .owner-listing-card-adopted {
-  border-color: #bfdbfe;
+  background: linear-gradient(180deg, #ecfdf5 0%, #dcfce7 100%);
+  border-color: #86efac;
+  box-shadow: 0 8px 24px rgba(134, 239, 172, 0.22);
+}
+
+.owner-listing-card-adopted .owner-listing-carousel {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  filter: saturate(0.9) sepia(0.08) hue-rotate(88deg) brightness(1.04);
+}
+
+.owner-listing-card-adopted .owner-listing-carousel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(236, 253, 245, 0.62) 0%,
+    rgba(187, 247, 208, 0.52) 100%
+  );
+  pointer-events: none;
+  z-index: 4;
+  border-radius: inherit;
+}
+
+.owner-listing-card-adopted .owner-listing-code {
+  color: #059669;
+}
+
+.owner-listing-card-adopted .owner-listing-name {
+  color: #047857;
+}
+
+.owner-listing-card-adopted .owner-listing-line {
+  color: #10b981;
+}
+
+.owner-listing-card-adopted .owner-listing-line-muted {
+  color: #34d399;
 }
 
 .owner-listing-side {

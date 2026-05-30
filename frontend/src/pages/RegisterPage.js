@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import "./RegisterPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
@@ -499,8 +499,8 @@ function RegisterPage() {
               />
 
               <span className={errors.agreeToTerms ? "checkbox-text-error" : ""}>
-                I agree to the <a href="/">Terms of Service</a> and{" "}
-                <a href="/">Privacy Policy</a>
+                I agree to the <Link to="/about">Terms of Service</Link> and{" "}
+                <Link to="/about">Privacy Policy</Link>
               </span>
             </label>
 
@@ -517,7 +517,7 @@ function RegisterPage() {
           <div className="register-divider"></div>
 
           <p className="register-login-text">
-            Already have an account? <a href="/login">Log in here</a>
+            Already have an account? <Link to="/login">Log in here</Link>
           </p>
         </section>
       </main>

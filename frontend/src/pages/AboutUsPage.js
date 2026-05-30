@@ -57,6 +57,11 @@ function AboutUsPage() {
               We aim to build trust and ensure every adoption is responsible,
               informed, and compassionate.
             </p>
+            <p>
+              Pavia does not support buying or selling animals and includes no
+              payment workflow. The platform is designed only for responsible
+              adoption decisions and private, need-based communication.
+            </p>
           </div>
 
           <div className="about-story-right">

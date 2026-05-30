@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import "./OwnerManageRequestsPage.css";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import { getStoredUser, normalizeRole } from "../utils/auth";
+import { STRONG_MATCH_THRESHOLD } from "../utils/adopterJourney";
 import {
-  loadOwnerEngagementState,
+  loadOwnerInboxState,
   resolveOwnerScenario,
   formatInquiryDate,
   listingsWithInquiries,
   PAVIA_OWNER_ENGAGEMENT_UPDATED,
-  STRONG_MATCH_THRESHOLD
+  readOwnerListingsCache,
+  readOwnerInquiriesCache
 } from "../utils/ownerJourney";
 import OwnerInquiryThreadPanel from "../components/OwnerInquiryThreadPanel";
 import {
@@ -21,10 +23,16 @@ import {
   ownerListingImageUrls,
   resolveOwnerListingImageUrl
 } from "../utils/ownerJourney";
+import { updateNavbarStateForUser } from "../utils/navbarState";
 
 function OwnerManageRequestsPage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const statusFilter = String(searchParams.get("filter") || "").toLowerCase();
+  const [loading, setLoading] = useState(() => {
+    const uid = getResolvedUserId(getStoredUser());
+    return uid == null || (!readOwnerListingsCache(uid) && !readOwnerInquiriesCache(uid));
+  });
   const [scenario, setScenario] = useState("NO_LISTINGS");
   const [engage, setEngage] = useState(null);
   const [selectedRequestId, setSelectedRequestId] = useState(null);
@@ -35,49 +43,72 @@ function OwnerManageRequestsPage() {
 
   const refresh = useCallback(async () => {
     const user = getStoredUser();
-    if (!user?.userId || normalizeRole(user.role) !== "OWNER") {
+    const resolvedOwnerId = getResolvedUserId(user);
+    if (resolvedOwnerId == null || normalizeRole(user?.role) !== "OWNER") {
       setScenario("NOT_OWNER");
       setEngage(null);
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const data = await loadOwnerEngagementState(user.userId);
-    const scen = resolveOwnerScenario({
-      hasListings: data.hasListings,
-      hasStrongMatchOnListings: data.hasStrongMatchOnListings,
-      hasInquiries: data.hasInquiries,
-      hasAnyMessages: data.hasAnyMessages
-    });
-    setEngage(data);
-    setScenario(scen);
-
-    if (
-      scen === "INQUIRY_NO_MESSAGES" ||
-      scen === "FULL"
-    ) {
-      const sorted = [...(data.inquiries || [])].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      );
-      const firstAnimalId = sorted[0]?.animalId;
-      setSelectedListingId((prev) => {
-        if (prev && sorted.some((i) => Number(i.animalId) === prev)) {
-          return prev;
-        }
-        return firstAnimalId != null ? Number(firstAnimalId) : null;
-      });
-      setSelectedRequestId((prev) => {
-        if (prev && sorted.some((i) => i.id === prev)) {
-          return prev;
-        }
-        return sorted[0]?.id || null;
-      });
-    } else {
-      setSelectedRequestId(null);
-      setSelectedListingId(null);
+    const cachedListings = readOwnerListingsCache(resolvedOwnerId);
+    const cachedInquiries = readOwnerInquiriesCache(resolvedOwnerId);
+    if (!cachedListings && !cachedInquiries) {
+      setLoading(true);
     }
-    setLoading(false);
-  }, []);
+    try {
+      const data = await loadOwnerInboxState(resolvedOwnerId, { force: false });
+      const scen = resolveOwnerScenario({
+        hasListings: data.hasListings,
+        hasStrongMatchOnListings: data.hasStrongMatchOnListings,
+        hasInquiries: data.hasInquiries,
+        hasAnyMessages: data.hasAnyMessages
+      });
+      setEngage(data);
+      setScenario(scen);
+      const pendingCount = (data.inquiries || []).filter(
+        (i) => String(i.status || "").toUpperCase() === "PENDING"
+      ).length;
+      updateNavbarStateForUser(resolvedOwnerId, {
+        ownerPendingRequests: pendingCount
+      });
+
+      if (scen === "INQUIRY_NO_MESSAGES" || scen === "FULL") {
+        let sorted = [...(data.inquiries || [])].sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        if (statusFilter === "pending") {
+          sorted = sorted.filter(
+            (i) => String(i.status || "").toUpperCase() === "PENDING"
+          );
+        } else if (statusFilter === "accepted") {
+          sorted = sorted.filter(
+            (i) => String(i.status || "").toUpperCase() === "ACCEPTED"
+          );
+        }
+        const firstAnimalId = sorted[0]?.animalId;
+        setSelectedListingId((prev) => {
+          if (prev && sorted.some((i) => Number(i.animalId) === prev)) {
+            return prev;
+          }
+          return firstAnimalId != null ? Number(firstAnimalId) : null;
+        });
+        setSelectedRequestId((prev) => {
+          if (prev && sorted.some((i) => i.id === prev)) {
+            return prev;
+          }
+          return sorted[0]?.id || null;
+        });
+      } else {
+        setSelectedRequestId(null);
+        setSelectedListingId(null);
+      }
+    } catch {
+      setEngage(null);
+      setScenario("NO_LISTINGS");
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter]);
 
   useEffect(() => {
     refresh();
@@ -87,13 +118,21 @@ function OwnerManageRequestsPage() {
   }, [refresh]);
 
   const listings = engage?.listings || [];
-  const inquiriesSorted = useMemo(
-    () =>
-      [...(engage?.inquiries || [])].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      ),
-    [engage]
-  );
+  const inquiriesSorted = useMemo(() => {
+    let rows = [...(engage?.inquiries || [])].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+    if (statusFilter === "pending") {
+      rows = rows.filter(
+        (i) => String(i.status || "").toUpperCase() === "PENDING"
+      );
+    } else if (statusFilter === "accepted") {
+      rows = rows.filter(
+        (i) => String(i.status || "").toUpperCase() === "ACCEPTED"
+      );
+    }
+    return rows;
+  }, [engage, statusFilter]);
 
   const inquiriesForListing = useMemo(() => {
     if (selectedListingId == null) {
@@ -128,11 +167,6 @@ function OwnerManageRequestsPage() {
     }
   }, [inquiriesForListing, selectedRequestId]);
 
-  const selectedInquiry = useMemo(
-    () => inquiriesForListing.find((i) => i.id === selectedRequestId),
-    [inquiriesForListing, selectedRequestId]
-  );
-
   const goToRegisterAnimal = () => {
     navigate("/register-animal");
   };
@@ -157,7 +191,7 @@ function OwnerManageRequestsPage() {
     }
   };
 
-  if (loading) {
+  if (loading && !engage) {
     return (
       <div className="owner-requests-page">
         <Navbar />
@@ -277,10 +311,15 @@ function OwnerManageRequestsPage() {
         <section className="owner-requests-hero owner-requests-hero-simple">
           <div className="owner-requests-hero-left owner-requests-hero-full">
             <p className="owner-requests-tag">Manage requests</p>
-            <h1>Message requests on your listings</h1>
+            <h1>
+              {statusFilter === "pending"
+                ? "Pending message requests"
+                : statusFilter === "accepted"
+                  ? "Accepted inquiries"
+                  : "Message requests"}
+            </h1>
             <p>
-              Only animals that received a request are listed. Select one, then review
-              the adopter&apos;s profile, adoption questionnaire, and reply in the thread.
+              Pick a listing, review the adopter&apos;s profile, approve the request, then reply.
             </p>
           </div>
         </section>

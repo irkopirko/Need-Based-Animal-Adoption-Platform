@@ -1,5 +1,6 @@
 package com.adoptionplatform.backend.controller;
 
+import com.adoptionplatform.backend.dto.AnimalMatchScoreDto;
 import com.adoptionplatform.backend.dto.MatchResultDto;
 import com.adoptionplatform.backend.service.MatchService;
 import com.adoptionplatform.backend.service.MatchSnapshotService;
@@ -34,6 +35,17 @@ public class MatchController {
             @RequestParam(required = false) Double minOverlap
     ) {
         return ResponseEntity.ok(matchService.getMatches(userId, requestId, minOverlap));
+    }
+
+    @GetMapping("/{userId}/animal/{animalId}")
+    public ResponseEntity<AnimalMatchScoreDto> getMatchForAnimal(
+            @PathVariable Long userId,
+            @PathVariable Long animalId,
+            @RequestParam(required = false) Long requestId
+    ) {
+        return matchService.getMatchForAnimal(userId, animalId, requestId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/{userId}/refresh-snapshots")
