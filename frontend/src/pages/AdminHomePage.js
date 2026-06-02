@@ -77,7 +77,6 @@ function AdminHomePage() {
     }
     try {
       await adminDeleteListing(report.animalId, user.email, getReason(report.animalId));
-      await resolveReport(report.id, user.email);
       showPopup({
         type: "success",
         title: "Listing deleted",

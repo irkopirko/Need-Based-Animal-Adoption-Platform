@@ -68,7 +68,11 @@ public class ModerationService {
         assertAdmin(adminEmail);
         Animal animal = animalRepository.findById(animalId)
                 .orElseThrow(() -> new IllegalArgumentException("Listing not found"));
-        resolveReportsForAnimal(animalId);
+        // Reports are hard-deleted together with the listing in removeListingFromDatabase().
+        // Do NOT call resolveReportsForAnimal() here: it would mark reports as RESOLVED via JPA
+        // (leaving dirty entities in the session), and the JDBC DELETE that follows would then
+        // make Hibernate fail at commit with StaleStateException because the rows it tries to
+        // flush no longer exist.
         animalService.removeListingFromDatabase(animalId);
         notifyOwner(animal, "deleted", reason);
     }

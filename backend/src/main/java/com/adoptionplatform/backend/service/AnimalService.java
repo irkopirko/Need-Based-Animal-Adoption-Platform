@@ -863,6 +863,12 @@ public class AnimalService {
         if (animalId == null) {
             throw new IllegalArgumentException("Listing id is required");
         }
+        // The dependents purge below is executed via JDBC and therefore bypasses the JPA
+        // session. Flush any pending changes first and clear the persistence context so
+        // Hibernate will not later try to UPDATE rows that the upcoming JDBC DELETEs remove
+        // (which would otherwise raise StaleStateException at commit time).
+        entityManager.flush();
+        entityManager.clear();
         purgeListingDependents(animalId);
         int removed = jdbcTemplate.update("DELETE FROM animals WHERE id = ?", animalId);
         if (removed == 0) {
