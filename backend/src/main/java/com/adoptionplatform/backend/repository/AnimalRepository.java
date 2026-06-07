@@ -65,7 +65,7 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
               a.housing_location AS housingLocation,
               a.register_time AS registerTime,
               (
-                SELECT GROUP_CONCAT(ai.image_url ORDER BY ai.sort_order ASC SEPARATOR CHAR(30))
+                SELECT GROUP_CONCAT(ai.image_url ORDER BY ai.sort_order ASC SEPARATOR 0x1e)
                 FROM animal_images ai
                 WHERE ai.animal_id = a.id
               ) AS imageUrlsPacked
@@ -112,7 +112,7 @@ public interface AnimalRepository extends JpaRepository<Animal, Long> {
               a.register_time AS registerTime,
               a.compatibility_score AS compatibilityScore,
               (
-                SELECT GROUP_CONCAT(ai.image_url ORDER BY ai.sort_order ASC SEPARATOR CHAR(30))
+                SELECT GROUP_CONCAT(ai.image_url ORDER BY ai.sort_order ASC SEPARATOR 0x1e)
                 FROM animal_images ai
                 WHERE ai.animal_id = a.id
               ) AS imageUrlsPacked
